@@ -1,0 +1,102 @@
+[gd_scene format=3 uid="uid://c181xd67fwosi"]
+
+[node name="LoginScreen" type="Control" unique_id=2048380402]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Background" type="Panel" parent="." unique_id=878216554]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="Background" unique_id=1857139177]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.3
+anchor_top = 0.3
+anchor_right = 0.7
+anchor_bottom = 0.7
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="Background/PanelContainer" unique_id=2078386266]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Background/PanelContainer/MarginContainer" unique_id=207718436]
+layout_mode = 2
+
+[node name="ServerInfoContainer" type="HBoxContainer" parent="Background/PanelContainer/MarginContainer/VBoxContainer" unique_id=1369465258]
+layout_mode = 2
+alignment = 1
+
+[node name="Label" type="Label" parent="Background/PanelContainer/MarginContainer/VBoxContainer/ServerInfoContainer" unique_id=1582949088]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "Server Address: "
+horizontal_alignment = 2
+
+[node name="LineEdit" type="LineEdit" parent="Background/PanelContainer/MarginContainer/VBoxContainer/ServerInfoContainer" unique_id=1253743422]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Your RomM server address."
+
+[node name="UserInfoContainer" type="HBoxContainer" parent="Background/PanelContainer/MarginContainer/VBoxContainer" unique_id=30093685]
+layout_mode = 2
+alignment = 1
+
+[node name="Label" type="Label" parent="Background/PanelContainer/MarginContainer/VBoxContainer/UserInfoContainer" unique_id=2114216179]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "Username: "
+horizontal_alignment = 2
+
+[node name="LineEdit" type="LineEdit" parent="Background/PanelContainer/MarginContainer/VBoxContainer/UserInfoContainer" unique_id=741375167]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Your RomM username."
+
+[node name="PasswordInfoContainer" type="HBoxContainer" parent="Background/PanelContainer/MarginContainer/VBoxContainer" unique_id=850549574]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Background/PanelContainer/MarginContainer/VBoxContainer/PasswordInfoContainer" unique_id=1233589596]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "Password: "
+horizontal_alignment = 2
+
+[node name="LineEdit" type="LineEdit" parent="Background/PanelContainer/MarginContainer/VBoxContainer/PasswordInfoContainer" unique_id=1014129848]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Your RomM password."
+secret = true
+
+[node name="APIKeyInfoContainer" type="HBoxContainer" parent="Background/PanelContainer/MarginContainer/VBoxContainer" unique_id=344868310]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Background/PanelContainer/MarginContainer/VBoxContainer/APIKeyInfoContainer" unique_id=930437178]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "API Key:"
+horizontal_alignment = 2
+
+[node name="LineEdit" type="LineEdit" parent="Background/PanelContainer/MarginContainer/VBoxContainer/APIKeyInfoContainer" unique_id=1466989955]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Get this from RomM."
+
+[node name="Button" type="Button" parent="Background/PanelContainer/MarginContainer/VBoxContainer" unique_id=1202995306]
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+text = "Login"
