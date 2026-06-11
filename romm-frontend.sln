@@ -1,6 +1,6 @@
 ﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2012
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "romm-frontend", "romm-frontend.csproj", "{6FD1DA98-E5ED-4DA4-82F4-DEB51D77D6C0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "romm-frontend", "romm-frontend.csproj", "{2A4B248D-E97F-42BB-B61B-DFC04FE0FDA4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -9,11 +9,11 @@ Global
 	ExportRelease|Any CPU = ExportRelease|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{6FD1DA98-E5ED-4DA4-82F4-DEB51D77D6C0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{6FD1DA98-E5ED-4DA4-82F4-DEB51D77D6C0}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{6FD1DA98-E5ED-4DA4-82F4-DEB51D77D6C0}.ExportDebug|Any CPU.ActiveCfg = ExportDebug|Any CPU
-		{6FD1DA98-E5ED-4DA4-82F4-DEB51D77D6C0}.ExportDebug|Any CPU.Build.0 = ExportDebug|Any CPU
-		{6FD1DA98-E5ED-4DA4-82F4-DEB51D77D6C0}.ExportRelease|Any CPU.ActiveCfg = ExportRelease|Any CPU
-		{6FD1DA98-E5ED-4DA4-82F4-DEB51D77D6C0}.ExportRelease|Any CPU.Build.0 = ExportRelease|Any CPU
+		{2A4B248D-E97F-42BB-B61B-DFC04FE0FDA4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2A4B248D-E97F-42BB-B61B-DFC04FE0FDA4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2A4B248D-E97F-42BB-B61B-DFC04FE0FDA4}.ExportDebug|Any CPU.ActiveCfg = ExportDebug|Any CPU
+		{2A4B248D-E97F-42BB-B61B-DFC04FE0FDA4}.ExportDebug|Any CPU.Build.0 = ExportDebug|Any CPU
+		{2A4B248D-E97F-42BB-B61B-DFC04FE0FDA4}.ExportRelease|Any CPU.ActiveCfg = ExportRelease|Any CPU
+		{2A4B248D-E97F-42BB-B61B-DFC04FE0FDA4}.ExportRelease|Any CPU.Build.0 = ExportRelease|Any CPU
 	EndGlobalSection
 EndGlobal

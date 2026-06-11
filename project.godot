@@ -18,6 +18,8 @@ config/icon="res://icon.svg"
 [autoload]
 
 RommAPI="*uid://c45fdarm7kidr"
+RomMAPI="*res://scripts/RomMAPI.cs"
+BackendManager="*res://scripts/BackendManager.cs"
 
 [dotnet]
 
