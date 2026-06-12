@@ -418,9 +418,7 @@ public partial class ControllerIconTexture : Texture2D
 
 	public override bool _IsPixelOpaque( int x, int y)
 	{
-		// TODO: Not exposed to GDScript; however, since this seems to be used for editor stuff, it's
-		// seemingly fine to just report all pixels as opaque. Otherwise, mouse picking for Sprite2D
-		// stops working.
+	
 		return true;
 	}
 

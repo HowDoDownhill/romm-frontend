@@ -26,6 +26,9 @@ public class GameSystem
     
     [JsonPropertyName("slug")]
     public string Slug { get; set; }
+    
+    [JsonPropertyName("igdb_slug")]
+    public string IgdbSlug { get; set; }
 }
 
 public class Game

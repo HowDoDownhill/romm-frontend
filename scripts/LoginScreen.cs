@@ -112,7 +112,7 @@ public partial class LoginScreen : Control
         {
             _backendManager.ActiveBackend = backend;
             if (_errorLabel != null) _errorLabel.Text = "Success!";
-            GetTree().ChangeSceneToFile("res://Scenes/main_scene.tscn");
+            GetTree().ChangeSceneToFile("res://Scenes/loading_screen.tscn");
         }
         else
         {

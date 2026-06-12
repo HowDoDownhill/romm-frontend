@@ -1,4 +1,5 @@
 ﻿using Godot;
+using System;
 using System.Collections.Generic;
 
 public partial class DownloadManager : Node
@@ -14,11 +15,12 @@ public partial class DownloadManager : Node
         public HttpRequest Request { get; set; }
         public string FileName { get; set; }
         public string DestinationPath { get; set; }
+        public Action<string> OnSuccessCallback { get; set; }
     }
 
     private List<Download> _activeDownloads = new List<Download>();
 
-    public void DownloadFile(string url, string destinationPath, string[] headers = null)
+    public void DownloadFile(string url, string destinationPath, string[] headers = null, Action<string> onSuccess = null)
     {
         var request = new HttpRequest();
         AddChild(request);
@@ -27,7 +29,8 @@ public partial class DownloadManager : Node
         {
             Request = request,
             FileName = destinationPath.GetFile(),
-            DestinationPath = destinationPath
+            DestinationPath = destinationPath,
+            OnSuccessCallback = onSuccess
         };
 
         _activeDownloads.Add(download);
@@ -44,14 +47,18 @@ public partial class DownloadManager : Node
 
     public override void _Process(double delta)
     {
-        foreach (var download in _activeDownloads)
+        for (int i = _activeDownloads.Count - 1; i >= 0; i--)
         {
-            if (download.Request.GetHttpClientStatus() == HttpClient.Status.Body)
+            var download = _activeDownloads[i];
+            if (download.Request != null && IsInstanceValid(download.Request))
             {
-                EmitSignal(SignalName.DownloadProgressUpdated,
-                    download.FileName,
-                    download.Request.GetDownloadedBytes(),
-                    download.Request.GetBodySize());
+                if (download.Request.GetHttpClientStatus() == HttpClient.Status.Body)
+                {
+                    EmitSignal(SignalName.DownloadProgressUpdated,
+                        download.FileName,
+                        download.Request.GetDownloadedBytes(),
+                        download.Request.GetBodySize());
+                }
             }
         }
     }
@@ -62,6 +69,8 @@ public partial class DownloadManager : Node
         {
             GD.Print($"Download completed successfully: {download.FileName}");
             EmitSignal(SignalName.DownloadCompleted, download.FileName);
+            
+            download.OnSuccessCallback?.Invoke(download.DestinationPath);
         }
         else
         {
@@ -69,6 +78,9 @@ public partial class DownloadManager : Node
         }
 
         _activeDownloads.Remove(download);
-        download.Request.QueueFree();
+        if (download.Request != null && IsInstanceValid(download.Request))
+        {
+            download.Request.QueueFree();
+        }
     }
 }

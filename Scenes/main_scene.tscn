@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://iu78vi21qhv0" path="res://scripts/MainScene.cs" id="1_52fb6"]
 [ext_resource type="PackedScene" uid="uid://cdhj70uq5atqd" path="res://Scenes/downloads_page.tscn" id="2_6l7je"]
+[ext_resource type="PackedScene" uid="uid://cffanb3xjob1c" path="res://Scenes/download_entry.tscn" id="3_jv6wh"]
 
 [node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("_mainContentContainer", "_platformControllerIcon", "_platformNameLabel", "_gameList", "_gameDetailsPanel", "_gameCoverArt", "_gameTitleLabel", "_gameDescriptionLabel", "_playDownloadButton", "_deleteButton", "_uploadButton", "_downloadsButton", "_downloadProgressContainer")]
 layout_mode = 3
@@ -12,7 +13,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_52fb6")
 _mainContentContainer = NodePath("VBoxContainer/GamesListMargin")
-_platformControllerIcon = NodePath("VBoxContainer/SystemsMargin/Panel/HBoxContainer/MarginContainer/ControllerIcon")
+_platformControllerIcon = NodePath("VBoxContainer/SystemsMargin/Panel/HBoxContainer/MarginContainer/SystemIcon")
 _platformNameLabel = NodePath("VBoxContainer/SystemsMargin/Panel/HBoxContainer/MarginContainer2/PlatformLabel")
 _gameList = NodePath("VBoxContainer/GamesListMargin/HBoxContainer/GameList")
 _gameDetailsPanel = NodePath("VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel")
@@ -60,9 +61,10 @@ theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="ControllerIcon" type="TextureRect" parent="VBoxContainer/SystemsMargin/Panel/HBoxContainer/MarginContainer" unique_id=1495603379]
+[node name="SystemIcon" type="TextureRect" parent="VBoxContainer/SystemsMargin/Panel/HBoxContainer/MarginContainer" unique_id=1495603379]
 layout_mode = 2
 expand_mode = 2
+stretch_mode = 5
 
 [node name="MarginContainer2" type="MarginContainer" parent="VBoxContainer/SystemsMargin/Panel/HBoxContainer" unique_id=431924869]
 layout_mode = 2
@@ -80,6 +82,7 @@ text = "Platform Label"
 vertical_alignment = 1
 
 [node name="GamesListMargin" type="MarginContainer" parent="VBoxContainer" unique_id=749665635]
+visible = false
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/margin_left = 10
@@ -184,7 +187,6 @@ layout_mode = 2
 text = "Upload"
 
 [node name="DownloadsMargin" type="MarginContainer" parent="VBoxContainer" unique_id=1554522468]
-visible = false
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/margin_left = 10
@@ -192,8 +194,37 @@ theme_override_constants/margin_top = 1
 theme_override_constants/margin_right = 10
 theme_override_constants/margin_bottom = 1
 
-[node name="DownloadsPage" parent="VBoxContainer/DownloadsMargin" unique_id=141579046 instance=ExtResource("2_6l7je")]
+[node name="DownloadsPage" parent="VBoxContainer/DownloadsMargin" unique_id=141579046 node_paths=PackedStringArray("_downloadsVBox") instance=ExtResource("2_6l7je")]
 layout_mode = 2
+_downloadsVBox = NodePath("VBoxContainer3/VBoxContainer2")
+_downloadEntryScene = ExtResource("3_jv6wh")
+
+[node name="VBoxContainer3" type="VBoxContainer" parent="VBoxContainer/DownloadsMargin/DownloadsPage" unique_id=888459564]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer2" type="VBoxContainer" parent="VBoxContainer/DownloadsMargin/DownloadsPage/VBoxContainer3" unique_id=1354520381]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer/DownloadsMargin/DownloadsPage/VBoxContainer3" unique_id=1154351311]
+layout_mode = 2
+size_flags_horizontal = 8
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="Button" type="Button" parent="VBoxContainer/DownloadsMargin/DownloadsPage/VBoxContainer3/MarginContainer" unique_id=1340347745]
+layout_mode = 2
+size_flags_horizontal = 8
+theme_type_variation = &"FlatButton"
+text = "Cancel Download
+"
 
 [node name="MarginContainer" type="MarginContainer" parent="VBoxContainer" unique_id=1594448033]
 layout_mode = 2
@@ -228,4 +259,5 @@ layout_mode = 2
 
 [node name="Button" type="Button" parent="VBoxContainer/MarginContainer/Panel/HBoxContainer/MarginContainer/HBoxContainer" unique_id=1665320228]
 layout_mode = 2
-text = "Downloads"
+theme_type_variation = &"FlatButton"
+text = "Toggle Downloads"

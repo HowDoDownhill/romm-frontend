@@ -4,8 +4,9 @@ using System.Collections.Generic;
 public partial class DownloadProgressUI : Panel
 {
     [Export] private VBoxContainer _downloadsVBox;
+    [Export] private PackedScene _downloadEntryScene;
 	
-    private Dictionary<string, ProgressBar> _progressBars = new Dictionary<string, ProgressBar>();
+    private Dictionary<string, DownloadEntryUI> _downloadEntries = new Dictionary<string, DownloadEntryUI>();
     private DownloadManager _downloadManager;
 
     public override void _Ready()
@@ -17,32 +18,39 @@ public partial class DownloadProgressUI : Panel
 
     private void OnDownloadProgressUpdated(string fileName, long current, long total)
     {
-        if (!_progressBars.ContainsKey(fileName))
+        if (!_downloadEntries.ContainsKey(fileName))
         {
-            var progressBar = new ProgressBar
+            if (_downloadEntryScene == null)
             {
-                MinValue = 0,
-                MaxValue = 100,
-                Value = 0
-            };
-            var label = new Label { Text = fileName };
-            _downloadsVBox.AddChild(label);
-            _downloadsVBox.AddChild(progressBar);
-            _progressBars[fileName] = progressBar;
+                GD.PrintErr("DownloadProgressUI: DownloadEntryScene is not assigned!");
+                return;
+            }
+
+            var entryUI = _downloadEntryScene.Instantiate<DownloadEntryUI>();
+            _downloadsVBox.AddChild(entryUI);
+            entryUI.SetFileName(fileName);
+            
+            _downloadEntries[fileName] = entryUI;
         }
 
-        double percentage = total > 0 ? (double)current / total * 100 : 0;
-        _progressBars[fileName].Value = percentage;
+        var entry = _downloadEntries[fileName];
+        entry.UpdateProgress(current, total);
+    }
+
+    public void SetDownloadStatus(string fileName, string status)
+    {
+        if (_downloadEntries.TryGetValue(fileName, out var entry))
+        {
+            entry.SetStatus(status);
+        }
     }
 
     private void OnDownloadCompleted(string fileName)
     {
-        if (_progressBars.TryGetValue(fileName, out var progressBar))
+        if (_downloadEntries.TryGetValue(fileName, out var entry))
         {
-            var label = progressBar.GetParent().GetChild<Label>(progressBar.GetIndex() - 1);
-            progressBar.QueueFree();
-            label.QueueFree();
-            _progressBars.Remove(fileName);
+            entry.QueueFree();
+            _downloadEntries.Remove(fileName);
         }
     }
 }
