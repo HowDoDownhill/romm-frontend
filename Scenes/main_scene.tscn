@@ -3,8 +3,9 @@
 [ext_resource type="Script" uid="uid://iu78vi21qhv0" path="res://scripts/main/MainScene.cs" id="1_6l7je"]
 [ext_resource type="PackedScene" uid="uid://cdhj70uq5atqd" path="res://scenes/downloads_list/downloads_page.tscn" id="2_6l7je"]
 [ext_resource type="Texture2D" uid="uid://dxgpruhh7d20e" path="res://assets/background/peak_background.png" id="2_7ykc4"]
+[ext_resource type="PackedScene" uid="uid://cffanb3xjob1c" path="res://scenes/downloads_list/download_entry.tscn" id="4_pu3yx"]
 
-[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "gameListContainer", "gameList", "detailsPanelContainer", "gameCover", "gameTitle", "gameDescription", "playDownloadButton", "deleteButton", "downloadsListContainer", "footerButtonsContainer", "DownloadsPageToggle")]
+[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "gameListContainer", "gameList", "detailsPanelContainer", "gameCover", "gameTitle", "gameDescription", "playDownloadButton", "deleteButton", "downloadsListContainer", "downloadProgressUI", "footerButtonsContainer", "downloadsPageToggle", "refreshGamesButton")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -24,8 +25,10 @@ gameDescription = NodePath("Background/VBoxContainer/GamesListContainer/HBoxCont
 playDownloadButton = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/ButtonsMargin/ButtonsContainer/PlayButton")
 deleteButton = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/ButtonsMargin/ButtonsContainer/DeleteButton")
 downloadsListContainer = NodePath("Background/VBoxContainer/DownloadsPageContainer")
+downloadProgressUI = NodePath("Background/VBoxContainer/DownloadsPageContainer/DownloadsPage")
 footerButtonsContainer = NodePath("Background/VBoxContainer/FooterButtonsContainer")
-DownloadsPageToggle = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/MarginContainer/HBoxContainer/DownloadPageToggle")
+downloadsPageToggle = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/DownloadsButtonConstainer/DownloadPageToggle")
+refreshGamesButton = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/RefreshButtonContainer/RefreshGamesButton")
 
 [node name="Background" type="TextureRect" parent="." unique_id=188783889]
 layout_mode = 1
@@ -101,6 +104,7 @@ theme_override_constants/separation = 10
 [node name="GameList" type="ItemList" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer" unique_id=2021837004]
 layout_mode = 2
 size_flags_horizontal = 3
+fixed_icon_size = Vector2i(24, 24)
 
 [node name="Panel" type="Panel" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer" unique_id=1330960290]
 layout_mode = 2
@@ -116,6 +120,7 @@ grow_horizontal = 2
 grow_vertical = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 0.3
+alignment = 1
 
 [node name="ImageMargin" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox" unique_id=92748540]
 layout_mode = 2
@@ -126,7 +131,6 @@ theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
 [node name="GameImage" type="TextureRect" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/ImageMargin" unique_id=477149517]
-clip_contents = true
 layout_mode = 2
 size_flags_vertical = 0
 expand_mode = 5
@@ -157,12 +161,14 @@ theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
 [node name="GameDesc" type="RichTextLabel" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/DescMargin" unique_id=313761642]
+clip_contents = false
 layout_mode = 2
 horizontal_alignment = 1
 vertical_alignment = 1
 
 [node name="ButtonsMargin" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox" unique_id=1979380459]
 layout_mode = 2
+size_flags_vertical = 10
 theme_override_constants/margin_left = 5
 theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
@@ -192,9 +198,11 @@ theme_override_constants/margin_top = 1
 theme_override_constants/margin_right = 10
 theme_override_constants/margin_bottom = 1
 
-[node name="DownloadsPage" parent="Background/VBoxContainer/DownloadsPageContainer" unique_id=141579046 instance=ExtResource("2_6l7je")]
+[node name="DownloadsPage" parent="Background/VBoxContainer/DownloadsPageContainer" unique_id=141579046 node_paths=PackedStringArray("downloadsVBox", "cancelDownloadButton") instance=ExtResource("2_6l7je")]
 layout_mode = 2
-script = null
+downloadsVBox = NodePath("VBoxContainer3/VBoxContainer2")
+_downloadEntryScene = ExtResource("4_pu3yx")
+cancelDownloadButton = NodePath("VBoxContainer3/MarginContainer/CancleButton")
 
 [node name="VBoxContainer3" type="VBoxContainer" parent="Background/VBoxContainer/DownloadsPageContainer/DownloadsPage" unique_id=888459564]
 layout_mode = 1
@@ -244,19 +252,32 @@ grow_horizontal = 2
 grow_vertical = 2
 alignment = 2
 
-[node name="MarginContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer" unique_id=775250903]
+[node name="RefreshButtonContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer" unique_id=2067252156]
 layout_mode = 2
-size_flags_horizontal = 3
+size_flags_horizontal = 8
+size_flags_vertical = 9
 theme_override_constants/margin_left = 5
 theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="HBoxContainer" type="HBoxContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/MarginContainer" unique_id=900729286]
+[node name="RefreshGamesButton" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/RefreshButtonContainer" unique_id=529449134]
 layout_mode = 2
 size_flags_horizontal = 8
+theme_type_variation = &"FlatButton"
+text = "Refresh Games
+"
 
-[node name="DownloadPageToggle" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/MarginContainer/HBoxContainer" unique_id=1665320228]
+[node name="DownloadsButtonConstainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer" unique_id=775250903]
+layout_mode = 2
+size_flags_horizontal = 8
+size_flags_vertical = 9
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="DownloadPageToggle" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/DownloadsButtonConstainer" unique_id=1665320228]
 layout_mode = 2
 size_flags_horizontal = 8
 theme_type_variation = &"FlatButton"

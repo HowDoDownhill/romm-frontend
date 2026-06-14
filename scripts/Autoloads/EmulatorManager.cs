@@ -9,44 +9,60 @@ using System.Threading.Tasks;
 using FileAccess = Godot.FileAccess;
 using DirAccess = Godot.DirAccess;
 
+public class EmulatorMeta
+{
+    [JsonPropertyName("name")]
+    public string Name { get; set; }
+
+    [JsonPropertyName("executable_name")]
+    public Dictionary<string, string> ExecutableName { get; set; }
+
+    [JsonPropertyName("launch_args")]
+    public string LaunchArgs { get; set; }
+    
+    [JsonPropertyName("emulator_dir_name")]
+    public Dictionary<string, string> EmulatorDirName { get; set; }
+}
+
 public partial class EmulatorManager : Node
 {
-    private const string EmulatorsBasePath = "user://emulators/";
-    private const string InstallScriptsBasePath = "user://install_scripts/";
-    private const string EmulatorMapPath = "user://install_scripts/emulator_map.json";
+    private string emulatorMapPath;
+    private string executableMapPath;
 
-    private Dictionary<string, string> _emulatorMap = new Dictionary<string, string>();
+    private Dictionary<string, string> emulatorMap = new Dictionary<string, string>();
+
+    private AppInstance appInstance;
+
+    public MainScene mainScene;
 
     public override void _Ready()
     {
-        EnsureDirectoriesExist();
+        appInstance = GetNode<AppInstance>("/root/AppInstance");
+        appInstance.emulatorManager = this; 
+
+        SetPaths();
         LoadOrGenerateEmulatorMap();
     }
 
-    private void EnsureDirectoriesExist()
+    private void SetPaths()
     {
-        if (!DirAccess.DirExistsAbsolute(EmulatorsBasePath))
-        {
-            DirAccess.MakeDirRecursiveAbsolute(EmulatorsBasePath);
-        }
-
-        if (!DirAccess.DirExistsAbsolute(InstallScriptsBasePath))
-        {
-            DirAccess.MakeDirRecursiveAbsolute(InstallScriptsBasePath);
-        }
+        emulatorMapPath = Path.Combine(appInstance.configManager.EmulatorsPath, "EmulatorMap.json");
+        GD.Print(emulatorMapPath);
+        executableMapPath = Path.Combine(appInstance.configManager.EmulatorsPath, "ExecutableMap.json");
+        GD.Print(executableMapPath);
     }
 
     private void LoadOrGenerateEmulatorMap()
     {
-        if (!FileAccess.FileExists(EmulatorMapPath))
+        if (!FileAccess.FileExists(emulatorMapPath) || !FileAccess.FileExists(executableMapPath))
         {
-            GenerateDefaultEmulatorMap();
+            GenerateDefaultMaps();
         }
 
         try
         {
-            string jsonString = FileAccess.GetFileAsString(EmulatorMapPath);
-            _emulatorMap = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonString);
+            string jsonString = FileAccess.GetFileAsString(emulatorMapPath);
+            emulatorMap = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonString);
             GD.Print("Loaded emulator map from user directory.");
         }
         catch (Exception e)
@@ -55,40 +71,17 @@ public partial class EmulatorManager : Node
         }
     }
 
-    private void GenerateDefaultEmulatorMap()
-    {
-        var defaultMap = new Dictionary<string, string>
-        {
-            { "nes,fds", "mesen" },
-            { "snes,sfam", "snes9x" },
-            { "n64", "rmg" },
-            { "ngc,wii", "dolphin" },
-            { "gb,gbc,gba", "mgba" },
-            { "nds", "melonDS" },
-            { "psx", "duckstation" },
-            { "ps2", "pcsx2" },
-            { "psp", "ppsspp" },
-            { "genesis,megadrive,sega32x,segacd", "picodrive" }
-        };
-
-        try
-        {
-            string jsonString = JsonSerializer.Serialize(defaultMap, new JsonSerializerOptions { WriteIndented = true });
-            using var file = FileAccess.Open(EmulatorMapPath, FileAccess.ModeFlags.Write);
-            file.StoreString(jsonString);
-            GD.Print("Generated default emulator map.");
-        }
-        catch (Exception e)
-        {
-            GD.PrintErr($"Failed to generate default emulator map: {e.Message}");
-        }
-    }
-
     public string GetMappedEmulator(string systemSlug)
     {
         if (string.IsNullOrEmpty(systemSlug)) return null;
 
-        foreach (var kvp in _emulatorMap)
+        if (emulatorMap.ContainsKey(systemSlug))
+        {
+            return emulatorMap[systemSlug]; 
+        }
+        
+        /*
+        foreach (var kvp in emulatorMap)
         {
             var slugs = kvp.Key.Split(',');
             foreach (var slug in slugs)
@@ -99,6 +92,7 @@ public partial class EmulatorManager : Node
                 }
             }
         }
+        */
         return null;
     }
 
@@ -106,7 +100,7 @@ public partial class EmulatorManager : Node
     {
         if (string.IsNullOrEmpty(emulatorName)) return false;
 
-        string metaPath = InstallScriptsBasePath.PathJoin(emulatorName).PathJoin("meta.json");
+        string metaPath = appInstance.configManager.InstallScriptsPath.PathJoin(emulatorName).PathJoin("meta.json");
         if (!FileAccess.FileExists(metaPath))
         {
             return false;
@@ -124,12 +118,15 @@ public partial class EmulatorManager : Node
             {
                  return false;
             }
+
+            string installDir = appInstance.configManager.EmulatorsPath.PathJoin(emulatorName); 
             
-            string installDir = ProjectSettings.GlobalizePath(EmulatorsBasePath.PathJoin(meta.EmulatorDirName[osName]));
             string executableRelativePath = meta.ExecutableName[osName];
             string fullExecutablePath = Path.Combine(installDir, executableRelativePath);
-            
-            return System.IO.File.Exists(fullExecutablePath);
+            fullExecutablePath = Path.GetFullPath(fullExecutablePath);
+            GD.Print(fullExecutablePath);
+
+            return FileAccess.FileExists(fullExecutablePath);
         }
         catch (Exception e)
         {
@@ -137,10 +134,10 @@ public partial class EmulatorManager : Node
              return false;
         }
     }
-
+    
     public async Task InstallEmulator(string emulatorName)
     {
-        string emulatorScriptDir = InstallScriptsBasePath.PathJoin(emulatorName);
+        string emulatorScriptDir = appInstance.configManager.InstallScriptsPath.PathJoin(emulatorName);
         string metaPath = emulatorScriptDir.PathJoin("meta.json");
         
         if (!FileAccess.FileExists(metaPath))
@@ -176,7 +173,9 @@ public partial class EmulatorManager : Node
             return;
         }
 
-        await RunInstallScript(scriptPath, EmulatorsBasePath, osName);
+        await RunInstallScript(scriptPath, appInstance.configManager.EmulatorsPath, osName);
+        mainScene.UpdateDetailsPanelButtons(mainScene.currentlySelectedGame);  
+
     }
 
     private Task RunInstallScript(string scriptPath, string installDir, string osName)
@@ -248,7 +247,7 @@ public partial class EmulatorManager : Node
             return;
         }
 
-        string metaPath = InstallScriptsBasePath.PathJoin(mappedEmulator).PathJoin("meta.json");
+        string metaPath = appInstance.configManager.InstallScriptsPath.PathJoin(mappedEmulator).PathJoin("meta.json");
         
         if (!FileAccess.FileExists(metaPath))
         {
@@ -269,12 +268,18 @@ public partial class EmulatorManager : Node
                  return;
             }
 
-            string installDir = ProjectSettings.GlobalizePath(EmulatorsBasePath.PathJoin(meta.EmulatorDirName[osName]));
+            string installDir = appInstance.configManager.EmulatorsPath + meta.EmulatorDirName[osName];
             string executableRelativePath = meta.ExecutableName[osName];
             string fullExecutablePath = Path.Combine(installDir, executableRelativePath);
+
+            string romPath = ProjectSettings.GlobalizePath(Path.Combine(
+                appInstance.configManager.RomsPath, 
+                game.System.Slug, 
+                game.Files[0].FileName));
             
-            string romPath = ProjectSettings.GlobalizePath(game.Path);
-            string arguments = meta.LaunchArgs.Replace("{rom_path}", $"\"{romPath}\"");
+            string arguments = meta.LaunchArgs;
+            arguments = arguments.Replace("{rom_path}", romPath);
+            
 
             GD.Print($"Launching: {fullExecutablePath} {arguments}"); 
             
@@ -303,19 +308,71 @@ public partial class EmulatorManager : Node
             GD.PrintErr($"Failed to launch emulator: {ex.Message}");
         }
     }
-}
-
-public class EmulatorMeta
-{
-    [JsonPropertyName("name")]
-    public string Name { get; set; }
-
-    [JsonPropertyName("executable_name")]
-    public Dictionary<string, string> ExecutableName { get; set; }
-
-    [JsonPropertyName("launch_args")]
-    public string LaunchArgs { get; set; }
     
-    [JsonPropertyName("emulator_dir_name")]
-    public Dictionary<string, string> EmulatorDirName { get; set; }
+    private void GenerateDefaultMaps()
+    {
+        var platformEmulatorMap = new Dictionary<string, string>
+        {
+            {"ngc", "dolphin"},
+            {"wii", "dolphin"},
+            {"snes", "snes9x"},
+            {"n64", "mupen64plus"},
+            {"nes", "nestopia"},
+            {"gb", "mGBA"},
+            {"gba", "mGBA"},
+            {"nds", "melonDS"},
+            {"psx", "DuckStation"},
+            {"ps2", "PCSX2"},
+            {"ps3", "RPCS3"},
+            {"ps4", "shadPS4"},
+            {"psp", "ppsspp"},
+            {"sega32", "ares"},
+            {"segacd", "ares"},
+            {"sms", "ares"},
+            {"genesis", "ares"}
+        };
+        
+        try
+        {
+            string jsonString = JsonSerializer.Serialize(platformEmulatorMap, new JsonSerializerOptions { WriteIndented = true });
+            using var file = FileAccess.Open(emulatorMapPath, FileAccess.ModeFlags.Write);
+            file.StoreString(jsonString);
+            GD.Print("Generated default emulator map.");
+        }
+        
+        catch (Exception e)
+        {
+            GD.PrintErr($"Failed to generate default emulator map: {e.Message}");
+        }
+
+        var platformExecutableMap = new Dictionary<string, string>
+        {
+            { "dolphin", "Dolphin.exe" },
+            { "snes9x", "snes9x-x64.exe" },
+            { "mupen64plus", "mupen64plus.exe" },
+            { "nestopia", "nestopia.exe" },
+            { "mGBA", "mgba.exe" },
+            { "melonDS", "melonDS.exe" },
+            { "DuckStation", "duckstation-qt.exe" },
+            { "PCSX2", "pcsx2-qt.exe" },
+            { "RPCS3", "rpcs3.exe" },
+            { "shadPS4", "shadps4.exe" },
+            { "ppsspp", "PPSSPPWindows64.exe" },
+            { "ares", "ares.exe" }
+        };
+        try
+        {
+            string jsonString = JsonSerializer.Serialize(executableMapPath, new JsonSerializerOptions { WriteIndented = true });
+            using var file = FileAccess.Open(executableMapPath, FileAccess.ModeFlags.Write);
+            file.StoreString(jsonString);
+            GD.Print("Generated default executable map.");
+        }
+        
+        catch (Exception e)
+        {
+            GD.PrintErr($"Failed to generate default exectuable map: {e.Message}");
+        }
+    }
 }
+
+

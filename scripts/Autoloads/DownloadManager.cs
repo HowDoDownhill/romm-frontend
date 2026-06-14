@@ -10,6 +10,14 @@ public partial class DownloadManager : Node
     [Signal]
     public delegate void DownloadCompletedEventHandler(string fileName, bool success);
 
+    private AppInstance appInstance;
+
+    public override void _Ready()
+    {
+        appInstance = GetNode<AppInstance>("/root/AppInstance");
+        appInstance.downloadManager = this; 
+    }
+
     private class Download
     {
         public HttpRequest Request { get; set; }
@@ -18,7 +26,7 @@ public partial class DownloadManager : Node
         public System.Action<string> CompletionCallback { get; set; }
     }
 
-    private List<Download> _activeDownloads = new List<Download>();
+    private List<Download> activeDownloads = new List<Download>();
 
     public void DownloadFile(string url, string destinationPath, string[] headers, System.Action<string> onComplete)
     {
@@ -33,7 +41,7 @@ public partial class DownloadManager : Node
             CompletionCallback = onComplete
         };
 
-        _activeDownloads.Add(download);
+        activeDownloads.Add(download);
 
         request.DownloadFile = destinationPath;
         request.UseThreads = true;
@@ -61,7 +69,7 @@ public partial class DownloadManager : Node
 
     public override void _Process(double delta)
     {
-        foreach (var download in _activeDownloads.ToList())
+        foreach (var download in activeDownloads.ToList())
         {
             if (download.Request.GetHttpClientStatus() == HttpClient.Status.Body)
             {
@@ -75,7 +83,7 @@ public partial class DownloadManager : Node
 
     public void CancelDownload(string fileName)
     {
-        var downloadToCancel = _activeDownloads.FirstOrDefault(d => d.FileName == fileName);
+        var downloadToCancel = activeDownloads.FirstOrDefault(d => d.FileName == fileName);
         if (downloadToCancel != null)
         {
             GD.Print($"Cancelling download: {fileName}");
@@ -104,7 +112,7 @@ public partial class DownloadManager : Node
 
         EmitSignal(SignalName.DownloadCompleted, download.FileName, success);
         
-        _activeDownloads.Remove(download);
+        activeDownloads.Remove(download);
         download.Request.QueueFree();
     }
 }
