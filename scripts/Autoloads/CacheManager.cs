@@ -15,6 +15,8 @@ public partial class CacheManager : Node
     public override void _Ready()
     {
         appInstance = GetNode<AppInstance>("/root/AppInstance");
+        appInstance.cacheManager = this; 
+        
         SetCacheLocations();
     }
 
@@ -22,14 +24,14 @@ public partial class CacheManager : Node
     {
         if(OS.HasFeature("editor"))
         {
-            SystemsCachePath = "res://systems.cache";
-            GamesCachePath = "res://games.cache";
+            SystemsCachePath = ProjectSettings.GlobalizePath("res://systems.cache");
+            GamesCachePath = ProjectSettings.GlobalizePath("res://games.cache");
         }
 
         else
         {
-            SystemsCachePath = Path.Combine(OS.GetExecutablePath(), "/systems.cache");
-            GamesCachePath = Path.Combine(OS.GetExecutablePath(), "/games.cache");
+            SystemsCachePath = OS.GetExecutablePath().GetBaseDir() + "/systems.cache";
+            GamesCachePath = OS.GetExecutablePath().GetBaseDir() + "/games.cache";
         }
     }
     public void SaveCache(List<GameSystem> systems, Dictionary<int, List<Game>> gameCache)
@@ -37,6 +39,14 @@ public partial class CacheManager : Node
         SaveJson(SystemsCachePath, systems);
         SaveJson(GamesCachePath, gameCache);
         GD.Print("Saved systems and games to cache.");
+    }
+
+    public void rebuildGameCache()
+    {
+        File.Delete(SystemsCachePath);
+        File.Delete(GamesCachePath);
+        
+        GetTree().ChangeSceneToFile("res://scenes/login/loading_screen.tscn");
     }
 
     public (List<GameSystem> systems, Dictionary<int, List<Game>> games) LoadCache()

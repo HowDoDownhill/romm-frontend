@@ -16,9 +16,12 @@ public partial class RomMAPI : Node
     private string _authToken;
     private bool _useBasicAuth = false;
 
+    private AppInstance appInstance;
+
     public override void _Ready()
     {
-        
+        appInstance = GetNode<AppInstance>("/root/AppInstance");
+        appInstance.rommApi = this; 
     }
 
     public async Task<(bool isSuccess, string errorMessage)> AuthenticateAsync(string username, string password, string host, string apiKey)
@@ -192,5 +195,93 @@ public partial class RomMAPI : Node
             return new string[0];
         }
         return new string[] { $"Authorization: {_httpClient.DefaultRequestHeaders.Authorization}" };
+    }
+
+    // --- Firmware Methods ---
+
+    public async Task<List<Firmware>> GetFirmwareAsync(int? platformId = null)
+    {
+        try
+        {
+            string requestUrl = $"{apiHost}/api/firmware";
+            if (platformId.HasValue)
+            {
+                requestUrl += $"?platform_id={platformId.Value}";
+            }
+
+            GD.Print($"Requesting firmware from URL: {requestUrl}");
+            HttpResponseMessage response = await _httpClient.GetAsync(requestUrl);
+
+            if (response.IsSuccessStatusCode)
+            {
+                string responseBody = await response.Content.ReadAsStringAsync();
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                List<Firmware> firmwareList = JsonSerializer.Deserialize<List<Firmware>>(responseBody, options);
+                
+                return firmwareList ?? new List<Firmware>();
+            }
+            else
+            {
+                GD.PrintErr($"Failed to fetch firmware. Status code: {response.StatusCode}");
+            }
+        }
+        catch (HttpRequestException e)
+        {
+            GD.PrintErr($"GetFirmware request failed: {e.Message}");
+        }
+        catch (JsonException e)
+        {
+            GD.PrintErr($"GetFirmware JSON deserialization failed: {e.Message}");
+        }
+        catch (Exception e)
+        {
+            GD.PrintErr($"An unexpected error occurred: {e.Message}");
+        }
+
+        return new List<Firmware>();
+    }
+
+    public async Task<Firmware> GetFirmwareByIdAsync(int id)
+    {
+        try
+        {
+            string requestUrl = $"{apiHost}/api/firmware/{id}";
+            GD.Print($"Requesting firmware from URL: {requestUrl}");
+            
+            HttpResponseMessage response = await _httpClient.GetAsync(requestUrl);
+
+            if (response.IsSuccessStatusCode)
+            {
+                string responseBody = await response.Content.ReadAsStringAsync();
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                
+                return JsonSerializer.Deserialize<Firmware>(responseBody, options);
+            }
+            else
+            {
+                GD.PrintErr($"Failed to fetch firmware ID {id}. Status code: {response.StatusCode}");
+            }
+        }
+        catch (HttpRequestException e)
+        {
+            GD.PrintErr($"GetFirmwareById request failed: {e.Message}");
+        }
+        catch (JsonException e)
+        {
+            GD.PrintErr($"GetFirmwareById JSON deserialization failed: {e.Message}");
+        }
+        catch (System.Exception e)
+        {
+            GD.PrintErr($"An unexpected error occurred: {e.Message}");
+        }
+
+        return null;
+    }
+
+    public string GetFirmwareDownloadUrl(Firmware firmware)
+    {
+        if (firmware == null) return null;
+        
+        return $"{apiHost}/api/firmware/download?firmware_ids={firmware.Id}";
     }
 }

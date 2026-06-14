@@ -13,14 +13,20 @@ public partial class ConfigManager : Node
     public string EmulatorsPath { get; private set; }
     public string DownloadsPath { get; private set; }
     public string InstallScriptsPath { get; private set; }
+    public string ToolsPath { get; private set; }
     public string RomMHost { get; private set; }
     public string RomMUsername { get; private set; }
     public string RomMPassword { get; private set; }
     public string RomMApiKey { get; private set; }
     public bool RomMValidLoginLastUsed { get; private set; }
 
+    private AppInstance appInstance;
+
     public override void _Ready()
     {
+        appInstance = GetNode<AppInstance>("/root/AppInstance");
+        appInstance.configManager = this; 
+        
         ChooseRootDir();
         CheckFilesystem();
         LoadConfig();
@@ -30,12 +36,12 @@ public partial class ConfigManager : Node
     {
         if (OS.HasFeature("editor"))
         {
-            rootDir = "res://";
-            
+            rootDir = ProjectSettings.GlobalizePath("res://");
+
         }
         else
         {
-            rootDir = OS.GetExecutablePath();
+            rootDir = OS.GetExecutablePath().GetBaseDir();
         }
         configDir = rootDir + "/config.cfg";
         config = new ConfigFile();
@@ -43,7 +49,7 @@ public partial class ConfigManager : Node
     
     private void CheckFilesystem()
     {
-        if(!DirAccess.DirExistsAbsolute(rootDir + "/roms/"));
+        if(!DirAccess.DirExistsAbsolute(rootDir + "/roms/"))
         {
             DirAccess.MakeDirAbsolute(rootDir + "/roms/");
         }
@@ -67,6 +73,11 @@ public partial class ConfigManager : Node
         {
             DirAccess.MakeDirAbsolute(rootDir + "/install_scripts/");
         }
+        
+        if (!DirAccess.DirExistsAbsolute(rootDir + "/tools/"))
+        {
+            DirAccess.MakeDirAbsolute(rootDir + "/tools/");
+        }
     }
 
     private void LoadConfig()
@@ -80,10 +91,11 @@ public partial class ConfigManager : Node
         }
 
         RomsPath = (string)config.GetValue("Paths", "RomsRomsPath", $"{rootDir}/roms/");
-        BiosPath = (string)config.GetValue("Paths", "BiosPath", $"{rootDir} + /bios/");
-        EmulatorsPath = (string)config.GetValue("Paths", "EmulatorsPath", $"{rootDir} + /emulators/");
-        DownloadsPath = (string)config.GetValue("Paths", "DownloadsPath", $"{rootDir} + /downloads/");
-        InstallScriptsPath = (string)config.GetValue("Paths", "InstallScriptsPath", $"{rootDir} + /install_scripts/");
+        BiosPath = (string)config.GetValue("Paths", "BiosPath", $"{rootDir}/bios/");
+        EmulatorsPath = (string)config.GetValue("Paths", "EmulatorsPath", $"{rootDir}/emulators/");
+        DownloadsPath = (string)config.GetValue("Paths", "DownloadsPath", $"{rootDir}/downloads/");
+        InstallScriptsPath = (string)config.GetValue("Paths", "InstallScriptsPath", $"{rootDir}/install_scripts/");
+        ToolsPath = (string)config.GetValue("Paths", "ToolsPath", $"{rootDir}/tools/");
         RomMHost = (string)config.GetValue("RomM", "Host", "");
         RomMUsername = (string)config.GetValue("RomM", "Username", "");
         RomMPassword = (string)config.GetValue("RomM", "Password", "");
@@ -94,11 +106,12 @@ public partial class ConfigManager : Node
 
     private void SetDefaultConfig()
     {
-        RomsPath = rootDir + "/roms/";
-        BiosPath = rootDir + "/bios/";
-        EmulatorsPath = rootDir + "/emulators/";
-        DownloadsPath = rootDir + "/downloads/";
-        InstallScriptsPath = rootDir + "/install_scripts/";
+        RomsPath = $"{rootDir}/roms/";
+        BiosPath = $"{rootDir}/bios/";
+        EmulatorsPath = $"{rootDir}/emulators/";
+        DownloadsPath = $"{rootDir}/downloads/";
+        InstallScriptsPath = $"{rootDir}/install_scripts/";
+        ToolsPath = $"{rootDir}/tools/";
         RomMHost = "";
         RomMUsername = "";
         RomMPassword = "";
@@ -110,11 +123,13 @@ public partial class ConfigManager : Node
         config.SetValue("Paths", "EmulatorsPath", EmulatorsPath);
         config.SetValue("Paths", "DownloadsPath", DownloadsPath);
         config.SetValue("Paths", "InstallScriptsPath", InstallScriptsPath);
+        config.SetValue("Paths", "ToolsPath", ToolsPath);
         config.SetValue("RomM", "Host", RomMHost);
         config.SetValue("RomM", "Username", RomMUsername);
         config.SetValue("RomM", "Password", RomMPassword);
         config.SetValue("RomM", "ApiKey", RomMApiKey);
         config.SetValue("RomM", "ValidLoginLastUsed", RomMValidLoginLastUsed);
+        config.Save(configDir);
     }
     
     public void SaveConfig()
@@ -124,6 +139,7 @@ public partial class ConfigManager : Node
         config.SetValue("Paths", "EmulatorsPath", EmulatorsPath);
         config.SetValue("Paths", "DownloadsPath", DownloadsPath);
         config.SetValue("Paths", "InstallScriptsPath", InstallScriptsPath);
+        config.SetValue("Paths", "ToolsPath", ToolsPath);
         config.SetValue("RomM", "Host", RomMHost);
         config.SetValue("RomM", "Username", RomMUsername);
         config.SetValue("RomM", "Password", RomMPassword);
