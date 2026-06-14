@@ -8,20 +8,25 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
-public partial class RomMAPI : Node, IBackend
+public partial class RomMAPI : Node
 {
     private readonly System.Net.Http.HttpClient _httpClient = new System.Net.Http.HttpClient();
-    public string ApiHost => _apiHost;
-    private string _apiHost;
+    public string ApiHost => apiHost;
+    private string apiHost;
     private string _authToken;
     private bool _useBasicAuth = false;
 
+    public override void _Ready()
+    {
+        
+    }
+
     public async Task<(bool isSuccess, string errorMessage)> AuthenticateAsync(string username, string password, string host, string apiKey)
     {
-        _apiHost = host.EndsWith("/") ? host.TrimEnd('/') : host;
+        apiHost = host.EndsWith("/") ? host.TrimEnd('/') : host;
 
-        if (!_apiHost.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && 
-            !_apiHost.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        if (!apiHost.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && 
+            !apiHost.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
             return (false, "Host must start with http:// or https://");
         }
@@ -36,7 +41,7 @@ public partial class RomMAPI : Node, IBackend
             
             try
             {
-                HttpResponseMessage testResponse = await _httpClient.GetAsync($"{_apiHost}/api/platforms");
+                HttpResponseMessage testResponse = await _httpClient.GetAsync($"{apiHost}/api/platforms");
                 if (testResponse.IsSuccessStatusCode)
                 {
                     _authToken = apiKey;
@@ -61,7 +66,7 @@ public partial class RomMAPI : Node, IBackend
 
         try
         {
-            HttpResponseMessage response = await _httpClient.PostAsync($"{_apiHost}/api/token", content);
+            HttpResponseMessage response = await _httpClient.PostAsync($"{apiHost}/api/token", content);
 
             if (response.IsSuccessStatusCode)
             {
@@ -79,7 +84,7 @@ public partial class RomMAPI : Node, IBackend
             var authHeaderValue = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{username}:{password}"));
             _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", authHeaderValue);
             
-            HttpResponseMessage basicAuthTest = await _httpClient.GetAsync($"{_apiHost}/api/platforms");
+            HttpResponseMessage basicAuthTest = await _httpClient.GetAsync($"{apiHost}/api/platforms");
             if (basicAuthTest.IsSuccessStatusCode)
             {
                 _useBasicAuth = true;
@@ -105,7 +110,7 @@ public partial class RomMAPI : Node, IBackend
     {
         try
         {
-            HttpResponseMessage response = await _httpClient.GetAsync($"{_apiHost}/api/platforms");
+            HttpResponseMessage response = await _httpClient.GetAsync($"{apiHost}/api/platforms");
 
             if (response.IsSuccessStatusCode)
             {
@@ -115,6 +120,17 @@ public partial class RomMAPI : Node, IBackend
                 
                 if (systems != null)
                 {
+                    foreach (var system in systems)
+                    {
+                        if (EmulatorDefaults.IgdbSlugToEmulator.TryGetValue(system.IgdbSlug ?? "", out string emulator))
+                        {
+                            system.MappedEmulator = emulator;
+                        }
+                        else if (EmulatorDefaults.IgdbSlugToEmulator.TryGetValue(system.Slug ?? "", out string emulatorBySlug))
+                        {
+                            system.MappedEmulator = emulatorBySlug;
+                        }
+                    }
                     return systems.Where(s => s.RomCount > 0).ToList();
                 }
             }
@@ -136,7 +152,7 @@ public partial class RomMAPI : Node, IBackend
         try
         {
             int offset = (page - 1) * size;
-            string requestUrl = $"{_apiHost}/api/roms?platform_ids={system.Id}&limit={size}&offset={offset}";
+            string requestUrl = $"{apiHost}/api/roms?platform_ids={system.Id}&limit={size}&offset={offset}";
             GD.Print($"Requesting games from URL: {requestUrl}");
             HttpResponseMessage response = await _httpClient.GetAsync(requestUrl);
             string responseBody = await response.Content.ReadAsStringAsync();
@@ -166,7 +182,7 @@ public partial class RomMAPI : Node, IBackend
     public string GetRomDownloadUrl(Game game)
     {
         if (game == null) return null;
-        return $"{_apiHost}/api/roms/download?rom_ids={game.Id}";
+        return $"{apiHost}/api/roms/download?rom_ids={game.Id}";
     }
 
     public string[] GetAuthHeaders()

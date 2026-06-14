@@ -6,6 +6,8 @@
     <RootNamespace>rommfrontend</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="assets\installers\dolphin\install_windows.ps1" />
+    <Content Include="assets\installers\dolphin\meta.json" />
     <Content Include="assets\platforms\1292-advanced-programmable-video-system.ico" />
     <Content Include="assets\platforms\1292-advanced-programmable-video-system.png" />
     <Content Include="assets\platforms\1292-advanced-programmable-video-system.png.import" />

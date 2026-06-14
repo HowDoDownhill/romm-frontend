@@ -17,11 +17,20 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-RomMAPI="*uid://c45fdarm7kidr"
-BackendManager="*res://scripts/BackendManager.cs"
 ConfigManager="*uid://lsoicc5h860p"
+RomMAPI="*uid://c45fdarm7kidr"
 DownloadManager="*uid://cahae8cxkj01b"
+CacheManager="*uid://0rycpw7unjjb"
 DataBus="*uid://c3ihjck7ojmb6"
+EmulatorManager="*uid://mc0jjiebfh7k"
+AppInstance="*uid://cukewmk3ypiu7"
+
+[display]
+
+window/size/viewport_width=1920
+window/size/viewport_height=1080
+window/size/borderless=true
+window/stretch/mode="canvas_items"
 
 [dotnet]
 

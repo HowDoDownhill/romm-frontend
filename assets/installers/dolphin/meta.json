@@ -1,0 +1,14 @@
+﻿{
+  "name": "Dolphin",
+  "executable_name": {
+    "windows": "Dolphin.exe",
+    "linux": "dolphin-emu",
+    "macos": "Dolphin"
+  },
+  "emulator_dir_name": {
+    "windows": "Dolphin-x64/",
+    "linux": "/dolphin",
+    "macos": "dolphin"
+  },
+  "launch_args": "-b -e \"{rom_path}\""
+}

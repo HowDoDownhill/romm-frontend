@@ -7,8 +7,8 @@
 - If a piece of logic seems complex enough to need a comment, refactor it into a well-named private method instead.
 
 ## 2. Godot UI and Node References
-- **Never use hardcoded `GetNode<T>("Path/To/Node")` calls in the `_Ready` function for UI elements.**
-- Always use `[Export]` attributes to expose UI nodes to the Godot Inspector.
+- **CRITICAL: Never use hardcoded `GetNode<T>("Path/To/Node")` calls in the `_Ready` function for UI elements.**
+- Always use `[Export]` attributes to expose all node references to the Godot Inspector. This is the required method for accessing other nodes from a script.
 - Group related exported UI nodes using the `[ExportGroup("Group Name")]` attribute to keep the Inspector organized.
 - Example:
   ```csharp
@@ -26,3 +26,8 @@
 - Always capitalize `RomM` consistently (e.g., `RomMAPI`, `RomMHost`).
 - Use `_camelCase` for private fields.
 - Use `PascalCase` for public properties, methods, and classes.
+
+## 5. File System and Paths
+- User-configurable paths (like ROMs and Downloads) should default to Godot's `user://` data directory.
+- Downloaded ROMs should be organized by platform: `user://roms/{platform_slug}/{filename}`.
+- All path concatenation should use Godot's `PathJoin()` method to ensure cross-platform compatibility.

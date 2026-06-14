@@ -1,0 +1,150 @@
+﻿using Godot;
+
+public partial class ConfigManager : Node
+{
+
+    public string rootDir;
+    private string configDir;
+    private ConfigFile config;
+    
+    
+    public string RomsPath { get; private set; }
+    public string BiosPath { get; private set; }
+    public string EmulatorsPath { get; private set; }
+    public string DownloadsPath { get; private set; }
+    public string InstallScriptsPath { get; private set; }
+    public string RomMHost { get; private set; }
+    public string RomMUsername { get; private set; }
+    public string RomMPassword { get; private set; }
+    public string RomMApiKey { get; private set; }
+    public bool RomMValidLoginLastUsed { get; private set; }
+
+    public override void _Ready()
+    {
+        ChooseRootDir();
+        CheckFilesystem();
+        LoadConfig();
+    }
+    
+    public void ChooseRootDir()
+    {
+        if (OS.HasFeature("editor"))
+        {
+            rootDir = "res://";
+            
+        }
+        else
+        {
+            rootDir = OS.GetExecutablePath();
+        }
+        configDir = rootDir + "/config.cfg";
+        config = new ConfigFile();
+    }
+    
+    private void CheckFilesystem()
+    {
+        if(!DirAccess.DirExistsAbsolute(rootDir + "/roms/"));
+        {
+            DirAccess.MakeDirAbsolute(rootDir + "/roms/");
+        }
+
+        if (!DirAccess.DirExistsAbsolute(rootDir + "/bios/"))
+        {
+            DirAccess.MakeDirAbsolute(rootDir + "/bios/");
+        }
+        
+        if(!DirAccess.DirExistsAbsolute(rootDir + "/emulators/"))
+        {
+            DirAccess.MakeDirAbsolute(rootDir + "/emulators/");
+        }
+
+        if (!DirAccess.DirExistsAbsolute(rootDir + "/downloads/"))
+        {
+            DirAccess.MakeDirAbsolute(rootDir + "/downloads/");
+        }
+
+        if (!DirAccess.DirExistsAbsolute(rootDir + "/install_scripts/"))
+        {
+            DirAccess.MakeDirAbsolute(rootDir + "/install_scripts/");
+        }
+    }
+
+    private void LoadConfig()
+    {
+        Error err = config.Load(configDir);
+        
+        if (err != Error.Ok)
+        {
+            SetDefaultConfig();
+            return;
+        }
+
+        RomsPath = (string)config.GetValue("Paths", "RomsRomsPath", $"{rootDir}/roms/");
+        BiosPath = (string)config.GetValue("Paths", "BiosPath", $"{rootDir} + /bios/");
+        EmulatorsPath = (string)config.GetValue("Paths", "EmulatorsPath", $"{rootDir} + /emulators/");
+        DownloadsPath = (string)config.GetValue("Paths", "DownloadsPath", $"{rootDir} + /downloads/");
+        InstallScriptsPath = (string)config.GetValue("Paths", "InstallScriptsPath", $"{rootDir} + /install_scripts/");
+        RomMHost = (string)config.GetValue("RomM", "Host", "");
+        RomMUsername = (string)config.GetValue("RomM", "Username", "");
+        RomMPassword = (string)config.GetValue("RomM", "Password", "");
+        RomMApiKey = (string)config.GetValue("RomM", "ApiKey", "");
+        RomMValidLoginLastUsed = (bool)config.GetValue("RomM", "ValidLoginLastUsed", "");
+        
+    }
+
+    private void SetDefaultConfig()
+    {
+        RomsPath = rootDir + "/roms/";
+        BiosPath = rootDir + "/bios/";
+        EmulatorsPath = rootDir + "/emulators/";
+        DownloadsPath = rootDir + "/downloads/";
+        InstallScriptsPath = rootDir + "/install_scripts/";
+        RomMHost = "";
+        RomMUsername = "";
+        RomMPassword = "";
+        RomMApiKey = "";
+        RomMValidLoginLastUsed = false;
+        
+        config.SetValue("Paths", "RomsPath", RomsPath);
+        config.SetValue("Paths", "BiosPath", BiosPath);
+        config.SetValue("Paths", "EmulatorsPath", EmulatorsPath);
+        config.SetValue("Paths", "DownloadsPath", DownloadsPath);
+        config.SetValue("Paths", "InstallScriptsPath", InstallScriptsPath);
+        config.SetValue("RomM", "Host", RomMHost);
+        config.SetValue("RomM", "Username", RomMUsername);
+        config.SetValue("RomM", "Password", RomMPassword);
+        config.SetValue("RomM", "ApiKey", RomMApiKey);
+        config.SetValue("RomM", "ValidLoginLastUsed", RomMValidLoginLastUsed);
+    }
+    
+    public void SaveConfig()
+    {
+        config.SetValue("Paths", "RomsPath", RomsPath);
+        config.SetValue("Paths", "BiosPath", BiosPath);
+        config.SetValue("Paths", "EmulatorsPath", EmulatorsPath);
+        config.SetValue("Paths", "DownloadsPath", DownloadsPath);
+        config.SetValue("Paths", "InstallScriptsPath", InstallScriptsPath);
+        config.SetValue("RomM", "Host", RomMHost);
+        config.SetValue("RomM", "Username", RomMUsername);
+        config.SetValue("RomM", "Password", RomMPassword);
+        config.SetValue("RomM", "ApiKey", RomMApiKey);
+        config.SetValue("RomM", "ValidLoginLastUsed", RomMValidLoginLastUsed);
+        config.Save(configDir);
+    }
+
+    public void SaveValidLoginLastUsed(bool value)
+    {
+        RomMValidLoginLastUsed = value;
+        SaveConfig();
+    }
+
+    public void SaveRomMCredentials(string host, string username, string password, string apiKey)
+    {
+        RomMHost = host;
+        RomMUsername = username;
+        RomMPassword = password;
+        RomMApiKey = apiKey;
+        RomMValidLoginLastUsed = true;
+        SaveConfig();
+    }
+}

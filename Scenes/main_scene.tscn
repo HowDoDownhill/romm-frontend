@@ -1,32 +1,43 @@
 [gd_scene format=3 uid="uid://b4t52ysiyhict"]
 
-[ext_resource type="Script" uid="uid://iu78vi21qhv0" path="res://scripts/MainScene.cs" id="1_52fb6"]
-[ext_resource type="PackedScene" uid="uid://cdhj70uq5atqd" path="res://Scenes/downloads_page.tscn" id="2_6l7je"]
-[ext_resource type="PackedScene" uid="uid://cffanb3xjob1c" path="res://Scenes/download_entry.tscn" id="3_jv6wh"]
+[ext_resource type="Script" uid="uid://iu78vi21qhv0" path="res://scripts/main/MainScene.cs" id="1_6l7je"]
+[ext_resource type="PackedScene" uid="uid://cdhj70uq5atqd" path="res://scenes/downloads_list/downloads_page.tscn" id="2_6l7je"]
+[ext_resource type="Texture2D" uid="uid://dxgpruhh7d20e" path="res://assets/background/peak_background.png" id="2_7ykc4"]
 
-[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("_mainContentContainer", "_platformControllerIcon", "_platformNameLabel", "_gameList", "_gameDetailsPanel", "_gameCoverArt", "_gameTitleLabel", "_gameDescriptionLabel", "_playDownloadButton", "_deleteButton", "_uploadButton", "_downloadsButton", "_downloadProgressContainer")]
+[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "gameListContainer", "gameList", "detailsPanelContainer", "gameCover", "gameTitle", "gameDescription", "playDownloadButton", "deleteButton", "downloadsListContainer", "footerButtonsContainer", "DownloadsPageToggle")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-script = ExtResource("1_52fb6")
-_mainContentContainer = NodePath("VBoxContainer/GamesListMargin")
-_platformControllerIcon = NodePath("VBoxContainer/SystemsMargin/Panel/HBoxContainer/MarginContainer/SystemIcon")
-_platformNameLabel = NodePath("VBoxContainer/SystemsMargin/Panel/HBoxContainer/MarginContainer2/PlatformLabel")
-_gameList = NodePath("VBoxContainer/GamesListMargin/HBoxContainer/GameList")
-_gameDetailsPanel = NodePath("VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel")
-_gameCoverArt = NodePath("VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel/VBoxContainer/MarginContainer/TextureRect")
-_gameTitleLabel = NodePath("VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel/VBoxContainer/GameNameMargin/Name")
-_gameDescriptionLabel = NodePath("VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel/VBoxContainer/GameDescMargin/RichTextLabel")
-_playDownloadButton = NodePath("VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel/VBoxContainer/VBoxContainer/MarginContainer/PlayButton")
-_deleteButton = NodePath("VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel/VBoxContainer/VBoxContainer/MarginContainer3/DeleteButton")
-_uploadButton = NodePath("VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel/VBoxContainer/VBoxContainer/MarginContainer2/UploadButton")
-_downloadsButton = NodePath("VBoxContainer/MarginContainer/Panel/HBoxContainer/MarginContainer/HBoxContainer/Button")
-_downloadProgressContainer = NodePath("VBoxContainer/DownloadsMargin")
+script = ExtResource("1_6l7je")
+headerContainer = NodePath("Background/VBoxContainer/MarginContainer")
+platformLabel = NodePath("Background/VBoxContainer/MarginContainer/Panel/MarginContainer/HBoxContainer/PlatformLabel")
+platformIcon = NodePath("Background/VBoxContainer/MarginContainer/Panel/MarginContainer/HBoxContainer/SystemIcon")
+gameListContainer = NodePath("Background/VBoxContainer/GamesListContainer")
+gameList = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/GameList")
+detailsPanelContainer = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox")
+gameCover = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/ImageMargin/GameImage")
+gameTitle = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/NameMargin/GameName")
+gameDescription = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/DescMargin/GameDesc")
+playDownloadButton = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/ButtonsMargin/ButtonsContainer/PlayButton")
+deleteButton = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/ButtonsMargin/ButtonsContainer/DeleteButton")
+downloadsListContainer = NodePath("Background/VBoxContainer/DownloadsPageContainer")
+footerButtonsContainer = NodePath("Background/VBoxContainer/FooterButtonsContainer")
+DownloadsPageToggle = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/MarginContainer/HBoxContainer/DownloadPageToggle")
 
-[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=1312213171]
+[node name="Background" type="TextureRect" parent="." unique_id=188783889]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_7ykc4")
+expand_mode = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Background" unique_id=1312213171]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -34,54 +45,145 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="SystemsMargin" type="MarginContainer" parent="VBoxContainer" unique_id=1133258435]
+[node name="MarginContainer" type="MarginContainer" parent="Background/VBoxContainer" unique_id=1375354100]
 layout_mode = 2
 size_flags_vertical = 3
 size_flags_stretch_ratio = 0.2
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 10
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 1
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
 
-[node name="Panel" type="Panel" parent="VBoxContainer/SystemsMargin" unique_id=2010479366]
+[node name="Panel" type="Panel" parent="Background/VBoxContainer/MarginContainer" unique_id=2010479366]
 layout_mode = 2
+size_flags_vertical = 3
+size_flags_stretch_ratio = 0.1
 
-[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer/SystemsMargin/Panel" unique_id=1366258634]
+[node name="MarginContainer" type="MarginContainer" parent="Background/VBoxContainer/MarginContainer/Panel" unique_id=485325432]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-
-[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer/SystemsMargin/Panel/HBoxContainer" unique_id=183192777]
-layout_mode = 2
 theme_override_constants/margin_left = 5
 theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="SystemIcon" type="TextureRect" parent="VBoxContainer/SystemsMargin/Panel/HBoxContainer/MarginContainer" unique_id=1495603379]
+[node name="HBoxContainer" type="HBoxContainer" parent="Background/VBoxContainer/MarginContainer/Panel/MarginContainer" unique_id=1366258634]
+layout_mode = 2
+
+[node name="SystemIcon" type="TextureRect" parent="Background/VBoxContainer/MarginContainer/Panel/MarginContainer/HBoxContainer" unique_id=1495603379]
 layout_mode = 2
 expand_mode = 2
-stretch_mode = 5
 
-[node name="MarginContainer2" type="MarginContainer" parent="VBoxContainer/SystemsMargin/Panel/HBoxContainer" unique_id=431924869]
-layout_mode = 2
-size_flags_horizontal = 3
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 5
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
-
-[node name="PlatformLabel" type="Label" parent="VBoxContainer/SystemsMargin/Panel/HBoxContainer/MarginContainer2" unique_id=2094541351]
+[node name="PlatformLabel" type="Label" parent="Background/VBoxContainer/MarginContainer/Panel/MarginContainer/HBoxContainer" unique_id=2094541351]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 1
 text = "Platform Label"
 vertical_alignment = 1
 
-[node name="GamesListMargin" type="MarginContainer" parent="VBoxContainer" unique_id=749665635]
+[node name="GamesListContainer" type="MarginContainer" parent="Background/VBoxContainer" unique_id=749665635]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Background/VBoxContainer/GamesListContainer" unique_id=2086912777]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 10
+
+[node name="GameList" type="ItemList" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer" unique_id=2021837004]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Panel" type="Panel" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer" unique_id=1330960290]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.3
+
+[node name="DetailsVBox" type="VBoxContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel" unique_id=2008924310]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.3
+
+[node name="ImageMargin" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox" unique_id=92748540]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="GameImage" type="TextureRect" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/ImageMargin" unique_id=477149517]
+clip_contents = true
+layout_mode = 2
+size_flags_vertical = 0
+expand_mode = 5
+
+[node name="NameMargin" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox" unique_id=166909246]
+layout_mode = 2
+size_flags_vertical = 10
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="GameName" type="Label" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/NameMargin" unique_id=253070661]
+layout_mode = 2
+size_flags_vertical = 8
+text = "TEXT
+"
+horizontal_alignment = 1
+vertical_alignment = 1
+clip_text = true
+
+[node name="DescMargin" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox" unique_id=2114637104]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="GameDesc" type="RichTextLabel" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/DescMargin" unique_id=313761642]
+layout_mode = 2
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ButtonsMargin" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox" unique_id=1979380459]
+layout_mode = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="ButtonsContainer" type="VBoxContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/ButtonsMargin" unique_id=1045750652]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="PlayButton" type="Button" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/ButtonsMargin/ButtonsContainer" unique_id=1097614377]
+layout_mode = 2
+focus_neighbor_bottom = NodePath("../DeleteButton")
+theme_override_font_sizes/font_size = 16
+text = "Play
+"
+
+[node name="DeleteButton" type="Button" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/ButtonsMargin/ButtonsContainer" unique_id=1476300814]
+layout_mode = 2
+text = "Delete"
+
+[node name="DownloadsPageContainer" type="MarginContainer" parent="Background/VBoxContainer" unique_id=1554522468]
 visible = false
 layout_mode = 2
 size_flags_vertical = 3
@@ -90,116 +192,11 @@ theme_override_constants/margin_top = 1
 theme_override_constants/margin_right = 10
 theme_override_constants/margin_bottom = 1
 
-[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer/GamesListMargin" unique_id=2086912777]
+[node name="DownloadsPage" parent="Background/VBoxContainer/DownloadsPageContainer" unique_id=141579046 instance=ExtResource("2_6l7je")]
 layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/separation = 6
+script = null
 
-[node name="GameList" type="ItemList" parent="VBoxContainer/GamesListMargin/HBoxContainer" unique_id=2021837004]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="GameDetailsPanel" type="Panel" parent="VBoxContainer/GamesListMargin/HBoxContainer" unique_id=597508277]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_stretch_ratio = 0.3
-
-[node name="VBoxContainer" type="VBoxContainer" parent="VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel" unique_id=2008924310]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-size_flags_horizontal = 3
-size_flags_stretch_ratio = 0.3
-
-[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel/VBoxContainer" unique_id=1878732895]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 5
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
-
-[node name="TextureRect" type="TextureRect" parent="VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel/VBoxContainer/MarginContainer" unique_id=477149517]
-layout_mode = 2
-size_flags_vertical = 3
-expand_mode = 4
-
-[node name="GameNameMargin" type="MarginContainer" parent="VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel/VBoxContainer" unique_id=235741237]
-layout_mode = 2
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 5
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
-
-[node name="Name" type="Label" parent="VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel/VBoxContainer/GameNameMargin" unique_id=253070661]
-layout_mode = 2
-horizontal_alignment = 1
-
-[node name="GameDescMargin" type="MarginContainer" parent="VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel/VBoxContainer" unique_id=1306039418]
-layout_mode = 2
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 0
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
-
-[node name="RichTextLabel" type="RichTextLabel" parent="VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel/VBoxContainer/GameDescMargin" unique_id=313761642]
-layout_mode = 2
-
-[node name="VBoxContainer" type="VBoxContainer" parent="VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel/VBoxContainer" unique_id=1045750652]
-layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel/VBoxContainer/VBoxContainer" unique_id=336058096]
-layout_mode = 2
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 5
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 0
-
-[node name="PlayButton" type="Button" parent="VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel/VBoxContainer/VBoxContainer/MarginContainer" unique_id=1097614377]
-layout_mode = 2
-text = "Play
-"
-
-[node name="MarginContainer3" type="MarginContainer" parent="VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel/VBoxContainer/VBoxContainer" unique_id=1203567311]
-layout_mode = 2
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 0
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 0
-
-[node name="DeleteButton" type="Button" parent="VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel/VBoxContainer/VBoxContainer/MarginContainer3" unique_id=1476300814]
-layout_mode = 2
-text = "Delete"
-
-[node name="MarginContainer2" type="MarginContainer" parent="VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel/VBoxContainer/VBoxContainer" unique_id=254957992]
-layout_mode = 2
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 0
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
-
-[node name="UploadButton" type="Button" parent="VBoxContainer/GamesListMargin/HBoxContainer/GameDetailsPanel/VBoxContainer/VBoxContainer/MarginContainer2" unique_id=557323191]
-layout_mode = 2
-text = "Upload"
-
-[node name="DownloadsMargin" type="MarginContainer" parent="VBoxContainer" unique_id=1554522468]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 1
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 1
-
-[node name="DownloadsPage" parent="VBoxContainer/DownloadsMargin" unique_id=141579046 node_paths=PackedStringArray("_downloadsVBox") instance=ExtResource("2_6l7je")]
-layout_mode = 2
-_downloadsVBox = NodePath("VBoxContainer3/VBoxContainer2")
-_downloadEntryScene = ExtResource("3_jv6wh")
-
-[node name="VBoxContainer3" type="VBoxContainer" parent="VBoxContainer/DownloadsMargin/DownloadsPage" unique_id=888459564]
+[node name="VBoxContainer3" type="VBoxContainer" parent="Background/VBoxContainer/DownloadsPageContainer/DownloadsPage" unique_id=888459564]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -207,11 +204,11 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VBoxContainer2" type="VBoxContainer" parent="VBoxContainer/DownloadsMargin/DownloadsPage/VBoxContainer3" unique_id=1354520381]
+[node name="VBoxContainer2" type="VBoxContainer" parent="Background/VBoxContainer/DownloadsPageContainer/DownloadsPage/VBoxContainer3" unique_id=1354520381]
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer/DownloadsMargin/DownloadsPage/VBoxContainer3" unique_id=1154351311]
+[node name="MarginContainer" type="MarginContainer" parent="Background/VBoxContainer/DownloadsPageContainer/DownloadsPage/VBoxContainer3" unique_id=1154351311]
 layout_mode = 2
 size_flags_horizontal = 8
 theme_override_constants/margin_left = 5
@@ -219,26 +216,26 @@ theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="Button" type="Button" parent="VBoxContainer/DownloadsMargin/DownloadsPage/VBoxContainer3/MarginContainer" unique_id=1340347745]
+[node name="CancleButton" type="Button" parent="Background/VBoxContainer/DownloadsPageContainer/DownloadsPage/VBoxContainer3/MarginContainer" unique_id=1340347745]
 layout_mode = 2
 size_flags_horizontal = 8
 theme_type_variation = &"FlatButton"
 text = "Cancel Download
 "
 
-[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer" unique_id=1594448033]
+[node name="FooterButtonsContainer" type="MarginContainer" parent="Background/VBoxContainer" unique_id=1594448033]
 layout_mode = 2
 size_flags_vertical = 3
 size_flags_stretch_ratio = 0.1
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 1
-theme_override_constants/margin_right = 10
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="Panel" type="Panel" parent="VBoxContainer/MarginContainer" unique_id=1828947604]
+[node name="Panel" type="Panel" parent="Background/VBoxContainer/FooterButtonsContainer" unique_id=1828947604]
 layout_mode = 2
 
-[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer/MarginContainer/Panel" unique_id=1733423683]
+[node name="HBoxContainer" type="HBoxContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel" unique_id=1733423683]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -247,17 +244,20 @@ grow_horizontal = 2
 grow_vertical = 2
 alignment = 2
 
-[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer/MarginContainer/Panel/HBoxContainer" unique_id=1829758031]
+[node name="MarginContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer" unique_id=775250903]
 layout_mode = 2
+size_flags_horizontal = 3
 theme_override_constants/margin_left = 5
 theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer/MarginContainer/Panel/HBoxContainer/MarginContainer" unique_id=1828005585]
+[node name="HBoxContainer" type="HBoxContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/MarginContainer" unique_id=900729286]
 layout_mode = 2
+size_flags_horizontal = 8
 
-[node name="Button" type="Button" parent="VBoxContainer/MarginContainer/Panel/HBoxContainer/MarginContainer/HBoxContainer" unique_id=1665320228]
+[node name="DownloadPageToggle" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/MarginContainer/HBoxContainer" unique_id=1665320228]
 layout_mode = 2
+size_flags_horizontal = 8
 theme_type_variation = &"FlatButton"
 text = "Toggle Downloads"
