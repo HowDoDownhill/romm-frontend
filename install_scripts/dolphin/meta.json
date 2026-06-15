@@ -1,13 +1,13 @@
-﻿{
+{
   "name": "Dolphin",
   "executable_name": {
     "windows": "Dolphin.exe",
-    "linux": "dolphin-emu",
+    "linux": "dolphin.AppImage",
     "macos": "Dolphin"
   },
   "emulator_dir_name": {
     "windows": "dolphin",
-    "linux": "/dolphin",
+    "linux": "dolphin",
     "macos": "dolphin"
   },
   "launch_args": "-b -e \"{rom_path}\""

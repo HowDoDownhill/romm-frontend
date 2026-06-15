@@ -30,3 +30,5 @@ bios/
 emulators/
 
 config.cfg
+
+.claude/
