@@ -30,5 +30,8 @@ bios/
 emulators/
 
 config.cfg
+games.cache
+systems.cache
+
 
 .claude/
