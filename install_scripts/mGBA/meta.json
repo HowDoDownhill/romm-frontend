@@ -1,0 +1,14 @@
+﻿{
+  "name": "mGBA",
+  "executable_name": {
+    "windows": "mGBA.exe",
+    "linux": "",
+    "macos": ""
+  },
+  "emulator_dir_name": {
+    "windows": "mGBA",
+    "linux": "mgba",
+    "macos": "mgba"
+  },
+  "launch_args": "-f  \"{rom_path}\""
+}

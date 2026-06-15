@@ -1,0 +1,132 @@
+[gd_scene format=3 uid="uid://c181xd67fwosi"]
+
+[ext_resource type="Script" uid="uid://d0sdyc3lh8p1u" path="res://scripts/login/LoginScreen.cs" id="1_frse4"]
+[ext_resource type="Texture2D" uid="uid://dxgpruhh7d20e" path="res://assets/background/peak_background.png" id="2_cv2ei"]
+
+[node name="LoginScreen" type="Control" unique_id=2048380402 node_paths=PackedStringArray("loginButton", "errorLabel", "rommHostInput", "rommUserInput", "rommPasswordInput", "rommApiKeyInput")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_frse4")
+loginButton = NodePath("TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/Login Button")
+errorLabel = NodePath("TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/Error Label")
+rommHostInput = NodePath("TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/RomMBackendInfo/ServerInfoContainer/LineEdit")
+rommUserInput = NodePath("TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/RomMBackendInfo/UserInfoContainer/LineEdit")
+rommPasswordInput = NodePath("TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/RomMBackendInfo/PasswordInfoContainer/LineEdit")
+rommApiKeyInput = NodePath("TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/RomMBackendInfo/APIKeyInfoContainer/LineEdit")
+
+[node name="TextureRect" type="TextureRect" parent="." unique_id=1928106699]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("2_cv2ei")
+expand_mode = 3
+
+[node name="Background" type="Panel" parent="TextureRect" unique_id=878216554]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="TextureRect/Background" unique_id=1857139177]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.3
+anchor_top = 0.3
+anchor_right = 0.7
+anchor_bottom = 0.7
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="TextureRect/Background/PanelContainer" unique_id=2078386266]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="TextureRect/Background/PanelContainer/MarginContainer" unique_id=207718436]
+layout_mode = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer" unique_id=514903357]
+layout_mode = 2
+
+[node name="RomMBackendInfo" type="VBoxContainer" parent="TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer" unique_id=520904360]
+layout_mode = 2
+
+[node name="ServerInfoContainer" type="HBoxContainer" parent="TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/RomMBackendInfo" unique_id=1369465258]
+layout_mode = 2
+alignment = 1
+
+[node name="Label" type="Label" parent="TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/RomMBackendInfo/ServerInfoContainer" unique_id=1582949088]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "Server Address: "
+horizontal_alignment = 2
+
+[node name="LineEdit" type="LineEdit" parent="TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/RomMBackendInfo/ServerInfoContainer" unique_id=1253743422]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Your RomM server address."
+
+[node name="UserInfoContainer" type="HBoxContainer" parent="TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/RomMBackendInfo" unique_id=30093685]
+layout_mode = 2
+alignment = 1
+
+[node name="Label" type="Label" parent="TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/RomMBackendInfo/UserInfoContainer" unique_id=2114216179]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "Username: "
+horizontal_alignment = 2
+
+[node name="LineEdit" type="LineEdit" parent="TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/RomMBackendInfo/UserInfoContainer" unique_id=741375167]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Your RomM username."
+
+[node name="PasswordInfoContainer" type="HBoxContainer" parent="TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/RomMBackendInfo" unique_id=850549574]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/RomMBackendInfo/PasswordInfoContainer" unique_id=1233589596]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "Password: "
+horizontal_alignment = 2
+
+[node name="LineEdit" type="LineEdit" parent="TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/RomMBackendInfo/PasswordInfoContainer" unique_id=1014129848]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Your RomM password."
+secret = true
+
+[node name="APIKeyInfoContainer" type="HBoxContainer" parent="TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/RomMBackendInfo" unique_id=344868310]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/RomMBackendInfo/APIKeyInfoContainer" unique_id=930437178]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "API Key:"
+horizontal_alignment = 2
+
+[node name="LineEdit" type="LineEdit" parent="TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/RomMBackendInfo/APIKeyInfoContainer" unique_id=1466989955]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Get this from RomM."
+
+[node name="Login Button" type="Button" parent="TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer" unique_id=1202995306]
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+text = "Login"
+
+[node name="Error Label" type="Label" parent="TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer" unique_id=1647000609]
+layout_mode = 2
+horizontal_alignment = 1
