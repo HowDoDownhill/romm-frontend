@@ -172,19 +172,26 @@ public partial class MainScene : Control
 
         if (platformIcon != null)
         {
-            string searchSlug = !string.IsNullOrEmpty(selectedSystem.IgdbSlug) ? selectedSystem.IgdbSlug : selectedSystem.Slug;
-            
-            if (!string.IsNullOrEmpty(searchSlug))
+            if (!string.IsNullOrEmpty(selectedSystem.IgdbSlug))
             {
-                var texture = FindPlatformIcon(searchSlug, "res://assets/platforms/", new[] { ".svg", ".png" });
+                var texture = FindPlatformIcon(selectedSystem.IgdbSlug, "res://assets/platforms/", new[] { ".svg", ".png" });
                 platformIcon.Texture = texture;
             }
+            
+            else if (platformIcon.Texture == null)
+            {
+                var texture = FindPlatformIcon(selectedSystem.Slug, "res://assets/platforms/", new[] { ".svg", ".png" });
+                platformIcon.Texture = texture;
+            }
+            
             else
             {
                 platformIcon.Texture = null;
             }
         }
 
+        GD.Print(selectedSystem.Slug);
+        GD.Print(selectedSystem.IgdbSlug);
         OnSystemSelected(selectedSystem);
     }
     
@@ -274,8 +281,7 @@ public partial class MainScene : Control
         string fileName = game.Files[0].FileName;
         string fullPath = appInstance.configManager.RomsPath.PathJoin(game.System.Slug).PathJoin(fileName);
         return Godot.FileAccess.FileExists(fullPath);
-
-        return true;
+        
     }
 
     private void OnGameSelected(long index)

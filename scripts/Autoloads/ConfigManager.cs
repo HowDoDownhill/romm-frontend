@@ -37,6 +37,8 @@ public partial class ConfigManager : Node
         if (OS.HasFeature("editor"))
         {
             rootDir = ProjectSettings.GlobalizePath("res://");
+            rootDir = rootDir.Remove(rootDir.Length-1);
+            GD.Print(rootDir); 
 
         }
         else

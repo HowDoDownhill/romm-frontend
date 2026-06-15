@@ -1,0 +1,14 @@
+﻿{
+  "name": "pcsx2",
+  "executable_name": {
+    "windows": "pcsx2-qt.exe",
+    "linux": "pcsx2",
+    "macos": "pcsx2"
+  },
+  "emulator_dir_name": {
+    "windows": "pcsx2",
+    "linux": "pcsx2",
+    "macos": "pcsx2"
+  },
+  "launch_args": "-batch -fullscreen \"{rom_path}\""
+}

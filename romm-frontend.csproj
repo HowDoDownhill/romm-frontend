@@ -1192,6 +1192,9 @@
     <Content Include="install_scripts\dolphin\meta.json" />
     <Content Include="install_scripts\mgba\install_windows.ps1" />
     <Content Include="install_scripts\mgba\meta.json" />
+    <Content Include="install_scripts\pcsx2\install_linux.sh" />
+    <Content Include="install_scripts\pcsx2\install_windows.ps1" />
+    <Content Include="install_scripts\pcsx2\meta.json" />
     <Content Include="Scenes\downloads_page.tscn" />
     <Content Include="Scenes\download_entry.tscn" />
     <Content Include="Scenes\login_screen.tscn" />

@@ -270,9 +270,9 @@ public partial class EmulatorManager : Node
 
             string installDir = appInstance.configManager.EmulatorsPath + meta.EmulatorDirName[osName];
             string executableRelativePath = meta.ExecutableName[osName];
-            string fullExecutablePath = Path.Combine(installDir, executableRelativePath);
+            string fullExecutablePath = Path.Join(installDir, executableRelativePath);
 
-            string romPath = ProjectSettings.GlobalizePath(Path.Combine(
+            string romPath = Path.GetFullPath(Path.Join(
                 appInstance.configManager.RomsPath, 
                 game.System.Slug, 
                 game.Files[0].FileName));
