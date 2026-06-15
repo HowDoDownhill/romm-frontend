@@ -1,7 +1,10 @@
+# Godot 4.2+ specific ignores
+~*.dll
+
 # Godot 4+ specific ignores
 .godot/
 .nomedia
-
+ 
 # Godot-specific ignores
 .import/
 export.cfg
@@ -15,3 +18,12 @@ export_credentials.cfg
 .mono/
 data_*/
 mono_crash.*.json
+
+/build/
+/bios/
+/roms/
+/emulators/
+
+roms/
+bios/
+emulators/
