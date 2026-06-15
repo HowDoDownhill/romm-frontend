@@ -18,6 +18,7 @@ export_credentials.cfg
 .mono/
 data_*/
 mono_crash.*.json
+.idea/
 
 /build/
 /bios/
