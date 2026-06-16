@@ -53,7 +53,6 @@ public partial class LoadingScreen : Control
                 _progressBar.Value = 100;
             }
 
-            // Sync BIOS files before changing scenes
             await SyncFirmwareAsync();
 
             await Task.Delay(200);
@@ -130,7 +129,6 @@ public partial class LoadingScreen : Control
         
         appInstance.cacheManager.SaveCache(appInstance.dataBus.systems, appInstance.dataBus.gameCache);
         
-        // Sync BIOS files before changing scenes
         await SyncFirmwareAsync();
         
         if (_statusLabel != null)
@@ -149,71 +147,76 @@ public partial class LoadingScreen : Control
             _statusLabel.Text = "Checking for BIOS updates...";
         }
 
-        // Fetch the metadata list of all firmware
-        List<Firmware> firmwares = await appInstance.rommApi.GetFirmwareAsync();
-
-        if (firmwares == null || !firmwares.Any())
+        var firmwareToDownload = new List<(Firmware fw, string slug, string systemName)>();
+        
+        foreach (var system in appInstance.dataBus.systems)
         {
-            return;
+            List<Firmware> systemFirmware = await appInstance.rommApi.GetFirmwareAsync(system.Id);
+            
+            if (systemFirmware != null && systemFirmware.Any())
+            {
+                foreach (var fw in systemFirmware)
+                {
+                    firmwareToDownload.Add((fw, system.Slug, system.Name));
+                }
+            }
         }
 
-        int processed = 0;
-        foreach (var fw in firmwares)
-        {
-            string savePath = Path.Combine(appInstance.configManager.BiosPath, fw.FileName);
+        if (!firmwareToDownload.Any()) return;
 
-            // If we don't have this BIOS file locally, download it
+        int processed = 0;
+        var authHeaders = appInstance.rommApi.GetAuthHeaders();
+
+        foreach (var item in firmwareToDownload)
+        {
+            Firmware fw = item.fw;
+            string slug = item.slug;
+            
+            string systemBiosDir = Path.Combine(appInstance.configManager.BiosPath, slug);
+            if (!Directory.Exists(systemBiosDir))
+            {
+                Directory.CreateDirectory(systemBiosDir);
+            }
+
+            string savePath = Path.Combine(systemBiosDir, fw.FileName);
+
             if (!File.Exists(savePath))
             {
                 if (_statusLabel != null)
                 {
-                    _statusLabel.Text = $"Downloading BIOS: {fw.FileName}...";
+                    _statusLabel.Text = $"Downloading BIOS: {fw.FileName} ({item.systemName})...";
                 }
 
                 string downloadUrl = appInstance.rommApi.GetFirmwareDownloadUrl(fw);
-                await DownloadFileAsync(downloadUrl, savePath);
+                await DownloadFirmwareWrapperAsync(downloadUrl, savePath, authHeaders);
+
+                string configPath = Path.Combine(systemBiosDir, $"{Path.GetFileNameWithoutExtension(fw.FileName)}.config.json");
+                string localConfig = "{ \"loaded\": true, \"path\": \"./" + fw.FileName + "\" }";
+                await File.WriteAllTextAsync(configPath, localConfig);
             }
 
             processed++;
             if (_progressBar != null)
             {
-                _progressBar.Value = ((float)processed / firmwares.Count) * 100;
+                _progressBar.Value = ((float)processed / firmwareToDownload.Count) * 100;
             }
         }
     }
-
-    private async Task DownloadFileAsync(string url, string destinationPath)
+    
+    private Task<string> DownloadFirmwareWrapperAsync(string url, string destinationPath, string[] headers)
     {
-        try
-        {
-            using var client = new System.Net.Http.HttpClient();
-            
-            // Re-apply the authentication headers to the new HttpClient
-            var authHeaders = appInstance.rommApi.GetAuthHeaders();
-            foreach (var header in authHeaders)
+        var tcs = new TaskCompletionSource<string>();
+        
+        appInstance.downloadManager.DownloadFile(
+            url, 
+            destinationPath, 
+            headers, 
+            (path) => 
             {
-                var split = header.Split(": ", 2);
-                if (split.Length == 2)
-                {
-                    client.DefaultRequestHeaders.Add(split[0], split[1]);
-                }
+                tcs.SetResult(path);
             }
-
-            var response = await client.GetAsync(url, System.Net.Http.HttpCompletionOption.ResponseHeadersRead);
-            
-            if (response.IsSuccessStatusCode)
-            {
-                using var fs = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None);
-                await response.Content.CopyToAsync(fs);
-            }
-            else
-            {
-                GD.PrintErr($"Failed to download firmware from {url}. Status code: {response.StatusCode}");
-            }
-        }
-        catch (System.Exception e)
-        {
-            GD.PrintErr($"Exception during firmware download: {e.Message}");
-        }
+        );
+        
+        return tcs.Task;
     }
 }

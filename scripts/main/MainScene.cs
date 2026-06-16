@@ -44,6 +44,7 @@ public partial class MainScene : Control
     [Export] private MarginContainer footerButtonsContainer;
     [Export] private Button downloadsPageToggle;
     [Export] private Button refreshGamesButton;
+    [Export] private Button LaunchEmulatorButton;
 
     //Global access to other systems
     private AppInstance appInstance;
@@ -99,8 +100,13 @@ public partial class MainScene : Control
         {
             refreshGamesButton.Pressed += appInstance.cacheManager.rebuildGameCache;
         }
-    }
 
+        if (LaunchEmulatorButton != null)
+        {
+            LaunchEmulatorButton.Pressed += OnLaunchEmulatorButtonPressed;
+        }
+    }
+    
     public void GetCache()
     {
         gameSystems = appInstance.dataBus.systems;
@@ -235,6 +241,8 @@ public partial class MainScene : Control
             currentlyShownGames = new List<Game>();
             GD.Print($"No games found in cache for system {system.Name}");
         }
+        
+        UpdateFooterButtons();
     }
 
     public void RefreshGameList()
@@ -365,6 +373,23 @@ public partial class MainScene : Control
             deleteButton.Visible = isGameDownloadedLocally;
         }
     }
+
+    public void UpdateFooterButtons()
+    {
+        if (LaunchEmulatorButton != null)
+        {
+            string emulatorName = gameSystems[currentGameSystemIndex].MappedEmulator;
+            
+            if (appInstance.emulatorManager.IsEmulatorInstalled(emulatorName))
+            {
+                LaunchEmulatorButton.Text = "Launch Emulator";
+            }
+            else
+            {
+                LaunchEmulatorButton.Text = "Install Emulator";
+            }
+        }
+    }
     
     private void DownloadAndSetTexture(string url, TextureRect textureRect)
     {
@@ -444,11 +469,27 @@ public partial class MainScene : Control
 
         if (isGameDownloadedLocally)
         {
-            appInstance.emulatorManager.LaunchEmulator(currentlySelectedGame);
+            appInstance.emulatorManager.LaunchEmulatorWithGame(currentlySelectedGame);
         }
         else
         {
             DownloadGame(currentlySelectedGame);
+        }
+    }
+
+    private void OnLaunchEmulatorButtonPressed()
+    {
+        if (LaunchEmulatorButton != null)
+        {
+            if (LaunchEmulatorButton.Text == "Install Emulator")
+            {
+                appInstance.emulatorManager.InstallEmulator(gameSystems[currentGameSystemIndex].MappedEmulator);
+            }
+
+            else
+            {
+                appInstance.emulatorManager.LaunchEmulatorWithoutGame(gameSystems[currentGameSystemIndex].MappedEmulator);
+            }
         }
     }
     
@@ -537,6 +578,7 @@ public partial class MainScene : Control
         }
 
         UpdateDetailsPanelButtons(game);
+        UpdateFooterButtons();
     }
     
     private void OnDownloadCompleted(string fileName, bool success)

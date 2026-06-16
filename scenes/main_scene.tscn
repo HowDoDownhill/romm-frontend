@@ -5,7 +5,7 @@
 [ext_resource type="Texture2D" uid="uid://dxgpruhh7d20e" path="res://assets/background/peak_background.png" id="2_7ykc4"]
 [ext_resource type="PackedScene" uid="uid://cffanb3xjob1c" path="res://scenes/downloads_list/download_entry.tscn" id="4_pu3yx"]
 
-[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "gameListContainer", "gameList", "detailsPanelContainer", "gameCover", "gameTitle", "gameDescription", "playDownloadButton", "deleteButton", "downloadsListContainer", "downloadProgressUI", "footerButtonsContainer", "downloadsPageToggle", "refreshGamesButton")]
+[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "gameListContainer", "gameList", "detailsPanelContainer", "gameCover", "gameTitle", "gameDescription", "playDownloadButton", "deleteButton", "downloadsListContainer", "downloadProgressUI", "footerButtonsContainer", "downloadsPageToggle", "refreshGamesButton", "LaunchEmulatorButton")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -29,6 +29,7 @@ downloadProgressUI = NodePath("Background/VBoxContainer/DownloadsPageContainer/D
 footerButtonsContainer = NodePath("Background/VBoxContainer/FooterButtonsContainer")
 downloadsPageToggle = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/DownloadsButtonConstainer/DownloadPageToggle")
 refreshGamesButton = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/RefreshButtonContainer/RefreshGamesButton")
+LaunchEmulatorButton = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/LaunchEmulatorContainer/LaunchEmulatorButton")
 
 [node name="Background" type="TextureRect" parent="." unique_id=188783889]
 layout_mode = 1
@@ -252,6 +253,24 @@ grow_horizontal = 2
 grow_vertical = 2
 alignment = 2
 
+[node name="LaunchEmulatorContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer" unique_id=1773723543]
+layout_mode = 2
+size_flags_horizontal = 8
+size_flags_vertical = 9
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="LaunchEmulatorButton" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/LaunchEmulatorContainer" unique_id=610111342]
+layout_mode = 2
+size_flags_horizontal = 8
+tooltip_text = "Launch the emulator for the currently selected system.
+
+NOTE: launching the emulator from the exectuable from outside the app may restult in your settings not being saved to the instance run from inside the app."
+theme_type_variation = &"FlatButton"
+text = "Launch Emulator"
+
 [node name="RefreshButtonContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer" unique_id=2067252156]
 layout_mode = 2
 size_flags_horizontal = 8
@@ -264,6 +283,7 @@ theme_override_constants/margin_bottom = 5
 [node name="RefreshGamesButton" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/RefreshButtonContainer" unique_id=529449134]
 layout_mode = 2
 size_flags_horizontal = 8
+tooltip_text = "Force refresh games from RomM"
 theme_type_variation = &"FlatButton"
 text = "Refresh Games
 "

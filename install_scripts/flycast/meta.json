@@ -1,0 +1,15 @@
+{
+  "name": "flycast",
+  "executable_name": {
+    "windows": "flycast.exe",
+    "linux": "flycast.AppImage",
+    "macos": "flycast"
+  },
+  "emulator_dir_name": {
+    "windows": "flycast",
+    "linux": "flycast",
+    "macos": "flycast"
+  },
+  "launch_args_with_game": "-portable \"{rom_path}\"",
+  "launch_args_without_game": "-portable"
+}

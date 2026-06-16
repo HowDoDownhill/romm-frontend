@@ -24,10 +24,12 @@ mono_crash.*.json
 /bios/
 /roms/
 /emulators/
+/downloads/
 
 roms/
 bios/
 emulators/
+downloads/
 
 config.cfg
 games.cache

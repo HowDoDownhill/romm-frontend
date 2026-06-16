@@ -10,5 +10,6 @@
     "linux": "dolphin",
     "macos": "dolphin"
   },
-  "launch_args": "-b -C Dolphin.Display.Fullscreen=True -e \"{rom_path}\" -u ./"
+  "launch_args_with_game": "-b -C Dolphin.Display.Fullscreen=True -e \"{rom_path}\" -u ./",
+  "launch_args_without_game": "-u ./"
 }

@@ -16,12 +16,20 @@ public class EmulatorMeta
 
     [JsonPropertyName("executable_name")]
     public Dictionary<string, string> ExecutableName { get; set; }
-
-    [JsonPropertyName("launch_args")]
-    public string LaunchArgs { get; set; }
     
     [JsonPropertyName("emulator_dir_name")]
     public Dictionary<string, string> EmulatorDirName { get; set; }
+
+    [JsonPropertyName("launch_args_with_game")]
+    public string LaunchArgsWithGame { get; set; }
+    
+    [JsonPropertyName("launch_args_without_game")]
+    public string LaunchArgsWithoutGame { get; set; }
+    
+    /*
+    [JsonPropertyName("emulator_default_config")]
+    public Dictionary<string, string> EmulatorDefaultConfig { get; set; }
+    */
 }
 
 public partial class EmulatorManager : Node
@@ -237,7 +245,7 @@ public partial class EmulatorManager : Node
         return tcs.Task;
     }
 
-    public void LaunchEmulator(Game game)
+    public void LaunchEmulatorWithGame(Game game)
     {
         string mappedEmulator = GetMappedEmulator(game.System.Slug);
         
@@ -277,10 +285,73 @@ public partial class EmulatorManager : Node
                 game.System.Slug, 
                 game.Files[0].FileName));
             
-            string arguments = meta.LaunchArgs;
+            string arguments = meta.LaunchArgsWithGame;
             arguments = arguments.Replace("{rom_path}", romPath);
             
 
+            GD.Print($"Launching: {fullExecutablePath} {arguments}"); 
+            
+            ProcessStartInfo startInfo = new ProcessStartInfo
+            {
+                FileName = fullExecutablePath,
+                Arguments = arguments,
+                WorkingDirectory = installDir, 
+                CreateNoWindow = true,
+                UseShellExecute = false
+            };
+
+            Process emulatorProcess = Process.Start(startInfo);
+            if (emulatorProcess != null)
+            {
+                GD.Print($"Emulator launched with PID: {emulatorProcess.Id}");
+                emulatorProcess.EnableRaisingEvents = true;
+                emulatorProcess.Exited += (sender, e) => 
+                {
+                    GD.Print("Emulator was closed.");
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"Failed to launch emulator: {ex.Message}");
+        }
+    }
+
+    public void LaunchEmulatorWithoutGame(string emulatorName)
+    {
+        if (string.IsNullOrEmpty(emulatorName))
+        {
+            GD.PrintErr("No emulator name provided.");
+            return;
+        }
+
+        string metaPath = appInstance.configManager.InstallScriptsPath.PathJoin(emulatorName).PathJoin("meta.json");
+        
+        if (!FileAccess.FileExists(metaPath))
+        {
+            GD.PrintErr($"Meta file not found for mapped emulator: {metaPath}");
+            return;
+        }
+        
+        try 
+        {
+            string osName = OS.GetName().ToLower();
+            var metaJson = FileAccess.GetFileAsString(metaPath);
+            var meta = JsonSerializer.Deserialize<EmulatorMeta>(metaJson);
+            
+            if (meta == null || meta.EmulatorDirName == null || meta.ExecutableName == null ||
+                !meta.EmulatorDirName.ContainsKey(osName) || !meta.ExecutableName.ContainsKey(osName))
+            {
+                 GD.PrintErr($"Incomplete meta.json for {emulatorName} on OS: {osName}");
+                 return;
+            }
+
+            string installDir = appInstance.configManager.EmulatorsPath + meta.EmulatorDirName[osName];
+            string executableRelativePath = meta.ExecutableName[osName];
+            string fullExecutablePath = Path.Join(installDir, executableRelativePath);
+            
+            string arguments = meta.LaunchArgsWithoutGame;
+            
             GD.Print($"Launching: {fullExecutablePath} {arguments}"); 
             
             ProcessStartInfo startInfo = new ProcessStartInfo
@@ -329,7 +400,8 @@ public partial class EmulatorManager : Node
             {"sega32", "ares"},
             {"segacd", "ares"},
             {"sms", "ares"},
-            {"genesis", "ares"}
+            {"genesis", "ares"},
+            {"dc", "flycast"}
         };
         
         try
@@ -344,22 +416,7 @@ public partial class EmulatorManager : Node
         {
             GD.PrintErr($"Failed to generate default emulator map: {e.Message}");
         }
-
-        var platformExecutableMap = new Dictionary<string, string>
-        {
-            { "dolphin", "Dolphin.exe" },
-            { "snes9x", "snes9x-x64.exe" },
-            { "mupen64plus", "mupen64plus.exe" },
-            { "nestopia", "nestopia.exe" },
-            { "mGBA", "mgba.exe" },
-            { "melonDS", "melonDS.exe" },
-            { "DuckStation", "duckstation-qt.exe" },
-            { "PCSX2", "pcsx2-qt.exe" },
-            { "RPCS3", "rpcs3.exe" },
-            { "shadPS4", "shadps4.exe" },
-            { "ppsspp", "PPSSPPWindows64.exe" },
-            { "ares", "ares.exe" }
-        };
+        
         try
         {
             string jsonString = JsonSerializer.Serialize(executableMapPath, new JsonSerializerOptions { WriteIndented = true });

@@ -125,13 +125,9 @@ public partial class RomMAPI : Node
                 {
                     foreach (var system in systems)
                     {
-                        if (EmulatorDefaults.IgdbSlugToEmulator.TryGetValue(system.IgdbSlug ?? "", out string emulator))
+                        if (appInstance.emulatorManager.GetMappedEmulator(system.Slug) != "")
                         {
-                            system.MappedEmulator = emulator;
-                        }
-                        else if (EmulatorDefaults.IgdbSlugToEmulator.TryGetValue(system.Slug ?? "", out string emulatorBySlug))
-                        {
-                            system.MappedEmulator = emulatorBySlug;
+                            system.MappedEmulator = appInstance.emulatorManager.GetMappedEmulator(system.Slug);
                         }
                     }
                     return systems.Where(s => s.RomCount > 0).ToList();
@@ -282,6 +278,10 @@ public partial class RomMAPI : Node
     {
         if (firmware == null) return null;
         
-        return $"{apiHost}/api/firmware/download?firmware_ids={firmware.Id}";
+        // Safely encode the filename to prevent routing errors
+        string safeFileName = Uri.EscapeDataString(firmware.FileName);
+        
+        // Use the direct binary stream endpoint instead of the batch zip endpoint
+        return $"{apiHost}/api/firmware/{firmware.Id}/content/{safeFileName}";
     }
 }
