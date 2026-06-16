@@ -10,5 +10,5 @@
     "linux": "dolphin",
     "macos": "dolphin"
   },
-  "launch_args": "-b -e \"{rom_path}\""
+  "launch_args": "-b -C Dolphin.Display.Fullscreen=True -e \"{rom_path}\" -u ./"
 }
