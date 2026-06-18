@@ -13,16 +13,18 @@ public partial class MainScene : Control
     [Export] private MarginContainer headerContainer;
     [Export] private Label platformLabel;
     [Export] private TextureRect platformIcon;
+    [Export] private OptionButton firmwareSelector;
+    
+    
 
-    private List<GameSystem> gameSystems = new List<GameSystem>();
+    public List<GameSystem> gameSystems = new List<GameSystem>();
     public Dictionary<int, List<Game>> games { get; set; } = new Dictionary<int, List<Game>>();
     private List<Game> currentlyShownGames = new List<Game>();
-    private int currentGameSystemIndex;
+    public int currentGameSystemIndex;
     public Game currentlySelectedGame; 
     
     //Game list / Details Panel 
     [ExportGroup("GameList")] 
-    [Export] private MarginContainer gameListContainer;
     [Export] private ItemList gameList;
     
     [ExportGroup("DetailsPanel")]
@@ -42,9 +44,10 @@ public partial class MainScene : Control
     //Footer
     [ExportGroup("FooterButtons")]
     [Export] private MarginContainer footerButtonsContainer;
+    [Export] private Button LaunchEmulatorButton;
     [Export] private Button downloadsPageToggle;
     [Export] private Button refreshGamesButton;
-    [Export] private Button LaunchEmulatorButton;
+    
 
     //Global access to other systems
     private AppInstance appInstance;
@@ -62,6 +65,7 @@ public partial class MainScene : Control
         SetupGameList();
         SetupDownloadsList();
         SetupButtonBindings();
+        SetupFirmwareSelector();
     }
     
     public override void _Input(InputEvent @event)
@@ -129,13 +133,21 @@ public partial class MainScene : Control
             downloadsListContainer.Visible = false;
         }
     }
+    
+    private void SetupFirmwareSelector()
+    {
+        if (firmwareSelector != null)
+        {
+            firmwareSelector.ItemSelected += OnFirmwareSelected;
+        }
+    }
 
     private void SwapLists()
     {
-        if (downloadsListContainer != null && gameListContainer != null)
+        if (downloadsListContainer != null && gameList != null)
         {
             downloadsListContainer.Visible = !downloadsListContainer.Visible;
-            gameListContainer.Visible = !gameListContainer.Visible;
+            gameList.Visible = !gameList.Visible;
         }
     }
 
@@ -180,13 +192,13 @@ public partial class MainScene : Control
         {
             if (!string.IsNullOrEmpty(selectedSystem.IgdbSlug))
             {
-                var texture = FindPlatformIcon(selectedSystem.IgdbSlug, "res://assets/platforms/", new[] { ".svg", ".png" });
+                var texture = FindPlatformIcon(selectedSystem.IgdbSlug, "res://assets/platforms/titles/", new[] { ".svg", ".png" });
                 platformIcon.Texture = texture;
             }
             
             else if (platformIcon.Texture == null)
             {
-                var texture = FindPlatformIcon(selectedSystem.Slug, "res://assets/platforms/", new[] { ".svg", ".png" });
+                var texture = FindPlatformIcon(selectedSystem.Slug, "res://assets/platforms/titles/", new[] { ".svg", ".png" });
                 platformIcon.Texture = texture;
             }
             
@@ -243,6 +255,46 @@ public partial class MainScene : Control
         }
         
         UpdateFooterButtons();
+        PopulateFirmwareSelector(system);
+    }
+    
+    private void PopulateFirmwareSelector(GameSystem system)
+    {
+        if (firmwareSelector == null)
+        {
+            GD.Print("Firmware selector is null");
+            return;
+        }
+
+        firmwareSelector.Clear();
+        GD.Print($"Populating firmware selector for {system.Name}");
+        var hasFirmwares = system.AvailableFirmwares != null && system.AvailableFirmwares.Any();
+        firmwareSelector.Visible = hasFirmwares;
+        GD.Print($"Firmware selector visible: {hasFirmwares}");
+
+        if (hasFirmwares)
+        {
+            GD.Print($"{system.AvailableFirmwares.Count} available firmwares found.");
+            foreach (var firmware in system.AvailableFirmwares)
+            {
+                firmwareSelector.AddItem(firmware.FileName);
+            }
+
+            var preferredFirmwareIndex = system.AvailableFirmwares.FindIndex(f => f.FullPath == system.PrefferedFirmware);
+            if (preferredFirmwareIndex != -1)
+            {
+                firmwareSelector.Select(preferredFirmwareIndex);
+            }
+        }
+    }
+    
+    private void OnFirmwareSelected(long index)
+    {
+        var system = gameSystems[currentGameSystemIndex];
+        if (index >= 0 && index < system.AvailableFirmwares.Count)
+        {
+            system.PrefferedFirmware = system.AvailableFirmwares[(int)index].FullPath;
+        }
     }
 
     public void RefreshGameList()

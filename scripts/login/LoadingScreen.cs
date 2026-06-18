@@ -54,6 +54,7 @@ public partial class LoadingScreen : Control
             }
 
             await SyncFirmwareAsync();
+            await PopulateAvailableFirmwareAsync();
 
             await Task.Delay(200);
             GetTree().ChangeSceneToFile("res://scenes/main_scene.tscn");
@@ -119,6 +120,7 @@ public partial class LoadingScreen : Control
             }
             
             appInstance.dataBus.gameCache[system.Id] = allGamesForSystem;
+            GD.Print($"Found {allGamesForSystem.Count} games for {system.Name}");
             
             systemsProcessed++;
             if (_progressBar != null)
@@ -127,9 +129,11 @@ public partial class LoadingScreen : Control
             }
         }
         
+        GD.Print($"Saving {appInstance.dataBus.gameCache.Sum(x => x.Value.Count)} games to cache.");
         appInstance.cacheManager.SaveCache(appInstance.dataBus.systems, appInstance.dataBus.gameCache);
         
         await SyncFirmwareAsync();
+        await PopulateAvailableFirmwareAsync();
         
         if (_statusLabel != null)
         {
@@ -199,6 +203,20 @@ public partial class LoadingScreen : Control
             if (_progressBar != null)
             {
                 _progressBar.Value = ((float)processed / firmwareToDownload.Count) * 100;
+            }
+        }
+    }
+    
+    private async Task PopulateAvailableFirmwareAsync()
+    {
+        foreach (var system in appInstance.dataBus.systems)
+        {
+            var firmwareDir = appInstance.configManager.BiosPath.PathJoin(system.Slug);
+            if (DirAccess.DirExistsAbsolute(firmwareDir))
+            {
+                var availableFirmwares = await appInstance.rommApi.GetFirmwareAsync(system.Id);
+                var files = DirAccess.GetFilesAt(firmwareDir);
+                system.AvailableFirmwares = availableFirmwares.Where(f => files.Contains(f.FileName)).ToList();
             }
         }
     }

@@ -33,6 +33,10 @@ public class GameSystem
     public string IgdbSlug { get; set; }
     
     public string MappedEmulator { get; set; }
+
+    public string PrefferedFirmware { get; set; }
+
+    public List<Firmware> AvailableFirmwares { get; set; }
 }
 
 

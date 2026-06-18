@@ -287,6 +287,11 @@ public partial class EmulatorManager : Node
             
             string arguments = meta.LaunchArgsWithGame;
             arguments = arguments.Replace("{rom_path}", romPath);
+
+            if (!string.IsNullOrEmpty(game.System.PrefferedFirmware))
+            {
+                arguments += $" --bios \"{game.System.PrefferedFirmware}\"";
+            }
             
 
             GD.Print($"Launching: {fullExecutablePath} {arguments}"); 
@@ -351,6 +356,12 @@ public partial class EmulatorManager : Node
             string fullExecutablePath = Path.Join(installDir, executableRelativePath);
             
             string arguments = meta.LaunchArgsWithoutGame;
+
+            var currentSystem = mainScene.gameSystems[mainScene.currentGameSystemIndex];
+            if (currentSystem != null && !string.IsNullOrEmpty(currentSystem.PrefferedFirmware))
+            {
+                arguments += $" --bios \"{currentSystem.PrefferedFirmware}\"";
+            }
             
             GD.Print($"Launching: {fullExecutablePath} {arguments}"); 
             
@@ -431,5 +442,3 @@ public partial class EmulatorManager : Node
         }
     }
 }
-
-
