@@ -10,5 +10,6 @@
     "linux": "pcsx2",
     "macos": "pcsx2"
   },
-  "launch_args": "-batch -fullscreen \"{rom_path}\""
+  "launch_args_with_game": "-batch -fullscreen -portable -bigpicture -bios \"{bios_path}\" -- \"{rom_path}\"",
+  "launch_args_without_game": "-portable -bios \"{bios_path}\""
 }

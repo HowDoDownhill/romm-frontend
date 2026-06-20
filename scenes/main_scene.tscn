@@ -3,7 +3,17 @@
 [ext_resource type="Script" uid="uid://iu78vi21qhv0" path="res://scripts/main/MainScene.cs" id="1_6l7je"]
 [ext_resource type="PackedScene" uid="uid://cdhj70uq5atqd" path="res://scenes/downloads_list/downloads_page.tscn" id="2_6l7je"]
 [ext_resource type="Texture2D" uid="uid://dxgpruhh7d20e" path="res://assets/background/peak_background.png" id="2_7ykc4"]
+[ext_resource type="PackedScene" uid="uid://cew2a8jxcgu6t" path="res://scenes/games_list/game_list_entry.tscn" id="2_rt2n2"]
+[ext_resource type="Script" uid="uid://hoxiyvqd0ld4" path="res://addons/tnowe_extra_controls/elements/interpolated_container/interpolated_flow_container.gd" id="3_gubc5"]
+[ext_resource type="Script" uid="uid://bgqglerkcylxx" path="res://addons/SmoothScroll/smooth_scroll_container.gd" id="4_18nlu"]
 [ext_resource type="PackedScene" uid="uid://cffanb3xjob1c" path="res://scenes/downloads_list/download_entry.tscn" id="4_pu3yx"]
+[ext_resource type="Script" uid="uid://b7h0k2h2qwlqv" path="res://addons/SmoothScroll/scroll_damper/expo_scroll_damper.gd" id="5_c1pb6"]
+
+[sub_resource type="Resource" id="Resource_6wevv"]
+script = ExtResource("5_c1pb6")
+
+[sub_resource type="Resource" id="Resource_e1cbu"]
+script = ExtResource("5_c1pb6")
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_pu3yx"]
 
@@ -27,7 +37,7 @@
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_r6p65"]
 
-[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "firmwareSelector", "gameList", "detailsPanelContainer", "gameCover", "gameTitle", "gameDescription", "playDownloadButton", "deleteButton", "downloadsListContainer", "downloadProgressUI", "footerButtonsContainer", "LaunchEmulatorButton", "downloadsPageToggle", "refreshGamesButton")]
+[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "firmwareSelector", "gameList", "detailsPanelContainer", "gameCover", "gameMarquee", "gameTitle", "gameDescription", "playDownloadButton", "deleteButton", "downloadsListContainer", "downloadProgressUI", "footerButtonsContainer", "LaunchEmulatorButton", "downloadsPageToggle", "refreshGamesButton")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -40,12 +50,14 @@ platformLabel = NodePath("Background/VBoxContainer/MarginContainer/Panel/MarginC
 platformIcon = NodePath("Background/VBoxContainer/MarginContainer/Panel/MarginContainer/HBoxContainer/SystemIcon")
 firmwareSelector = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/SetBiosContainer/SetBiosButton")
 gameList = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/ScrollContainer/GameList")
-detailsPanelContainer = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox")
-gameCover = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/ImageMargin/GameImage")
-gameTitle = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/NameMargin/GameName")
-gameDescription = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/DescMargin/GameDesc")
-playDownloadButton = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/ButtonsMargin/ButtonsContainer/PlayButton")
-deleteButton = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/ButtonsMargin/ButtonsContainer/DeleteButton")
+gameListEntryScene = ExtResource("2_rt2n2")
+detailsPanelContainer = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel")
+gameCover = NodePath("")
+gameMarquee = NodePath("")
+gameTitle = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/NameMargin/GameName")
+gameDescription = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/DescMargin/GameDesc")
+playDownloadButton = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ButtonsMargin/ButtonsContainer/PlayButton")
+deleteButton = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ButtonsMargin/ButtonsContainer/DeleteButton")
 downloadsListContainer = NodePath("Background/VBoxContainer/DownloadsPageContainer")
 downloadProgressUI = NodePath("Background/VBoxContainer/DownloadsPageContainer/DownloadsPage")
 footerButtonsContainer = NodePath("Background/VBoxContainer/FooterButtonsContainer")
@@ -126,22 +138,34 @@ layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 10
 
-[node name="ScrollContainer" type="ScrollContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer" unique_id=970090981]
+[node name="ScrollContainer" type="ScrollContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer" unique_id=526878826]
 layout_mode = 2
 size_flags_horizontal = 3
+follow_focus = true
+script = ExtResource("4_18nlu")
+wheel_scroll_damper = SubResource("Resource_6wevv")
+dragging_scroll_damper = SubResource("Resource_e1cbu")
+hide_scrollbar_over_time = true
+scrollbar_hide_time = 0.0
+scrollbar_fade_in_time = 0.0
+scrollbar_fade_out_time = 0.0
+metadata/_custom_type_script = "uid://bgqglerkcylxx"
 
-[node name="GameList" type="ItemList" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/ScrollContainer" unique_id=336343651]
+[node name="GameList" type="Container" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/ScrollContainer" unique_id=2095098638]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-fixed_icon_size = Vector2i(16, 16)
+script = ExtResource("3_gubc5")
+allow_drag_reorder = false
+metadata/_custom_type_script = "uid://hoxiyvqd0ld4"
+metadata/_smooth_scroll_default_mouse_filter_set = true
 
 [node name="Panel" type="Panel" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer" unique_id=1330960290]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 0.3
 
-[node name="DetailsVBox" type="VBoxContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel" unique_id=2008924310]
+[node name="DetailsPanel" type="VBoxContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel" unique_id=280236495]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -149,54 +173,40 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 size_flags_horizontal = 3
-size_flags_stretch_ratio = 0.3
-alignment = 1
 
-[node name="ImageMargin" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox" unique_id=92748540]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 5
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
-
-[node name="GameImage" type="TextureRect" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/ImageMargin" unique_id=477149517]
+[node name="NameMargin" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel" unique_id=166909246]
 layout_mode = 2
 size_flags_vertical = 0
-expand_mode = 5
-
-[node name="NameMargin" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox" unique_id=166909246]
-layout_mode = 2
-size_flags_vertical = 10
 theme_override_constants/margin_left = 5
 theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="GameName" type="Label" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/NameMargin" unique_id=253070661]
+[node name="GameName" type="Label" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/NameMargin" unique_id=1077688247]
 layout_mode = 2
-size_flags_vertical = 8
+size_flags_vertical = 1
 text = "TEXT
 "
 horizontal_alignment = 1
 vertical_alignment = 1
 clip_text = true
 
-[node name="DescMargin" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox" unique_id=2114637104]
+[node name="DescMargin" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel" unique_id=2114637104]
 layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 3
 theme_override_constants/margin_left = 5
 theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="GameDesc" type="RichTextLabel" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/DescMargin" unique_id=313761642]
+[node name="GameDesc" type="RichTextLabel" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/DescMargin" unique_id=313761642]
 clip_contents = false
 layout_mode = 2
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="ButtonsMargin" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox" unique_id=1979380459]
+[node name="ButtonsMargin" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel" unique_id=1979380459]
 layout_mode = 2
 size_flags_vertical = 10
 theme_override_constants/margin_left = 5
@@ -204,18 +214,18 @@ theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="ButtonsContainer" type="VBoxContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/ButtonsMargin" unique_id=1045750652]
+[node name="ButtonsContainer" type="VBoxContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ButtonsMargin" unique_id=1045750652]
 layout_mode = 2
 theme_override_constants/separation = 4
 
-[node name="PlayButton" type="Button" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/ButtonsMargin/ButtonsContainer" unique_id=1097614377]
+[node name="PlayButton" type="Button" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ButtonsMargin/ButtonsContainer" unique_id=1097614377]
 layout_mode = 2
 focus_neighbor_bottom = NodePath("../DeleteButton")
 theme_override_font_sizes/font_size = 16
 text = "Play
 "
 
-[node name="DeleteButton" type="Button" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsVBox/ButtonsMargin/ButtonsContainer" unique_id=1476300814]
+[node name="DeleteButton" type="Button" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ButtonsMargin/ButtonsContainer" unique_id=1476300814]
 layout_mode = 2
 text = "Delete"
 
@@ -312,6 +322,7 @@ theme_override_styles/focus = SubResource("StyleBoxEmpty_r6p65")
 flat = true
 alignment = 1
 fit_to_longest_item = false
+allow_reselect = true
 
 [node name="LaunchEmulatorContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer" unique_id=1773723543]
 layout_mode = 2

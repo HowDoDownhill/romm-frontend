@@ -25,15 +25,26 @@ mono_crash.*.json
 /roms/
 /emulators/
 /downloads/
+/assets/covers_2d/
+/assets/covers_3d/
+/assets/marquees/
 
 roms/
 bios/
 emulators/
 downloads/
+assets/covers_2d/
+assets/covers_3d/
+assets/marquees/
 
 config.cfg
 games.cache
 systems.cache
 
-
 .claude/
+
+# AI Agent and Context Files
+.cursorrules
+.windsurfrules
+docs/CONTEXT.md
+docs/ARCHITECTURE.md

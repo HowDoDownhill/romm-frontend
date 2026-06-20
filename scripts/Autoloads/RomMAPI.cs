@@ -151,7 +151,7 @@ public partial class RomMAPI : Node
         try
         {
             int offset = (page - 1) * size;
-            string requestUrl = $"{apiHost}/api/roms?platform_ids={system.Id}&limit={size}&offset={offset}";
+            string requestUrl = $"{apiHost}/api/roms?platform_ids={system.Id}&limit={size}&offset={offset}&include=path_cover_3d";
             GD.Print($"Requesting games from URL: {requestUrl}");
             HttpResponseMessage response = await _httpClient.GetAsync(requestUrl);
             string responseBody = await response.Content.ReadAsStringAsync();
@@ -173,6 +173,10 @@ public partial class RomMAPI : Node
         catch (JsonException e)
         {
             GD.PrintErr($"GetGames JSON deserialization failed: {e.Message}");
+        }
+        catch (UriFormatException e)
+        {
+            GD.PrintErr($"Invalid URL format: {e.Message}");
         }
 
         return null;
@@ -283,5 +287,24 @@ public partial class RomMAPI : Node
         
         // Use the direct binary stream endpoint instead of the batch zip endpoint
         return $"{apiHost}/api/firmware/{firmware.Id}/content/{safeFileName}";
+    }
+
+    public async Task<bool> DownloadAssetAsync(string url, string destinationPath)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+            if (response.IsSuccessStatusCode)
+            {
+                using var fileStream = new System.IO.FileStream(destinationPath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None);
+                await response.Content.CopyToAsync(fileStream);
+                return true;
+            }
+        }
+        catch (Exception e)
+        {
+            GD.PrintErr($"Failed to download asset {url}: {e.Message}");
+        }
+        return false;
     }
 }

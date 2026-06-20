@@ -24,6 +24,7 @@ CacheManager="*uid://0rycpw7unjjb"
 DataBus="*uid://c3ihjck7ojmb6"
 DownloadManager="*uid://cahae8cxkj01b"
 EmulatorManager="*uid://mc0jjiebfh7k"
+AssetManager="*res://scripts/autoloads/AssetManager.cs"
 
 [display]
 
@@ -35,6 +36,10 @@ window/stretch/mode="canvas_items"
 [dotnet]
 
 project/assembly_name="romm-frontend"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/SmoothScroll/plugin.cfg", "res://addons/tnowe_extra_controls/plugin.cfg")
 
 [input]
 

@@ -58,6 +58,9 @@ public class Game
 
     [JsonPropertyName("path_cover_small")]
     public string PathCoverSmall { get; set; }
+
+    [JsonPropertyName("path_cover_3d")]
+    public string PathCover3d { get; set; }
     
     [JsonPropertyName("platform_id")]
     public int PlatformId { get; set; }

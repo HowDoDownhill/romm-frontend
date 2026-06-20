@@ -9,7 +9,7 @@ public partial class AppInstance : Node
     public CacheManager cacheManager;
     public EmulatorManager emulatorManager;
     public DataBus dataBus;
-    
+    public AssetManager assetManager;
     
     public override void _Ready()
     {

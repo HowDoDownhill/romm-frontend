@@ -1,10 +1,11 @@
-﻿using Godot;
+using Godot;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Threading.Tasks;
+using FileAccess = Godot.FileAccess;
 
 public partial class MainScene : Control
 {
@@ -25,11 +26,13 @@ public partial class MainScene : Control
     
     //Game list / Details Panel 
     [ExportGroup("GameList")] 
-    [Export] private ItemList gameList;
+    [Export] private Container gameList;
+    [Export] private PackedScene gameListEntryScene;
     
     [ExportGroup("DetailsPanel")]
     [Export] private VBoxContainer detailsPanelContainer;
     [Export] private TextureRect gameCover;
+    [Export] private TextureRect gameMarquee;
     [Export] private Label gameTitle;
     [Export] private RichTextLabel gameDescription;
     [Export] private Button playDownloadButton;
@@ -59,6 +62,7 @@ public partial class MainScene : Control
         appInstance.downloadManager.DownloadCompleted += OnDownloadCompleted; 
         
         appInstance.emulatorManager.mainScene = this;
+        appInstance.assetManager.AssetDownloaded += OnAssetDownloaded;
         
         GetCache();
         SelectSystemByIndex(0);
@@ -66,6 +70,14 @@ public partial class MainScene : Control
         SetupDownloadsList();
         SetupButtonBindings();
         SetupFirmwareSelector();
+    }
+
+    private void OnAssetDownloaded(int gameId, string assetType)
+    {
+        if (currentlySelectedGame != null && currentlySelectedGame.Id == gameId)
+        {
+            ShowGameDetails(currentlySelectedGame);
+        }
     }
     
     public override void _Input(InputEvent @event)
@@ -120,10 +132,7 @@ public partial class MainScene : Control
     
     public void SetupGameList()
     {
-        if (gameList != null)
-        {
-            gameList.ItemSelected += OnGameSelected;
-        }
+        // Removed ItemList signals since we are using a standard container
     }
     
     private void SetupDownloadsList()
@@ -230,7 +239,6 @@ public partial class MainScene : Control
     {
         if (gameList == null) return;
 
-        gameList.Clear();
         currentlySelectedGame = null;
 
         if (games.TryGetValue(system.Id, out List<Game> cachedGames))
@@ -238,13 +246,15 @@ public partial class MainScene : Control
             currentlyShownGames = cachedGames;
             RefreshGameList();
 
-            if (currentlyShownGames.Any())
+            if (currentlyShownGames.Any() && gameList.GetChildCount() > 0)
             {
-                gameList.Select(0);
-                OnGameSelected(0);
+                OnGameSelected(0L);
                 if (downloadsListContainer is not { Visible: true })
                 {
-                    gameList.GrabFocus();
+                    if (gameList.GetChild(0) is Control firstChild)
+                    {
+                        firstChild.GrabFocus();
+                    }
                 }
             }
         }
@@ -284,6 +294,7 @@ public partial class MainScene : Control
             if (preferredFirmwareIndex != -1)
             {
                 firmwareSelector.Select(preferredFirmwareIndex);
+                GD.Print($"Selected preferred firmware: {Path.GetFullPath(system.PrefferedFirmware)}");
             }
         }
     }
@@ -294,6 +305,7 @@ public partial class MainScene : Control
         if (index >= 0 && index < system.AvailableFirmwares.Count)
         {
             system.PrefferedFirmware = system.AvailableFirmwares[(int)index].FullPath;
+            GD.Print($"Selected preferred firmware: {system.PrefferedFirmware}");
         }
     }
 
@@ -301,7 +313,11 @@ public partial class MainScene : Control
     {
         if (gameList == null) return;
 
-        gameList.Clear();
+        foreach (Node child in gameList.GetChildren())
+        {
+            gameList.RemoveChild(child);
+            child.QueueFree();
+        }
 
         Texture2D systemControllerIcon = null;
         if (currentGameSystemIndex >= 0 && currentGameSystemIndex < gameSystems.Count)
@@ -319,18 +335,127 @@ public partial class MainScene : Control
         for (int i = 0; i < currentlyShownGames.Count; i++)
         {
             var game = currentlyShownGames[i];
-            gameList.AddItem(game.Name);
-            if (CheckIfGameIsDownloaded(game))
+            
+            if (gameListEntryScene == null) continue;
+
+            TextureRect entry = gameListEntryScene.Instantiate<TextureRect>();
+            entry.FocusMode = FocusModeEnum.All;
+
+            // Set up focus highlight
+            Panel focusPanel = new Panel();
+            focusPanel.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+            focusPanel.MouseFilter = Control.MouseFilterEnum.Ignore;
+            StyleBoxFlat focusStyle = new StyleBoxFlat
             {
-                if (systemControllerIcon != null)
+                BgColor = new Color(0, 0, 0, 0),
+                BorderWidthTop = 4,
+                BorderWidthBottom = 4,
+                BorderWidthLeft = 4,
+                BorderWidthRight = 4,
+                BorderColor = Colors.White,
+                DrawCenter = false
+            };
+            focusPanel.AddThemeStyleboxOverride("panel", focusStyle);
+            focusPanel.Visible = false;
+            entry.AddChild(focusPanel);
+
+            // Handle selection and focus
+            int index = i;
+            entry.GuiInput += (InputEvent @event) => 
+            {
+                if (@event is InputEventMouseButton mouseButton && mouseButton.Pressed && mouseButton.ButtonIndex == MouseButton.Left)
                 {
-                    gameList.SetItemIcon(i, systemControllerIcon);
+                    entry.GrabFocus();
+                    OnGameSelected((long)index);
+                }
+                else if (@event.IsActionPressed("ui_accept"))
+                {
+                    OnGameSelected((long)index);
+                    if (playDownloadButton != null && playDownloadButton.Visible && !playDownloadButton.Disabled)
+                    {
+                        playDownloadButton.GrabFocus();
+                    }
+                    entry.AcceptEvent();
+                }
+                else if (@event.IsActionPressed("ui_up") || @event.IsActionPressed("ui_down") || @event.IsActionPressed("ui_left") || @event.IsActionPressed("ui_right"))
+                {
+                    Side side = Side.Bottom;
+                    if (@event.IsActionPressed("ui_up")) side = Side.Top;
+                    if (@event.IsActionPressed("ui_down")) side = Side.Bottom;
+                    if (@event.IsActionPressed("ui_left")) side = Side.Left;
+                    if (@event.IsActionPressed("ui_right")) side = Side.Right;
+
+                    Control nextFocus = entry.FindValidFocusNeighbor(side);
+                    
+                    if (nextFocus != null && !gameList.IsAncestorOf(nextFocus))
+                    {
+                        entry.AcceptEvent();
+                    }
+                    else if (nextFocus == null)
+                    {
+                        entry.AcceptEvent();
+                    }
+                }
+            };
+
+            entry.FocusEntered += () => 
+            {
+                focusPanel.Visible = true;
+                entry.ZIndex = 1;
+                OnGameSelected((long)index);
+            };
+
+            entry.FocusExited += () => 
+            {
+                focusPanel.Visible = false;
+                entry.ZIndex = 0;
+            };
+
+            // Set up fallback covers for the list item
+            Label titleLabel = entry.GetNode<Label>("TitleLabel");
+            titleLabel.Text = game.Name;
+
+            void TryLoadImage()
+            {
+                string assetsPath = appInstance.configManager.AssetsPath;
+                string path3d = System.IO.Path.Combine(assetsPath, "covers_3d", $"{game.Id}.png");
+                string path2d = System.IO.Path.Combine(assetsPath, "covers_2d", $"{game.Id}.png");
+
+                if (Godot.FileAccess.FileExists(path3d))
+                {
+                    entry.Texture = ImageTexture.CreateFromImage(Image.LoadFromFile(path3d));
+                    titleLabel.Visible = false;
+                }
+                else if (Godot.FileAccess.FileExists(path2d))
+                {
+                    entry.Texture = ImageTexture.CreateFromImage(Image.LoadFromFile(path2d));
+                    titleLabel.Visible = false;
+                }
+                else if (CheckIfGameIsDownloaded(game) && systemControllerIcon != null)
+                {
+                    entry.Texture = systemControllerIcon;
                 }
             }
-            else
+
+            TryLoadImage();
+
+            // Subscribe to asset downloads in background
+            AssetManager.AssetDownloadedEventHandler onAssetDownloaded = null;
+            onAssetDownloaded = (downloadedGameId, assetType) =>
             {
-                gameList.SetItemIcon(i, null);
-            }
+                if (downloadedGameId == game.Id && (assetType == "box3d" || assetType == "box2d"))
+                {
+                    TryLoadImage();
+                }
+            };
+            appInstance.assetManager.AssetDownloaded += onAssetDownloaded;
+
+            entry.TreeExiting += () => 
+            {
+                appInstance.assetManager.AssetDownloaded -= onAssetDownloaded;
+            };
+
+            gameList.AddChild(entry);
         }
     }
 
@@ -356,26 +481,44 @@ public partial class MainScene : Control
     {
         if (detailsPanelContainer == null) return;
         
-        if (gameTitle != null) gameTitle.Text = game.Name;
+        if (gameTitle != null) 
+        {
+            gameTitle.Text = game.Name;
+            gameTitle.Visible = true;
+        }
         if (gameDescription != null) gameDescription.Text = game.Description;
         
+        if (gameMarquee != null)
+        {
+            gameMarquee.Visible = false;
+            string assetsPath = appInstance.configManager.AssetsPath;
+            string pathMarquee = System.IO.Path.Combine(assetsPath, "marquees", $"{game.Id}.png");
+            
+            if (Godot.FileAccess.FileExists(pathMarquee))
+            {
+                gameMarquee.Texture = ImageTexture.CreateFromImage(Image.LoadFromFile(pathMarquee));
+                gameMarquee.Visible = true;
+                if (gameTitle != null) gameTitle.Visible = false;
+            }
+            else
+            {
+                if (gameTitle != null) gameTitle.Visible = true;
+            }
+        }
+
         if (gameCover != null)
         {
-            string coverUrl = null;
+            string assetsPath = appInstance.configManager.AssetsPath;
+            string path3d = System.IO.Path.Combine(assetsPath, "covers_3d", $"{game.Id}.png");
+            string path2d = System.IO.Path.Combine(assetsPath, "covers_2d", $"{game.Id}.png");
 
-            if (appInstance.rommApi != null && !string.IsNullOrEmpty(game.PathCoverLarge))
+            if (Godot.FileAccess.FileExists(path3d))
             {
-                string cleanPath = game.PathCoverLarge.StartsWith("/") ? game.PathCoverLarge.Substring(1) : game.PathCoverLarge;
-                coverUrl = $"{appInstance.rommApi.ApiHost}/{cleanPath}".Replace(" ", "%20");
+                gameCover.Texture = ImageTexture.CreateFromImage(Image.LoadFromFile(path3d));
             }
-            else if (!string.IsNullOrEmpty(game.CoverArtUrl))
+            else if (Godot.FileAccess.FileExists(path2d))
             {
-                coverUrl = game.CoverArtUrl.Replace(" ", "%20");
-            }
-
-            if (!string.IsNullOrEmpty(coverUrl))
-            {
-                DownloadAndSetTexture(coverUrl, gameCover);
+                gameCover.Texture = ImageTexture.CreateFromImage(Image.LoadFromFile(path2d));
             }
             else
             {
@@ -443,66 +586,7 @@ public partial class MainScene : Control
         }
     }
     
-    private void DownloadAndSetTexture(string url, TextureRect textureRect)
-    {
-        HttpRequest httpRequest = new HttpRequest();
-        AddChild(httpRequest);
-        
-        httpRequest.RequestCompleted += (long result, long responseCode, string[] headers, byte[] body) => 
-        {
-            if (result == (long)HttpRequest.Result.Success && responseCode == 200 && body != null && body.Length > 0)
-            {
-                string contentType = "";
-                foreach (string header in headers)
-                {
-                    if (header.StartsWith("Content-Type", System.StringComparison.OrdinalIgnoreCase))
-                    {
-                        contentType = header.Split(':')[1].Trim().ToLower();
-                        break;
-                    }
-                }
 
-                Image image = new Image();
-                Error error = Error.Failed;
-
-                if (contentType.Contains("jpeg") || contentType.Contains("jpg"))
-                {
-                    error = image.LoadJpgFromBuffer(body);
-                }
-                else if (contentType.Contains("png"))
-                {
-                    error = image.LoadPngFromBuffer(body);
-                }
-                else if (contentType.Contains("webp"))
-                {
-                    error = image.LoadWebpFromBuffer(body);
-                }
-                else
-                {
-                    error = image.LoadJpgFromBuffer(body);
-                    if (error != Error.Ok) error = image.LoadPngFromBuffer(body);
-                    if (error != Error.Ok) error = image.LoadWebpFromBuffer(body);
-                }
-
-                if (error == Error.Ok)
-                {
-                    ImageTexture texture = ImageTexture.CreateFromImage(image);
-                    textureRect.Texture = texture;
-                }
-                else
-                {
-                    GD.PrintErr($"Failed to create image from downloaded data. URL: {url}, Error: {error}");
-                }
-            }
-            else
-            {
-                GD.PrintErr($"Failed to download image. URL: {url}, Response Code: {responseCode}, Result: {result}, Body Length: {(body != null ? body.Length.ToString() : "null")}");
-            }
-            httpRequest.QueueFree();
-        };
-
-        httpRequest.Request(url);
-    }
     
     private void OnPlayDownloadButtonPressed()
     {

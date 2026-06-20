@@ -1,4 +1,4 @@
-﻿using Godot;
+using Godot;
 
 public partial class ConfigManager : Node
 {
@@ -14,6 +14,7 @@ public partial class ConfigManager : Node
     public string DownloadsPath { get; private set; }
     public string InstallScriptsPath { get; private set; }
     public string ToolsPath { get; private set; }
+    public string AssetsPath { get; private set; }
     public string RomMHost { get; private set; }
     public string RomMUsername { get; private set; }
     public string RomMPassword { get; private set; }
@@ -80,6 +81,23 @@ public partial class ConfigManager : Node
         {
             DirAccess.MakeDirAbsolute(rootDir + "/tools/");
         }
+
+        if (!DirAccess.DirExistsAbsolute(rootDir + "/assets/"))
+        {
+            DirAccess.MakeDirAbsolute(rootDir + "/assets/");
+        }
+        if (!DirAccess.DirExistsAbsolute(rootDir + "/assets/covers_3d/"))
+        {
+            DirAccess.MakeDirAbsolute(rootDir + "/assets/covers_3d/");
+        }
+        if (!DirAccess.DirExistsAbsolute(rootDir + "/assets/covers_2d/"))
+        {
+            DirAccess.MakeDirAbsolute(rootDir + "/assets/covers_2d/");
+        }
+        if (!DirAccess.DirExistsAbsolute(rootDir + "/assets/marquees/"))
+        {
+            DirAccess.MakeDirAbsolute(rootDir + "/assets/marquees/");
+        }
     }
 
     private void LoadConfig()
@@ -98,6 +116,7 @@ public partial class ConfigManager : Node
         DownloadsPath = (string)config.GetValue("Paths", "DownloadsPath", $"{rootDir}/downloads/");
         InstallScriptsPath = (string)config.GetValue("Paths", "InstallScriptsPath", $"{rootDir}/install_scripts/");
         ToolsPath = (string)config.GetValue("Paths", "ToolsPath", $"{rootDir}/tools/");
+        AssetsPath = (string)config.GetValue("Paths", "AssetsPath", $"{rootDir}/assets/");
         RomMHost = (string)config.GetValue("RomM", "Host", "");
         RomMUsername = (string)config.GetValue("RomM", "Username", "");
         RomMPassword = (string)config.GetValue("RomM", "Password", "");
@@ -114,6 +133,7 @@ public partial class ConfigManager : Node
         DownloadsPath = $"{rootDir}/downloads/";
         InstallScriptsPath = $"{rootDir}/install_scripts/";
         ToolsPath = $"{rootDir}/tools/";
+        AssetsPath = $"{rootDir}/assets/";
         RomMHost = "";
         RomMUsername = "";
         RomMPassword = "";
@@ -126,6 +146,7 @@ public partial class ConfigManager : Node
         config.SetValue("Paths", "DownloadsPath", DownloadsPath);
         config.SetValue("Paths", "InstallScriptsPath", InstallScriptsPath);
         config.SetValue("Paths", "ToolsPath", ToolsPath);
+        config.SetValue("Paths", "AssetsPath", AssetsPath);
         config.SetValue("RomM", "Host", RomMHost);
         config.SetValue("RomM", "Username", RomMUsername);
         config.SetValue("RomM", "Password", RomMPassword);
@@ -142,6 +163,7 @@ public partial class ConfigManager : Node
         config.SetValue("Paths", "DownloadsPath", DownloadsPath);
         config.SetValue("Paths", "InstallScriptsPath", InstallScriptsPath);
         config.SetValue("Paths", "ToolsPath", ToolsPath);
+        config.SetValue("Paths", "AssetsPath", AssetsPath);
         config.SetValue("RomM", "Host", RomMHost);
         config.SetValue("RomM", "Username", RomMUsername);
         config.SetValue("RomM", "Password", RomMPassword);

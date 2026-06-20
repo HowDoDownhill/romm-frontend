@@ -1,4 +1,4 @@
-﻿using Godot;
+using Godot;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -55,6 +55,8 @@ public partial class LoadingScreen : Control
 
             await SyncFirmwareAsync();
             await PopulateAvailableFirmwareAsync();
+
+            appInstance.assetManager.StartBackgroundSync();
 
             await Task.Delay(200);
             GetTree().ChangeSceneToFile("res://scenes/main_scene.tscn");
@@ -135,6 +137,8 @@ public partial class LoadingScreen : Control
         await SyncFirmwareAsync();
         await PopulateAvailableFirmwareAsync();
         
+        appInstance.assetManager.StartBackgroundSync();
+        
         if (_statusLabel != null)
         {
             _statusLabel.Text = "Finished!";
@@ -214,9 +218,24 @@ public partial class LoadingScreen : Control
             var firmwareDir = appInstance.configManager.BiosPath.PathJoin(system.Slug);
             if (DirAccess.DirExistsAbsolute(firmwareDir))
             {
-                var availableFirmwares = await appInstance.rommApi.GetFirmwareAsync(system.Id);
-                var files = DirAccess.GetFilesAt(firmwareDir);
-                system.AvailableFirmwares = availableFirmwares.Where(f => files.Contains(f.FileName)).ToList();
+                var firmwaresFromApi = await appInstance.rommApi.GetFirmwareAsync(system.Id);
+                var localFiles = DirAccess.GetFilesAt(firmwareDir);
+
+                var availableFirmwares = new List<Firmware>();
+                foreach (var fw in firmwaresFromApi)
+                {
+                    if (localFiles.Contains(fw.FileName))
+                    {
+                        fw.FullPath = firmwareDir.PathJoin(fw.FileName);
+                        availableFirmwares.Add(fw);
+                    }
+                }
+                system.AvailableFirmwares = availableFirmwares;
+
+                if (string.IsNullOrEmpty(system.PrefferedFirmware) && system.AvailableFirmwares.Any())
+                {
+                    system.PrefferedFirmware = system.AvailableFirmwares.First().FullPath;
+                }
             }
         }
     }

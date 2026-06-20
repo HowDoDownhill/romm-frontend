@@ -247,60 +247,111 @@ public partial class EmulatorManager : Node
 
     public void LaunchEmulatorWithGame(Game game)
     {
+        GD.Print("--- Launching Emulator with Game ---");
+
+        if (game == null)
+        {
+            GD.PrintErr("Game object is null.");
+            return;
+        }
+        GD.Print($"Game: {game.Name}");
+
+        if (game.System == null)
+        {
+            GD.PrintErr("Game.System is null.");
+            return;
+        }
+        GD.Print($"Game System: {game.System.Name}");
+        GD.Print($"Game System Slug: {game.System.Slug}");
+
         string mappedEmulator = GetMappedEmulator(game.System.Slug);
-        
         if (string.IsNullOrEmpty(mappedEmulator))
         {
             GD.PrintErr($"No emulator mapped for system: {game.System.Name} ({game.System.Slug})");
             return;
         }
+        GD.Print($"Mapped Emulator: {mappedEmulator}");
 
         string metaPath = appInstance.configManager.InstallScriptsPath.PathJoin(mappedEmulator).PathJoin("meta.json");
-        
         if (!FileAccess.FileExists(metaPath))
         {
-            GD.PrintErr($"Meta file not found for mapped emulator: {metaPath}");
+            GD.PrintErr($"Meta file not found: {metaPath}");
             return;
         }
-        
-        try 
+        GD.Print($"Meta Path: {metaPath}");
+
+        try
         {
             string osName = OS.GetName().ToLower();
+            GD.Print($"Operating System: {osName}");
+
             var metaJson = FileAccess.GetFileAsString(metaPath);
             var meta = JsonSerializer.Deserialize<EmulatorMeta>(metaJson);
-            
-            if (meta == null || meta.EmulatorDirName == null || meta.ExecutableName == null ||
-                !meta.EmulatorDirName.ContainsKey(osName) || !meta.ExecutableName.ContainsKey(osName))
+
+            if (meta == null)
             {
-                 GD.PrintErr($"Incomplete meta.json for {mappedEmulator} on OS: {osName}");
-                 return;
+                GD.PrintErr("meta.json could not be deserialized.");
+                return;
+            }
+            if (meta.EmulatorDirName == null || !meta.EmulatorDirName.ContainsKey(osName))
+            {
+                GD.PrintErr("EmulatorDirName is missing or does not contain key for the current OS.");
+                return;
+            }
+            if (meta.ExecutableName == null || !meta.ExecutableName.ContainsKey(osName))
+            {
+                GD.PrintErr("ExecutableName is missing or does not contain key for the current OS.");
+                return;
             }
 
-            string installDir = appInstance.configManager.EmulatorsPath + meta.EmulatorDirName[osName];
-            string executableRelativePath = meta.ExecutableName[osName];
-            string fullExecutablePath = Path.Join(installDir, executableRelativePath);
+            string installDir = Path.Combine(appInstance.configManager.EmulatorsPath, meta.EmulatorDirName[osName]);
+            GD.Print($"Install Directory: {installDir}");
 
-            string romPath = Path.GetFullPath(Path.Join(
-                appInstance.configManager.RomsPath, 
-                game.System.Slug, 
-                game.Files[0].FileName));
-            
+            string executableRelativePath = meta.ExecutableName[osName];
+            GD.Print($"Executable Relative Path: {executableRelativePath}");
+
+            string fullExecutablePath = Path.Combine(installDir, executableRelativePath);
+            GD.Print($"Full Executable Path: {fullExecutablePath}");
+
+            if (game.Files == null || game.Files.Count == 0)
+            {
+                GD.PrintErr("Game has no files.");
+                return;
+            }
+            string romFileName = game.Files[0].FileName;
+            GD.Print($"ROM File Name: {romFileName}");
+
+            string romPath = Path.GetFullPath(Path.Combine(appInstance.configManager.RomsPath, game.System.Slug, romFileName));
+            GD.Print($"ROM Path: {romPath}");
+
             string arguments = meta.LaunchArgsWithGame;
-            arguments = arguments.Replace("{rom_path}", romPath);
+            if (string.IsNullOrEmpty(arguments))
+            {
+                GD.PrintErr("LaunchArgsWithGame is not defined in meta.json.");
+                return;
+            }
+            GD.Print($"Raw Arguments: {arguments}");
+
+            arguments = arguments.Replace("{rom_path}", $"\"{romPath}\"");
 
             if (!string.IsNullOrEmpty(game.System.PrefferedFirmware))
             {
-                arguments += $" --bios \"{game.System.PrefferedFirmware}\"";
+                string biosPath = Path.GetFullPath(game.System.PrefferedFirmware);
+                GD.Print($"Preferred Firmware Path: {biosPath}");
+                arguments = arguments.Replace("{bios_path}", $"\"{biosPath}\"");
             }
-            
+            else
+            {
+                GD.Print("No preferred firmware set.");
+            }
 
-            GD.Print($"Launching: {fullExecutablePath} {arguments}"); 
-            
+            GD.Print($"Launching Command: \"{fullExecutablePath}\" {arguments}");
+
             ProcessStartInfo startInfo = new ProcessStartInfo
             {
                 FileName = fullExecutablePath,
                 Arguments = arguments,
-                WorkingDirectory = installDir, 
+                WorkingDirectory = installDir,
                 CreateNoWindow = true,
                 UseShellExecute = false
             };
@@ -310,15 +361,20 @@ public partial class EmulatorManager : Node
             {
                 GD.Print($"Emulator launched with PID: {emulatorProcess.Id}");
                 emulatorProcess.EnableRaisingEvents = true;
-                emulatorProcess.Exited += (sender, e) => 
+                emulatorProcess.Exited += (sender, e) =>
                 {
                     GD.Print("Emulator was closed.");
                 };
             }
+            else
+            {
+                GD.PrintErr("Failed to start emulator process. Process.Start returned null.");
+            }
         }
         catch (Exception ex)
         {
-            GD.PrintErr($"Failed to launch emulator: {ex.Message}");
+            GD.PrintErr($"An exception occurred while launching the emulator: {ex.Message}");
+            GD.PrintErr($"Stack Trace: {ex.StackTrace}");
         }
     }
 
@@ -358,9 +414,10 @@ public partial class EmulatorManager : Node
             string arguments = meta.LaunchArgsWithoutGame;
 
             var currentSystem = mainScene.gameSystems[mainScene.currentGameSystemIndex];
+            
             if (currentSystem != null && !string.IsNullOrEmpty(currentSystem.PrefferedFirmware))
             {
-                arguments += $" --bios \"{currentSystem.PrefferedFirmware}\"";
+                arguments = arguments.Replace("{bios_path}", Path.GetFullPath(currentSystem.PrefferedFirmware));
             }
             
             GD.Print($"Launching: {fullExecutablePath} {arguments}"); 
@@ -403,9 +460,9 @@ public partial class EmulatorManager : Node
             {"gb", "mGBA"},
             {"gba", "mGBA"},
             {"nds", "melonDS"},
-            {"psx", "DuckStation"},
-            {"ps2", "PCSX2"},
-            {"ps3", "RPCS3"},
+            {"psx", "duckstation"},
+            {"ps2", "pcsx2"},
+            {"ps3", "rpcs3"},
             {"ps4", "shadPS4"},
             {"psp", "ppsspp"},
             {"sega32", "ares"},
