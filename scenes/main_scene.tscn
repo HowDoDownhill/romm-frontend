@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://iu78vi21qhv0" path="res://scripts/main/MainScene.cs" id="1_6l7je"]
 [ext_resource type="PackedScene" uid="uid://cdhj70uq5atqd" path="res://scenes/downloads_list/downloads_page.tscn" id="2_6l7je"]
-[ext_resource type="Texture2D" uid="uid://dxgpruhh7d20e" path="res://assets/background/peak_background.png" id="2_7ykc4"]
+[ext_resource type="Texture2D" uid="uid://djk0hyd5820ol" path="res://assets/background/peak_background.png" id="2_7ykc4"]
 [ext_resource type="PackedScene" uid="uid://cew2a8jxcgu6t" path="res://scenes/games_list/game_list_entry.tscn" id="2_rt2n2"]
 [ext_resource type="Script" uid="uid://hoxiyvqd0ld4" path="res://addons/tnowe_extra_controls/elements/interpolated_container/interpolated_flow_container.gd" id="3_gubc5"]
 [ext_resource type="Script" uid="uid://bgqglerkcylxx" path="res://addons/SmoothScroll/smooth_scroll_container.gd" id="4_18nlu"]
@@ -37,7 +37,7 @@ script = ExtResource("5_c1pb6")
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_r6p65"]
 
-[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "firmwareSelector", "gameList", "detailsPanelContainer", "gameCover", "gameMarquee", "gameTitle", "gameDescription", "playDownloadButton", "deleteButton", "downloadsListContainer", "downloadProgressUI", "footerButtonsContainer", "LaunchEmulatorButton", "downloadsPageToggle", "refreshGamesButton")]
+[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "firmwareSelector", "gameList", "detailsPanelContainer", "gameTitle", "gameDescription", "playDownloadButton", "deleteButton", "downloadsListContainer", "downloadProgressUI", "footerButtonsContainer", "LaunchEmulatorButton", "downloadsPageToggle", "refreshGamesButton")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -52,8 +52,6 @@ firmwareSelector = NodePath("Background/VBoxContainer/FooterButtonsContainer/Pan
 gameList = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/ScrollContainer/GameList")
 gameListEntryScene = ExtResource("2_rt2n2")
 detailsPanelContainer = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel")
-gameCover = NodePath("")
-gameMarquee = NodePath("")
 gameTitle = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/NameMargin/GameName")
 gameDescription = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/DescMargin/GameDesc")
 playDownloadButton = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ButtonsMargin/ButtonsContainer/PlayButton")
