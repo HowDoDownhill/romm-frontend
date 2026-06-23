@@ -2,18 +2,9 @@
 
 [ext_resource type="Script" uid="uid://iu78vi21qhv0" path="res://scripts/main/MainScene.cs" id="1_6l7je"]
 [ext_resource type="PackedScene" uid="uid://cdhj70uq5atqd" path="res://scenes/downloads_list/downloads_page.tscn" id="2_6l7je"]
-[ext_resource type="Texture2D" uid="uid://djk0hyd5820ol" path="res://assets/background/peak_background.png" id="2_7ykc4"]
 [ext_resource type="PackedScene" uid="uid://cew2a8jxcgu6t" path="res://scenes/games_list/game_list_entry.tscn" id="2_rt2n2"]
-[ext_resource type="Script" uid="uid://hoxiyvqd0ld4" path="res://addons/tnowe_extra_controls/elements/interpolated_container/interpolated_flow_container.gd" id="3_gubc5"]
-[ext_resource type="Script" uid="uid://bgqglerkcylxx" path="res://addons/SmoothScroll/smooth_scroll_container.gd" id="4_18nlu"]
+[ext_resource type="Script" uid="uid://cwtykxfgbvhv6" path="res://scripts/ui/VerticalCarousel.cs" id="3_gubc5"]
 [ext_resource type="PackedScene" uid="uid://cffanb3xjob1c" path="res://scenes/downloads_list/download_entry.tscn" id="4_pu3yx"]
-[ext_resource type="Script" uid="uid://b7h0k2h2qwlqv" path="res://addons/SmoothScroll/scroll_damper/expo_scroll_damper.gd" id="5_c1pb6"]
-
-[sub_resource type="Resource" id="Resource_6wevv"]
-script = ExtResource("5_c1pb6")
-
-[sub_resource type="Resource" id="Resource_e1cbu"]
-script = ExtResource("5_c1pb6")
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_pu3yx"]
 
@@ -49,7 +40,7 @@ headerContainer = NodePath("Background/VBoxContainer/MarginContainer")
 platformLabel = NodePath("Background/VBoxContainer/MarginContainer/Panel/MarginContainer/HBoxContainer/PlatformLabel")
 platformIcon = NodePath("Background/VBoxContainer/MarginContainer/Panel/MarginContainer/HBoxContainer/SystemIcon")
 firmwareSelector = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/SetBiosContainer/SetBiosButton")
-gameList = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/ScrollContainer/GameList")
+gameList = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/GameList")
 gameListEntryScene = ExtResource("2_rt2n2")
 detailsPanelContainer = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel")
 gameTitle = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/NameMargin/GameName")
@@ -63,15 +54,13 @@ LaunchEmulatorButton = NodePath("Background/VBoxContainer/FooterButtonsContainer
 downloadsPageToggle = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/DownloadsButtonConstainer/DownloadPageToggle")
 refreshGamesButton = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/RefreshButtonContainer/RefreshGamesButton")
 
-[node name="Background" type="TextureRect" parent="." unique_id=188783889]
+[node name="Background" type="TextureRect" parent="." unique_id=586301297]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-texture = ExtResource("2_7ykc4")
-expand_mode = 2
 
 [node name="VBoxContainer" type="VBoxContainer" parent="Background" unique_id=1312213171]
 layout_mode = 1
@@ -136,27 +125,17 @@ layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/separation = 10
 
-[node name="ScrollContainer" type="ScrollContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer" unique_id=526878826]
-layout_mode = 2
-size_flags_horizontal = 3
-follow_focus = true
-script = ExtResource("4_18nlu")
-wheel_scroll_damper = SubResource("Resource_6wevv")
-dragging_scroll_damper = SubResource("Resource_e1cbu")
-hide_scrollbar_over_time = true
-scrollbar_hide_time = 0.0
-scrollbar_fade_in_time = 0.0
-scrollbar_fade_out_time = 0.0
-metadata/_custom_type_script = "uid://bgqglerkcylxx"
-
-[node name="GameList" type="Container" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/ScrollContainer" unique_id=2095098638]
+[node name="GameList" type="Control" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer" unique_id=2095098638]
+clip_contents = true
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
+focus_mode = 2
 script = ExtResource("3_gubc5")
-allow_drag_reorder = false
-metadata/_custom_type_script = "uid://hoxiyvqd0ld4"
-metadata/_smooth_scroll_default_mouse_filter_set = true
+DepthOffset = 400.0
+XOffset = -300.0
+MinimumOpacity = 0.0
+WindowWidthRatio = 0.2
 
 [node name="Panel" type="Panel" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer" unique_id=1330960290]
 layout_mode = 2

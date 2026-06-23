@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Godot;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -26,10 +26,29 @@ public class EmulatorMeta
     [JsonPropertyName("launch_args_without_game")]
     public string LaunchArgsWithoutGame { get; set; }
     
-    /*
-    [JsonPropertyName("emulator_default_config")]
-    public Dictionary<string, string> EmulatorDefaultConfig { get; set; }
-    */
+    [JsonPropertyName("install_recipe")]
+    public Dictionary<string, InstallRecipe> InstallRecipe { get; set; }
+}
+
+public class InstallRecipe
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; }
+
+    [JsonPropertyName("url")]
+    public string Url { get; set; }
+
+    [JsonPropertyName("repo")]
+    public string Repo { get; set; }
+
+    [JsonPropertyName("asset_regex")]
+    public string AssetRegex { get; set; }
+
+    [JsonPropertyName("extract")]
+    public bool Extract { get; set; } = true;
+
+    [JsonPropertyName("extract_folder_regex")]
+    public string ExtractFolderRegex { get; set; }
 }
 
 public partial class EmulatorManager : Node
@@ -154,95 +173,30 @@ public partial class EmulatorManager : Node
             return;
         }
 
-        string scriptPath = "";
-        string osName = OS.GetName();
+        string osName = OS.GetName().ToLower();
 
-        if (osName == "Windows")
-        {
-            scriptPath = emulatorScriptDir.PathJoin("install_windows.ps1");
-        }
-        else if (osName == "Linux")
-        {
-            scriptPath = emulatorScriptDir.PathJoin("install_linux.sh");
-        }
-        else if (osName == "macOS")
-        {
-            scriptPath = emulatorScriptDir.PathJoin("install_macos.sh");
-        }
-        else
-        {
-            GD.PrintErr($"Unsupported OS: {osName}");
-            return;
-        }
-
-        if (!FileAccess.FileExists(scriptPath))
-        {
-            GD.PrintErr($"Installation script not found: {scriptPath}");
-            return;
-        }
-
-        await RunInstallScript(scriptPath, appInstance.configManager.EmulatorsPath, osName);
-        mainScene.UpdateDetailsPanelButtons(mainScene.currentlySelectedGame);  
-
-    }
-
-    private Task RunInstallScript(string scriptPath, string installDir, string osName)
-    {
-        var tcs = new TaskCompletionSource<bool>();
-        var process = new Process();
-        
         try
         {
-            if (osName == "Windows")
+            var metaJson = FileAccess.GetFileAsString(metaPath);
+            var meta = JsonSerializer.Deserialize<EmulatorMeta>(metaJson);
+
+            bool success = await UniversalInstaller.Install(appInstance, emulatorName, meta, osName);
+
+            if (success)
             {
-                process.StartInfo.FileName = "powershell.exe";
-                process.StartInfo.Arguments = $"-NoProfile -ExecutionPolicy Bypass -File \"{ProjectSettings.GlobalizePath(scriptPath)}\" -InstallDirectory \"{ProjectSettings.GlobalizePath(installDir)}\"";
+                GD.Print($"Successfully installed {emulatorName}.");
             }
             else
             {
-                process.StartInfo.FileName = "/bin/bash";
-                process.StartInfo.Arguments = $"\"{ProjectSettings.GlobalizePath(scriptPath)}\" \"{ProjectSettings.GlobalizePath(installDir)}\"";
+                GD.PrintErr($"Failed to install {emulatorName}.");
             }
-
-            process.StartInfo.RedirectStandardOutput = true;
-            process.StartInfo.RedirectStandardError = true;
-            process.StartInfo.UseShellExecute = false;
-            process.StartInfo.CreateNoWindow = true;
-            process.EnableRaisingEvents = true;
-
-            process.OutputDataReceived += (sender, args) => {
-                if (args.Data != null) GD.Print(args.Data);
-            };
-            process.ErrorDataReceived += (sender, args) => {
-                if (args.Data != null) GD.PrintErr(args.Data);
-            };
-
-            process.Exited += (sender, args) =>
-            {
-                if (process.ExitCode == 0)
-                {
-                    GD.Print("Installation script finished successfully.");
-                    tcs.SetResult(true);
-                }
-                else
-                {
-                    GD.PrintErr($"Installation script failed with exit code: {process.ExitCode}");
-                    tcs.SetResult(false);
-                }
-                process.Dispose();
-            };
-
-            process.Start();
-            process.BeginOutputReadLine();
-            process.BeginErrorReadLine();
         }
-        catch (Exception e)
+        catch (Exception ex)
         {
-            GD.PrintErr($"Failed to start installation process: {e.Message}");
-            tcs.SetResult(false);
+            GD.PrintErr($"Exception during install: {ex.Message}");
         }
 
-        return tcs.Task;
+        mainScene.UpdateDetailsPanelButtons(mainScene.currentlySelectedGame);  
     }
 
     public void LaunchEmulatorWithGame(Game game)
@@ -332,13 +286,13 @@ public partial class EmulatorManager : Node
             }
             GD.Print($"Raw Arguments: {arguments}");
 
-            arguments = arguments.Replace("{rom_path}", $"\"{romPath}\"");
+            arguments = arguments.Replace("{rom_path}", romPath);
 
             if (!string.IsNullOrEmpty(game.System.PrefferedFirmware))
             {
                 string biosPath = Path.GetFullPath(game.System.PrefferedFirmware);
                 GD.Print($"Preferred Firmware Path: {biosPath}");
-                arguments = arguments.Replace("{bios_path}", $"\"{biosPath}\"");
+                arguments = arguments.Replace("{bios_path}", biosPath);
             }
             else
             {
@@ -455,7 +409,7 @@ public partial class EmulatorManager : Node
             {"ngc", "dolphin"},
             {"wii", "dolphin"},
             {"snes", "snes9x"},
-            {"n64", "mupen64plus"},
+            {"n64", "gopher64"},
             {"nes", "nestopia"},
             {"gb", "mGBA"},
             {"gba", "mGBA"},

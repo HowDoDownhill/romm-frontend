@@ -1,0 +1,29 @@
+{
+  "name": "gopher64",
+  "executable_name": {
+    "windows": "gopher64.exe",
+    "linux": "gopher64",
+    "macos": "gopher64"
+  },
+  "emulator_dir_name": {
+    "windows": "gopher64",
+    "linux": "gopher64",
+    "macos": "gopher64"
+  },
+  "launch_args_with_game": "\"{rom_path}\"",
+  "launch_args_without_game": "",
+  "install_recipe": {
+    "windows": {
+      "type": "github_release",
+      "repo": "gopher64/gopher64",
+      "asset_regex": ".*windows-x86_64\\.exe$",
+      "extract": false
+    },
+    "linux": {
+      "type": "github_release",
+      "repo": "gopher64/gopher64",
+      "asset_regex": ".*linux-x86_64$",
+      "extract": false
+    }
+  }
+}

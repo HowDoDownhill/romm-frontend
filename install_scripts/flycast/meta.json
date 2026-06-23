@@ -11,5 +11,22 @@
     "macos": "flycast"
   },
   "launch_args_with_game": "-portable \"{rom_path}\"",
-  "launch_args_without_game": "-portable"
+  "launch_args_without_game": "-portable",
+  "install_recipe": {
+    "windows": {
+      "type": "github_release",
+      "repo": "flyinghead/flycast",
+      "asset_regex": ".*win64.*\\.zip$",
+      "extract": true,
+      "post_install_create_files": [
+        "emu.cfg"
+      ]
+    },
+    "linux": {
+      "type": "github_release",
+      "repo": "flyinghead/flycast",
+      "asset_regex": ".*AppImage$",
+      "extract": false
+    }
+  }
 }

@@ -1,14 +1,30 @@
-﻿{
+{
   "name": "mGBA",
   "executable_name": {
     "windows": "mGBA.exe",
-    "linux": "",
-    "macos": ""
+    "linux": "mgba-qt.AppImage",
+    "macos": "mGBA"
   },
   "emulator_dir_name": {
     "windows": "mGBA",
-    "linux": "mgba",
-    "macos": "mgba"
+    "linux": "mGBA",
+    "macos": "mGBA"
   },
-  "launch_args": "-f  \"{rom_path}\""
+  "launch_args_with_game": "-f \"{rom_path}\"",
+  "launch_args_without_game": "",
+  "install_recipe": {
+    "windows": {
+      "type": "github_release",
+      "repo": "mgba-emu/mgba",
+      "asset_regex": ".*win64\\.7z$",
+      "extract": true,
+      "extract_folder_regex": "mGBA-*"
+    },
+    "linux": {
+      "type": "github_release",
+      "repo": "mgba-emu/mgba",
+      "asset_regex": ".*AppImage$",
+      "extract": false
+    }
+  }
 }

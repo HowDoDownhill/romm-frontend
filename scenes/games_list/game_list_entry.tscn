@@ -1,13 +1,14 @@
 [gd_scene format=3 uid="uid://cew2a8jxcgu6t"]
 
 [node name="TextureRect" type="TextureRect" unique_id=2014039112]
-custom_minimum_size = Vector2(200, 200)
+custom_minimum_size = Vector2(400, 600)
 anchors_preset = -1
-anchor_right = 0.104
-anchor_bottom = 0.185
-offset_right = 0.31999207
-offset_bottom = 0.19999695
-expand_mode = 3
+anchor_right = 0.208
+anchor_bottom = 0.37
+offset_right = -199.36002
+offset_bottom = -199.6
+expand_mode = 1
+stretch_mode = 5
 
 [node name="TitleLabel" type="Label" parent="." unique_id=2011165587]
 layout_mode = 1
@@ -21,3 +22,15 @@ grow_vertical = 2
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3
+
+[node name="InstalledIcon" type="TextureRect" parent="." unique_id=2014039113]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -40.0
+offset_right = 40.0
+grow_vertical = 0
+expand_mode = 1
+stretch_mode = 5
+

@@ -98,6 +98,14 @@ public partial class ConfigManager : Node
         {
             DirAccess.MakeDirAbsolute(rootDir + "/assets/marquees/");
         }
+        if (!DirAccess.DirExistsAbsolute(rootDir + "/assets/covers_fallback/"))
+        {
+            DirAccess.MakeDirAbsolute(rootDir + "/assets/covers_fallback/");
+        }
+        if (!DirAccess.DirExistsAbsolute(rootDir + "/assets/screenshots/"))
+        {
+            DirAccess.MakeDirAbsolute(rootDir + "/assets/screenshots/");
+        }
     }
 
     private void LoadConfig()

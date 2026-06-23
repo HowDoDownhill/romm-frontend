@@ -1,0 +1,29 @@
+{
+  "name": "snes9x",
+  "executable_name": {
+    "windows": "snes9x-x64.exe",
+    "linux": "snes9x-gtk",
+    "macos": "snes9x"
+  },
+  "emulator_dir_name": {
+    "windows": "snes9x",
+    "linux": "snes9x",
+    "macos": "snes9x"
+  },
+  "launch_args_with_game": "\"{rom_path}\"",
+  "launch_args_without_game": "",
+  "install_recipe": {
+    "windows": {
+      "type": "github_release",
+      "repo": "snes9xgit/snes9x",
+      "asset_regex": ".*win32-x64\\.zip$",
+      "extract": true
+    },
+    "linux": {
+      "type": "github_release",
+      "repo": "snes9xgit/snes9x",
+      "asset_regex": ".*linux\\.zip$",
+      "extract": true
+    }
+  }
+}

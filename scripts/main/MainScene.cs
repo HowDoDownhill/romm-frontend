@@ -26,7 +26,7 @@ public partial class MainScene : Control
     
     //Game list / Details Panel 
     [ExportGroup("GameList")] 
-    [Export] private Container gameList;
+    [Export] private Control gameList;
     [Export] private PackedScene gameListEntryScene;
     
     [ExportGroup("DetailsPanel")]
@@ -54,11 +54,16 @@ public partial class MainScene : Control
 
     //Global access to other systems
     private AppInstance appInstance;
+    private ImageTexture _placeholderTexture;
+    private VBoxContainer _mainVBoxContainer;
     
-
     public override void _Ready()
     {
+        var whiteImage = Image.CreateEmpty(1, 1, false, Image.Format.Rgba8);
+        whiteImage.Fill(Colors.White);
+        _placeholderTexture = ImageTexture.CreateFromImage(whiteImage);
         appInstance = GetNode<AppInstance>("/root/AppInstance");
+        _mainVBoxContainer = GetNode<VBoxContainer>("Background/VBoxContainer");
         appInstance.downloadManager.DownloadCompleted += OnDownloadCompleted; 
         
         appInstance.emulatorManager.mainScene = this;
@@ -132,7 +137,11 @@ public partial class MainScene : Control
     
     public void SetupGameList()
     {
-        // Removed ItemList signals since we are using a standard container
+        if (gameList != null)
+        {
+            gameList.Connect("ItemSelected", Callable.From<long>(OnGameSelected));
+            gameList.Connect("ItemFocused", Callable.From<long>(OnGameSelected));
+        }
     }
     
     private void SetupDownloadsList()
@@ -160,15 +169,88 @@ public partial class MainScene : Control
         }
     }
 
+    private bool _isTransitioningSystem = false;
+    
+    private async void TransitionToSystem(int targetIndex)
+    {
+        if (_isTransitioningSystem) return;
+        _isTransitioningSystem = true;
+        
+        float duration = 0.2f;
+
+        // Fade out
+        Tween fadeOutTween = CreateTween();
+        
+        Color glColorOut = gameList.Modulate; glColorOut.A = 0.0f;
+        fadeOutTween.TweenProperty(gameList, "modulate", glColorOut, duration);
+        
+        if (platformIcon != null) {
+            Color piColorOut = platformIcon.Modulate; piColorOut.A = 0.0f;
+            fadeOutTween.Parallel().TweenProperty(platformIcon, "modulate", piColorOut, duration);
+        }
+        if (platformLabel != null) {
+            Color plColorOut = platformLabel.Modulate; plColorOut.A = 0.0f;
+            fadeOutTween.Parallel().TweenProperty(platformLabel, "modulate", plColorOut, duration);
+        }
+        if (detailsPanelContainer != null) {
+            Color dpcColorOut = detailsPanelContainer.Modulate; dpcColorOut.A = 0.0f;
+            fadeOutTween.Parallel().TweenProperty(detailsPanelContainer, "modulate", dpcColorOut, duration);
+        }
+            
+        await ToSignal(fadeOutTween, Tween.SignalName.Finished);
+
+        // Hard enforce 0 opacity before loading
+        var glModOut = gameList.Modulate; glModOut.A = 0.0f; gameList.Modulate = glModOut;
+        if (platformIcon != null) { var piMod = platformIcon.Modulate; piMod.A = 0.0f; platformIcon.Modulate = piMod; }
+        if (platformLabel != null) { var plMod = platformLabel.Modulate; plMod.A = 0.0f; platformLabel.Modulate = plMod; }
+        if (detailsPanelContainer != null) { var dpcMod = detailsPanelContainer.Modulate; dpcMod.A = 0.0f; detailsPanelContainer.Modulate = dpcMod; }
+
+        // Load the next system
+        SelectSystemByIndex(targetIndex);
+
+        // Give the UI one frame to actually layout the new list and covers before fading in
+        await ToSignal(GetTree(), "process_frame");
+        await ToSignal(GetTree(), "process_frame"); // Two frames for good measure
+
+        // Fade in
+        Tween fadeInTween = CreateTween();
+        
+        Color glColorIn = gameList.Modulate; glColorIn.A = 1.0f;
+        fadeInTween.TweenProperty(gameList, "modulate", glColorIn, duration);
+        
+        if (platformIcon != null) {
+            Color piColorIn = platformIcon.Modulate; piColorIn.A = 1.0f;
+            fadeInTween.Parallel().TweenProperty(platformIcon, "modulate", piColorIn, duration);
+        }
+        if (platformLabel != null) {
+            Color plColorIn = platformLabel.Modulate; plColorIn.A = 1.0f;
+            fadeInTween.Parallel().TweenProperty(platformLabel, "modulate", plColorIn, duration);
+        }
+        if (detailsPanelContainer != null) {
+            Color dpcColorIn = detailsPanelContainer.Modulate; dpcColorIn.A = 1.0f;
+            fadeInTween.Parallel().TweenProperty(detailsPanelContainer, "modulate", dpcColorIn, duration);
+        }
+
+        await ToSignal(fadeInTween, Tween.SignalName.Finished);
+        
+        // Failsafe to guarantee 100% opacity
+        var glModIn = gameList.Modulate; glModIn.A = 1.0f; gameList.Modulate = glModIn;
+        if (platformIcon != null) { var piMod = platformIcon.Modulate; piMod.A = 1.0f; platformIcon.Modulate = piMod; }
+        if (platformLabel != null) { var plMod = platformLabel.Modulate; plMod.A = 1.0f; platformLabel.Modulate = plMod; }
+        if (detailsPanelContainer != null) { var dpcMod = detailsPanelContainer.Modulate; dpcMod.A = 1.0f; detailsPanelContainer.Modulate = dpcMod; }
+        
+        _isTransitioningSystem = false;
+    }
+
     public void CycleSelectedSystemNext()
     {
         if (currentGameSystemIndex == gameSystems.Count - 1)
         {
-            SelectSystemByIndex(0);
+            TransitionToSystem(0);
         }
         else
         {
-            SelectSystemByIndex(currentGameSystemIndex + 1);
+            TransitionToSystem(currentGameSystemIndex + 1);
         }
     }
 
@@ -176,12 +258,11 @@ public partial class MainScene : Control
     {
         if (currentGameSystemIndex == 0)
         {
-            SelectSystemByIndex(gameSystems.Count - 1);
+            TransitionToSystem(gameSystems.Count - 1);
         }
-        
         else
         {
-            SelectSystemByIndex(currentGameSystemIndex - 1);
+            TransitionToSystem(currentGameSystemIndex - 1);
         }
     }
     
@@ -246,15 +327,12 @@ public partial class MainScene : Control
             currentlyShownGames = cachedGames;
             RefreshGameList();
 
-            if (currentlyShownGames.Any() && gameList.GetChildCount() > 0)
+            if (currentlyShownGames.Any())
             {
                 OnGameSelected(0L);
                 if (downloadsListContainer is not { Visible: true })
                 {
-                    if (gameList.GetChild(0) is Control firstChild)
-                    {
-                        firstChild.GrabFocus();
-                    }
+                    gameList.GrabFocus();
                 }
             }
         }
@@ -359,85 +437,92 @@ public partial class MainScene : Control
             focusPanel.Visible = false;
             entry.AddChild(focusPanel);
 
-            // Handle selection and focus
-            int index = i;
-            entry.GuiInput += (InputEvent @event) => 
-            {
-                if (@event is InputEventMouseButton mouseButton && mouseButton.Pressed && mouseButton.ButtonIndex == MouseButton.Left)
-                {
-                    entry.GrabFocus();
-                    OnGameSelected((long)index);
-                }
-                else if (@event.IsActionPressed("ui_accept"))
-                {
-                    OnGameSelected((long)index);
-                    if (playDownloadButton != null && playDownloadButton.Visible && !playDownloadButton.Disabled)
-                    {
-                        playDownloadButton.GrabFocus();
-                    }
-                    entry.AcceptEvent();
-                }
-                else if (@event.IsActionPressed("ui_up") || @event.IsActionPressed("ui_down") || @event.IsActionPressed("ui_left") || @event.IsActionPressed("ui_right"))
-                {
-                    Side side = Side.Bottom;
-                    if (@event.IsActionPressed("ui_up")) side = Side.Top;
-                    if (@event.IsActionPressed("ui_down")) side = Side.Bottom;
-                    if (@event.IsActionPressed("ui_left")) side = Side.Left;
-                    if (@event.IsActionPressed("ui_right")) side = Side.Right;
-
-                    Control nextFocus = entry.FindValidFocusNeighbor(side);
-                    
-                    if (nextFocus != null && !gameList.IsAncestorOf(nextFocus))
-                    {
-                        entry.AcceptEvent();
-                    }
-                    else if (nextFocus == null)
-                    {
-                        entry.AcceptEvent();
-                    }
-                }
-            };
-
-            entry.FocusEntered += () => 
-            {
-                focusPanel.Visible = true;
-                entry.ZIndex = 1;
-                OnGameSelected((long)index);
-            };
-
-            entry.FocusExited += () => 
-            {
-                focusPanel.Visible = false;
-                entry.ZIndex = 0;
-            };
+            // Input and Focus are now handled entirely by the parent VerticalCarousel.
 
             // Set up fallback covers for the list item
+            entry.Texture = _placeholderTexture;
             Label titleLabel = entry.GetNode<Label>("TitleLabel");
             titleLabel.Text = game.Name;
+            titleLabel.AddThemeColorOverride("font_color", Colors.Black);
+
+            bool textureLoaded = false;
 
             void TryLoadImage()
             {
+                if (textureLoaded) return;
+                
                 string assetsPath = appInstance.configManager.AssetsPath;
                 string path3d = System.IO.Path.Combine(assetsPath, "covers_3d", $"{game.Id}.png");
                 string path2d = System.IO.Path.Combine(assetsPath, "covers_2d", $"{game.Id}.png");
+                
+                string pathFallback = "";
+                string[] exts = { ".png", ".jpg", ".webp" };
+                foreach (var ext in exts)
+                {
+                    string p = System.IO.Path.Combine(assetsPath, "covers_fallback", $"{game.Id}{ext}");
+                    if (Godot.FileAccess.FileExists(p))
+                    {
+                        pathFallback = p;
+                        break;
+                    }
+                }
 
-                if (Godot.FileAccess.FileExists(path3d))
+                ImageTexture loadedTex = null;
+                if (!string.IsNullOrEmpty(path3d)) loadedTex = SafeLoadTexture(path3d);
+                if (loadedTex == null && !string.IsNullOrEmpty(path2d)) loadedTex = SafeLoadTexture(path2d);
+                if (loadedTex == null && !string.IsNullOrEmpty(pathFallback)) loadedTex = SafeLoadTexture(pathFallback);
+
+                if (loadedTex != null)
                 {
-                    entry.Texture = ImageTexture.CreateFromImage(Image.LoadFromFile(path3d));
+                    entry.Texture = loadedTex;
                     titleLabel.Visible = false;
+                    textureLoaded = true;
                 }
-                else if (Godot.FileAccess.FileExists(path2d))
+
+                TextureRect installedIcon = entry.GetNodeOrNull<TextureRect>("InstalledIcon");
+                if (installedIcon != null)
                 {
-                    entry.Texture = ImageTexture.CreateFromImage(Image.LoadFromFile(path2d));
-                    titleLabel.Visible = false;
+                    if (CheckIfGameIsDownloaded(game) && systemControllerIcon != null)
+                    {
+                        installedIcon.Texture = systemControllerIcon;
+                        installedIcon.Visible = true;
+                    }
+                    else
+                    {
+                        installedIcon.Visible = false;
+                    }
                 }
-                else if (CheckIfGameIsDownloaded(game) && systemControllerIcon != null)
+
+                if (textureLoaded && gameList.HasMethod("UpdateLayout"))
                 {
-                    entry.Texture = systemControllerIcon;
+                    bool isAnimating = (bool)gameList.Get("IsAnimating");
+                    if (!isAnimating)
+                    {
+                        gameList.Call("UpdateLayout", false);
+                    }
                 }
             }
 
-            TryLoadImage();
+            void TryUnloadImage()
+            {
+                if (!textureLoaded) return;
+
+                entry.Texture = _placeholderTexture;
+                titleLabel.Visible = true;
+                textureLoaded = false;
+            }
+
+            VisibleOnScreenNotifier2D visibilityNotifier = new VisibleOnScreenNotifier2D();
+            visibilityNotifier.Rect = new Rect2(0, -600, 200, 1400); // Expanded rect to load items before they become visible
+            visibilityNotifier.ScreenEntered += () => 
+            {
+                TryLoadImage();
+            };
+            visibilityNotifier.ScreenExited += () =>
+            {
+                TryUnloadImage();
+            };
+            entry.AddChild(visibilityNotifier);
 
             // Subscribe to asset downloads in background
             AssetManager.AssetDownloadedEventHandler onAssetDownloaded = null;
@@ -445,7 +530,11 @@ public partial class MainScene : Control
             {
                 if (downloadedGameId == game.Id && (assetType == "box3d" || assetType == "box2d"))
                 {
-                    TryLoadImage();
+                    textureLoaded = false;
+                    if (visibilityNotifier.IsOnScreen())
+                    {
+                        TryLoadImage();
+                    }
                 }
             };
             appInstance.assetManager.AssetDownloaded += onAssetDownloaded;
@@ -456,6 +545,11 @@ public partial class MainScene : Control
             };
 
             gameList.AddChild(entry);
+        }
+
+        if (gameList.HasMethod("Refresh"))
+        {
+            gameList.Call("Refresh");
         }
     }
 
@@ -494,9 +588,10 @@ public partial class MainScene : Control
             string assetsPath = appInstance.configManager.AssetsPath;
             string pathMarquee = System.IO.Path.Combine(assetsPath, "marquees", $"{game.Id}.png");
             
-            if (Godot.FileAccess.FileExists(pathMarquee))
+            ImageTexture marqueeTex = SafeLoadTexture(pathMarquee);
+            if (marqueeTex != null)
             {
-                gameMarquee.Texture = ImageTexture.CreateFromImage(Image.LoadFromFile(pathMarquee));
+                gameMarquee.Texture = marqueeTex;
                 gameMarquee.Visible = true;
                 if (gameTitle != null) gameTitle.Visible = false;
             }
@@ -511,18 +606,45 @@ public partial class MainScene : Control
             string assetsPath = appInstance.configManager.AssetsPath;
             string path3d = System.IO.Path.Combine(assetsPath, "covers_3d", $"{game.Id}.png");
             string path2d = System.IO.Path.Combine(assetsPath, "covers_2d", $"{game.Id}.png");
-
-            if (Godot.FileAccess.FileExists(path3d))
+            
+            string pathFallback = "";
+            string[] exts = { ".png", ".jpg", ".webp" };
+            foreach (var ext in exts)
             {
-                gameCover.Texture = ImageTexture.CreateFromImage(Image.LoadFromFile(path3d));
+                string p = System.IO.Path.Combine(assetsPath, "covers_fallback", $"{game.Id}{ext}");
+                if (Godot.FileAccess.FileExists(p))
+                {
+                    pathFallback = p;
+                    break;
+                }
             }
-            else if (Godot.FileAccess.FileExists(path2d))
+
+            ImageTexture loadedTex = null;
+            if (!string.IsNullOrEmpty(path3d)) loadedTex = SafeLoadTexture(path3d);
+            if (loadedTex == null && !string.IsNullOrEmpty(path2d)) loadedTex = SafeLoadTexture(path2d);
+            if (loadedTex == null && !string.IsNullOrEmpty(pathFallback)) loadedTex = SafeLoadTexture(pathFallback);
+
+            gameCover.Texture = loadedTex;
+        }
+
+        TextureRect backgroundRect = GetNodeOrNull<TextureRect>("Background");
+        if (backgroundRect != null)
+        {
+            string assetsPath = appInstance.configManager.AssetsPath;
+            string pathScreenshot = System.IO.Path.Combine(assetsPath, "screenshots", $"{game.Id}.jpg");
+            
+            if (Godot.FileAccess.FileExists(pathScreenshot))
             {
-                gameCover.Texture = ImageTexture.CreateFromImage(Image.LoadFromFile(path2d));
+                backgroundRect.Texture = ImageTexture.CreateFromImage(Image.LoadFromFile(pathScreenshot));
+                // Optional: dim the screenshot slightly so the UI remains readable
+                backgroundRect.Modulate = new Color(0.6f, 0.6f, 0.6f, 1.0f);
             }
             else
             {
-                gameCover.Texture = null;
+                var blackImage = Image.CreateEmpty(1, 1, false, Image.Format.Rgba8);
+                blackImage.Fill(Colors.Black);
+                backgroundRect.Texture = ImageTexture.CreateFromImage(blackImage);
+                backgroundRect.Modulate = Colors.White;
             }
         }
         
@@ -738,5 +860,22 @@ public partial class MainScene : Control
         { 
             File.Delete(file.FullPath);
         }
+    }
+    private ImageTexture SafeLoadTexture(string path)
+    {
+        if (string.IsNullOrEmpty(path) || !Godot.FileAccess.FileExists(path)) return null;
+        try
+        {
+            var img = Image.LoadFromFile(path);
+            if (img != null && !img.IsEmpty())
+            {
+                return ImageTexture.CreateFromImage(img);
+            }
+        }
+        catch (Exception e)
+        {
+            GD.PrintErr($"SafeLoadTexture failed for {path}: {e.Message}");
+        }
+        return null;
     }
 }

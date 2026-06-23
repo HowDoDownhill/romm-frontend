@@ -36,6 +36,7 @@ downloads/
 assets/covers_2d/
 assets/covers_3d/
 assets/marquees/
+assets/covers_fallback/
 
 config.cfg
 games.cache

@@ -58,20 +58,36 @@ public partial class AssetManager : Node
             _downloadQueue.Enqueue((game.Id, "box3d", url3d, path3d));
         }
 
-        // 2D Cover
+        // 2D Cover (box2d)
         string path2d = Path.Combine(assetsPath, "covers_2d", $"{game.Id}.png");
         if (!File.Exists(path2d))
         {
-            if (!string.IsNullOrEmpty(game.PathCoverLarge))
+            string url2d = $"{appInstance.rommApi.ApiHost}/assets/romm/resources/roms/{game.PlatformId}/{game.Id}/box2d/box2d.png";
+            _downloadQueue.Enqueue((game.Id, "box2d", url2d, path2d));
+        }
+
+        // Fallback Cover (cover/big.png usually)
+        string urlFallback = "";
+        if (!string.IsNullOrEmpty(game.PathCoverLarge))
+        {
+            string cleanPath = game.PathCoverLarge.StartsWith("/") ? game.PathCoverLarge.Substring(1) : game.PathCoverLarge;
+            urlFallback = $"{appInstance.rommApi.ApiHost}/{cleanPath}".Replace(" ", "%20");
+        }
+        else if (!string.IsNullOrEmpty(game.CoverArtUrl))
+        {
+            urlFallback = game.CoverArtUrl.Replace(" ", "%20");
+        }
+
+        if (!string.IsNullOrEmpty(urlFallback))
+        {
+            string ext = ".png";
+            if (urlFallback.Contains(".jpg", StringComparison.OrdinalIgnoreCase) || urlFallback.Contains(".jpeg", StringComparison.OrdinalIgnoreCase)) ext = ".jpg";
+            else if (urlFallback.Contains(".webp", StringComparison.OrdinalIgnoreCase)) ext = ".webp";
+
+            string pathFallback = Path.Combine(assetsPath, "covers_fallback", $"{game.Id}{ext}");
+            if (!File.Exists(pathFallback))
             {
-                string cleanPath = game.PathCoverLarge.StartsWith("/") ? game.PathCoverLarge.Substring(1) : game.PathCoverLarge;
-                string url2d = $"{appInstance.rommApi.ApiHost}/{cleanPath}".Replace(" ", "%20");
-                _downloadQueue.Enqueue((game.Id, "box2d", url2d, path2d));
-            }
-            else if (!string.IsNullOrEmpty(game.CoverArtUrl))
-            {
-                string url2d = game.CoverArtUrl.Replace(" ", "%20");
-                _downloadQueue.Enqueue((game.Id, "box2d", url2d, path2d));
+                _downloadQueue.Enqueue((game.Id, "cover_fallback", urlFallback, pathFallback));
             }
         }
 
@@ -81,6 +97,14 @@ public partial class AssetManager : Node
         {
             string urlMarquee = $"{appInstance.rommApi.ApiHost}/assets/romm/resources/roms/{game.PlatformId}/{game.Id}/marquee/marquee.png";
             _downloadQueue.Enqueue((game.Id, "marquee", urlMarquee, pathMarquee));
+        }
+
+        // Screenshot
+        string pathScreenshot = Path.Combine(assetsPath, "screenshots", $"{game.Id}.jpg");
+        if (!File.Exists(pathScreenshot))
+        {
+            string urlScreenshot = $"{appInstance.rommApi.ApiHost}/assets/romm/resources/roms/{game.PlatformId}/{game.Id}/screenshot/0.jpg";
+            _downloadQueue.Enqueue((game.Id, "screenshot", urlScreenshot, pathScreenshot));
         }
     }
 

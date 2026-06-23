@@ -1,8 +1,8 @@
-﻿{
+{
   "name": "pcsx2",
   "executable_name": {
     "windows": "pcsx2-qt.exe",
-    "linux": "pcsx2",
+    "linux": "pcsx2.AppImage",
     "macos": "pcsx2"
   },
   "emulator_dir_name": {
@@ -11,5 +11,19 @@
     "macos": "pcsx2"
   },
   "launch_args_with_game": "-batch -fullscreen -portable -bigpicture -bios \"{bios_path}\" -- \"{rom_path}\"",
-  "launch_args_without_game": "-portable -bios \"{bios_path}\""
+  "launch_args_without_game": "-portable -bios \"{bios_path}\"",
+  "install_recipe": {
+    "windows": {
+      "type": "github_release",
+      "repo": "PCSX2/pcsx2",
+      "asset_regex": ".*windows-x64-Qt\\.7z$",
+      "extract": true
+    },
+    "linux": {
+      "type": "github_release",
+      "repo": "PCSX2/pcsx2",
+      "asset_regex": ".*linux-AppImage-64bit-Qt\\.AppImage$",
+      "extract": false
+    }
+  }
 }
