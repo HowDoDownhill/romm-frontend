@@ -10,8 +10,31 @@
     "linux": "dolphin",
     "macos": "dolphin"
   },
-  "launch_args_with_game": "-b -C Dolphin.Display.Fullscreen=True -e \"{rom_path}\" -u ./",
+  "launch_args_with_game": "-b -e \"{rom_path}\" -u ./",
   "launch_args_without_game": "-u ./",
+  "settings_fields": [
+    {
+      "id": "fullscreen",
+      "label": "Start in Fullscreen",
+      "type": "boolean",
+      "default_value_bool": true,
+      "launch_arg_true": "-C Dolphin.Display.Fullscreen=True",
+      "launch_arg_false": "-C Dolphin.Display.Fullscreen=False"
+    },
+    {
+      "id": "video_backend",
+      "label": "Video Backend",
+      "type": "dropdown",
+      "default_value_string": "Vulkan",
+      "options": {
+        "Vulkan": "Vulkan",
+        "Direct3D 11": "D3D",
+        "Direct3D 12": "D3D12",
+        "OpenGL": "OGL"
+      },
+      "launch_arg_format": "-C Dolphin.Display.GFXBackend={value}"
+    }
+  ],
   "install_recipe": {
     "windows": {
       "type": "direct_url",

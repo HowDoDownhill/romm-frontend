@@ -1,4 +1,4 @@
-﻿using Godot;
+using Godot;
 
 public partial class DownloadEntryUI : MarginContainer
 {
@@ -8,7 +8,7 @@ public partial class DownloadEntryUI : MarginContainer
     [Export] private Label _nameLabel;
     [Export] private Label _statusLabel;
     [Export] private ProgressBar _progressBar;
-    [Export] private Panel _backgroundPanel;
+    [Export] private PanelContainer _backgroundPanel;
     
     private StyleBoxFlat _backgroundStyle;
 
@@ -24,11 +24,26 @@ public partial class DownloadEntryUI : MarginContainer
             _backgroundPanel.AddThemeStyleboxOverride("panel", _backgroundStyle);
         }
 
+        // Ensure child controls pass mouse events up to this node for selection
+        SetChildrenMousePass(this);
+
         GuiInput += OnGuiInput;
         FocusEntered += OnFocusEntered;
         FocusExited += OnFocusExited;
         
         Unhighlight();
+    }
+
+    private void SetChildrenMousePass(Node node)
+    {
+        foreach (var child in node.GetChildren())
+        {
+            if (child is Control control)
+            {
+                control.MouseFilter = MouseFilterEnum.Pass;
+            }
+            SetChildrenMousePass(child);
+        }
     }
 
     private void OnGuiInput(InputEvent @event)

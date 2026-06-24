@@ -56,7 +56,6 @@ public partial class LoadingScreen : Control
             await SyncFirmwareAsync();
             await PopulateAvailableFirmwareAsync();
 
-            appInstance.assetManager.StartBackgroundSync();
 
             await Task.Delay(200);
             GetTree().ChangeSceneToFile("res://scenes/main_scene.tscn");
@@ -137,7 +136,6 @@ public partial class LoadingScreen : Control
         await SyncFirmwareAsync();
         await PopulateAvailableFirmwareAsync();
         
-        appInstance.assetManager.StartBackgroundSync();
         
         if (_statusLabel != null)
         {

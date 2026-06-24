@@ -151,7 +151,7 @@ public partial class RomMAPI : Node
         try
         {
             int offset = (page - 1) * size;
-            string requestUrl = $"{apiHost}/api/roms?platform_ids={system.Id}&limit={size}&offset={offset}&include=path_cover_3d";
+            string requestUrl = $"{apiHost}/api/roms?platform_ids={system.Id}&limit={size}&offset={offset}&include=path_cover_3d,path_cover_large";
             GD.Print($"Requesting games from URL: {requestUrl}");
             HttpResponseMessage response = await _httpClient.GetAsync(requestUrl);
             string responseBody = await response.Content.ReadAsStringAsync();
@@ -299,6 +299,10 @@ public partial class RomMAPI : Node
                 using var fileStream = new System.IO.FileStream(destinationPath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None);
                 await response.Content.CopyToAsync(fileStream);
                 return true;
+            }
+            else
+            {
+                GD.PrintErr($"Failed to download asset {url}. Status: {response.StatusCode} {response.ReasonPhrase}");
             }
         }
         catch (Exception e)

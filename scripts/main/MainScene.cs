@@ -57,6 +57,11 @@ public partial class MainScene : Control
     private ImageTexture _placeholderTexture;
     private VBoxContainer _mainVBoxContainer;
     
+    // Settings Menu
+    private MarginContainer settingsMenuContainer;
+    private Tree settingsSectionsTree;
+    private VBoxContainer sectionOptionsContainer;
+    
     public override void _Ready()
     {
         var whiteImage = Image.CreateEmpty(1, 1, false, Image.Format.Rgba8);
@@ -75,6 +80,16 @@ public partial class MainScene : Control
         SetupDownloadsList();
         SetupButtonBindings();
         SetupFirmwareSelector();
+        
+        // Setup Settings
+        settingsMenuContainer = GetNodeOrNull<MarginContainer>("Background/VBoxContainer/SettingsMenuContainer");
+        if (settingsMenuContainer != null)
+        {
+            settingsSectionsTree = settingsMenuContainer.GetNodeOrNull<Tree>("HBoxContainer/SettingsSections");
+            sectionOptionsContainer = settingsMenuContainer.GetNodeOrNull<VBoxContainer>("HBoxContainer/SectionOptions");
+            settingsMenuContainer.Visible = false;
+            SetupSettingsTree();
+        }
     }
 
     private void OnAssetDownloaded(int gameId, string assetType)
@@ -87,14 +102,54 @@ public partial class MainScene : Control
     
     public override void _Input(InputEvent @event)
     {
+        if (@event.IsActionPressed("ToggleSettings"))
+        {
+            if (settingsMenuContainer != null)
+            {
+                var gamesListContainer = gameList?.GetParent()?.GetParent<Control>();
+                if (settingsMenuContainer.Visible)
+                {
+                    settingsMenuContainer.Visible = false;
+                    if (gamesListContainer != null) gamesListContainer.Visible = true;
+                    gameList?.GrabFocus();
+                }
+                else
+                {
+                    settingsMenuContainer.Visible = true;
+                    if (gamesListContainer != null) gamesListContainer.Visible = false;
+                    settingsSectionsTree?.GrabFocus();
+                }
+                UpdateHeaderLabel();
+            }
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (settingsMenuContainer != null && settingsMenuContainer.Visible)
+        {
+            if (@event.IsActionPressed("ui_cancel") || @event.IsActionPressed("Back"))
+            {
+                var gamesListContainer = gameList?.GetParent()?.GetParent<Control>();
+                settingsMenuContainer.Visible = false;
+                if (gamesListContainer != null) gamesListContainer.Visible = true;
+                UpdateHeaderLabel();
+                gameList?.GrabFocus();
+                GetViewport().SetInputAsHandled();
+            }
+            // Block other custom input processing while settings is open
+            return; 
+        }
+
         if(@event.IsActionPressed("CylceSystemUp"))
         {
+            if (downloadsListContainer != null && downloadsListContainer.Visible) return;
             CycleSelectedSystemNext();
             return;
         }
         
         if (@event.IsActionPressed("CycleSystemDown"))
         {
+            if (downloadsListContainer != null && downloadsListContainer.Visible) return;
             CycleSelectedSystemLast();
             return;
         }
@@ -165,7 +220,21 @@ public partial class MainScene : Control
         if (downloadsListContainer != null && gameList != null)
         {
             downloadsListContainer.Visible = !downloadsListContainer.Visible;
-            gameList.Visible = !gameList.Visible;
+            
+            // Hide the entire games list container (game list + details panel)
+            var gamesListContainer = gameList.GetParent().GetParent<Control>();
+            if (gamesListContainer != null)
+            {
+                gamesListContainer.Visible = !downloadsListContainer.Visible;
+            }
+            
+            // Restore focus to the game list when returning to games view
+            if (!downloadsListContainer.Visible)
+            {
+                gameList.GrabFocus();
+            }
+            
+            UpdateHeaderLabel();
         }
     }
 
@@ -285,21 +354,14 @@ public partial class MainScene : Control
                 var texture = FindPlatformIcon(selectedSystem.IgdbSlug, "res://assets/platforms/titles/", new[] { ".svg", ".png" });
                 platformIcon.Texture = texture;
             }
-            
-            else if (platformIcon.Texture == null)
+            else
             {
                 var texture = FindPlatformIcon(selectedSystem.Slug, "res://assets/platforms/titles/", new[] { ".svg", ".png" });
                 platformIcon.Texture = texture;
             }
-            
-            else
-            {
-                platformIcon.Texture = null;
-            }
         }
 
-        GD.Print(selectedSystem.Slug);
-        GD.Print(selectedSystem.IgdbSlug);
+        UpdateHeaderLabel();
         OnSystemSelected(selectedSystem);
     }
     
@@ -330,10 +392,13 @@ public partial class MainScene : Control
             if (currentlyShownGames.Any())
             {
                 OnGameSelected(0L);
-                if (downloadsListContainer is not { Visible: true })
+                // Restore focus to the game list when returning to games view
+                if (!downloadsListContainer.Visible)
                 {
                     gameList.GrabFocus();
                 }
+            
+                UpdateHeaderLabel();
             }
         }
         else
@@ -468,8 +533,8 @@ public partial class MainScene : Control
                 }
 
                 ImageTexture loadedTex = null;
-                if (!string.IsNullOrEmpty(path3d)) loadedTex = SafeLoadTexture(path3d);
-                if (loadedTex == null && !string.IsNullOrEmpty(path2d)) loadedTex = SafeLoadTexture(path2d);
+                if (!string.IsNullOrEmpty(path2d)) loadedTex = SafeLoadTexture(path2d);
+                if (loadedTex == null && !string.IsNullOrEmpty(path3d)) loadedTex = SafeLoadTexture(path3d);
                 if (loadedTex == null && !string.IsNullOrEmpty(pathFallback)) loadedTex = SafeLoadTexture(pathFallback);
 
                 if (loadedTex != null)
@@ -620,8 +685,8 @@ public partial class MainScene : Control
             }
 
             ImageTexture loadedTex = null;
-            if (!string.IsNullOrEmpty(path3d)) loadedTex = SafeLoadTexture(path3d);
-            if (loadedTex == null && !string.IsNullOrEmpty(path2d)) loadedTex = SafeLoadTexture(path2d);
+            if (!string.IsNullOrEmpty(path2d)) loadedTex = SafeLoadTexture(path2d);
+            if (loadedTex == null && !string.IsNullOrEmpty(path3d)) loadedTex = SafeLoadTexture(path3d);
             if (loadedTex == null && !string.IsNullOrEmpty(pathFallback)) loadedTex = SafeLoadTexture(pathFallback);
 
             gameCover.Texture = loadedTex;
@@ -858,18 +923,29 @@ public partial class MainScene : Control
         
         foreach (RomFile file in romFiles)
         { 
-            File.Delete(file.FullPath);
+            System.IO.File.Delete(file.FullPath);
         }
     }
+
     private ImageTexture SafeLoadTexture(string path)
     {
-        if (string.IsNullOrEmpty(path) || !Godot.FileAccess.FileExists(path)) return null;
+        if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path)) return null;
         try
         {
-            var img = Image.LoadFromFile(path);
-            if (img != null && !img.IsEmpty())
+            byte[] fileData = System.IO.File.ReadAllBytes(path);
+            var img = new Image();
+            
+            Error err = img.LoadPngFromBuffer(fileData);
+            if (err != Error.Ok) err = img.LoadWebpFromBuffer(fileData);
+            if (err != Error.Ok) err = img.LoadJpgFromBuffer(fileData);
+            
+            if (err == Error.Ok && img != null && !img.IsEmpty())
             {
                 return ImageTexture.CreateFromImage(img);
+            }
+            else
+            {
+                GD.PrintErr($"SafeLoadTexture failed for {path}: Not a valid PNG, WebP, or JPG. Error code: {err}");
             }
         }
         catch (Exception e)
@@ -877,5 +953,176 @@ public partial class MainScene : Control
             GD.PrintErr($"SafeLoadTexture failed for {path}: {e.Message}");
         }
         return null;
+    }
+
+    private void SetupSettingsTree()
+    {
+        if (settingsSectionsTree == null) return;
+        
+        settingsSectionsTree.Clear();
+        TreeItem root = settingsSectionsTree.CreateItem();
+        settingsSectionsTree.HideRoot = true;
+
+        TreeItem general = settingsSectionsTree.CreateItem(root);
+        general.SetText(0, "General Settings");
+        
+        TreeItem connection = settingsSectionsTree.CreateItem(root);
+        connection.SetText(0, "Connection Settings");
+
+        TreeItem emulatorsItem = settingsSectionsTree.CreateItem(root);
+        emulatorsItem.SetText(0, "Emulator Settings");
+
+        var allEmulators = appInstance.emulatorManager.GetAllAvailableEmulators();
+        foreach (var kvp in allEmulators)
+        {
+            string slug = kvp.Key;
+            EmulatorMeta meta = kvp.Value;
+            
+            TreeItem emuNode = settingsSectionsTree.CreateItem(emulatorsItem);
+            emuNode.SetText(0, meta.Name);
+            emuNode.SetMetadata(0, slug);
+
+            // Generate UI Form for this emulator
+            GenerateEmulatorSettingsForm(slug, meta);
+        }
+
+        settingsSectionsTree.ItemSelected += OnSettingsTreeItemSelected;
+    }
+
+    private void GenerateEmulatorSettingsForm(string slug, EmulatorMeta meta)
+    {
+        if (sectionOptionsContainer == null || meta.SettingsFields == null) return;
+
+        // Check if form already exists
+        string nodeName = meta.Name.Replace(" ", "");
+        if (sectionOptionsContainer.HasNode(nodeName)) return;
+
+        MarginContainer formContainer = new MarginContainer();
+        formContainer.Name = nodeName;
+        formContainer.Visible = false;
+        
+        VBoxContainer vbox = new VBoxContainer();
+        formContainer.AddChild(vbox);
+        sectionOptionsContainer.AddChild(formContainer);
+
+        var userSettings = appInstance.emulatorManager.LoadEmulatorSettings(slug);
+
+        foreach (var field in meta.SettingsFields)
+        {
+            if (string.IsNullOrEmpty(field.Id)) continue;
+            
+            bool hasValue = userSettings.TryGetValue(field.Id, out System.Text.Json.JsonElement element);
+
+            HBoxContainer fieldBox = new HBoxContainer();
+            
+            Label label = new Label();
+            label.Text = field.Label;
+            label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+            fieldBox.AddChild(label);
+
+            if (field.Type == "boolean")
+            {
+                CheckButton checkbox = new CheckButton();
+                bool val = field.DefaultValueBool;
+                if (hasValue && element.ValueKind == System.Text.Json.JsonValueKind.True) val = true;
+                if (hasValue && element.ValueKind == System.Text.Json.JsonValueKind.False) val = false;
+                checkbox.ButtonPressed = val;
+                
+                checkbox.Toggled += (bool toggledOn) => 
+                {
+                    appInstance.emulatorManager.SaveEmulatorSetting(slug, field.Id, toggledOn);
+                };
+                fieldBox.AddChild(checkbox);
+            }
+            else if (field.Type == "string")
+            {
+                LineEdit lineEdit = new LineEdit();
+                lineEdit.CustomMinimumSize = new Vector2(200, 0);
+                string val = field.DefaultValueString;
+                if (hasValue && element.ValueKind == System.Text.Json.JsonValueKind.String) val = element.GetString();
+                lineEdit.Text = val;
+
+                lineEdit.TextChanged += (string newText) => 
+                {
+                    appInstance.emulatorManager.SaveEmulatorSetting(slug, field.Id, newText);
+                };
+                fieldBox.AddChild(lineEdit);
+            }
+            else if (field.Type == "dropdown")
+            {
+                OptionButton optionButton = new OptionButton();
+                string val = field.DefaultValueString;
+                if (hasValue && element.ValueKind == System.Text.Json.JsonValueKind.String) val = element.GetString();
+
+                int idx = 0;
+                int selectedIdx = 0;
+                if (field.Options != null)
+                {
+                    foreach (var option in field.Options)
+                    {
+                        optionButton.AddItem(option.Key, idx);
+                        optionButton.SetItemMetadata(idx, option.Value);
+                        if (option.Value == val) selectedIdx = idx;
+                        idx++;
+                    }
+                }
+                optionButton.Select(selectedIdx);
+
+                optionButton.ItemSelected += (long index) => 
+                {
+                    string selectedValue = optionButton.GetItemMetadata((int)index).AsString();
+                    appInstance.emulatorManager.SaveEmulatorSetting(slug, field.Id, selectedValue);
+                };
+                fieldBox.AddChild(optionButton);
+            }
+
+            vbox.AddChild(fieldBox);
+        }
+    }
+
+    private void OnSettingsTreeItemSelected()
+    {
+        if (settingsSectionsTree == null || sectionOptionsContainer == null) return;
+        
+        TreeItem selected = settingsSectionsTree.GetSelected();
+        if (selected == null) return;
+
+        string sectionName = selected.GetText(0);
+
+        foreach (Node child in sectionOptionsContainer.GetChildren())
+        {
+            if (child is Control control)
+            {
+                control.Visible = false;
+            }
+        }
+
+        string nodeName = sectionName.Replace(" ", "");
+        var activePanel = sectionOptionsContainer.GetNodeOrNull<Control>(nodeName);
+        if (activePanel != null)
+        {
+            activePanel.Visible = true;
+        }
+    }
+
+    private void UpdateHeaderLabel()
+    {
+        if (platformLabel == null) return;
+
+        if (settingsMenuContainer != null && settingsMenuContainer.Visible)
+        {
+            platformLabel.Text = "Settings";
+            if (platformIcon != null) platformIcon.Visible = false;
+        }
+        else if (downloadsListContainer != null && downloadsListContainer.Visible)
+        {
+            platformLabel.Text = "Downloads";
+            if (platformIcon != null) platformIcon.Visible = false;
+        }
+        else if (gameSystems != null && currentGameSystemIndex >= 0 && currentGameSystemIndex < gameSystems.Count)
+        {
+            platformLabel.Text = gameSystems[currentGameSystemIndex].Name;
+            if (platformIcon != null) platformIcon.Visible = true;
+        }
     }
 }

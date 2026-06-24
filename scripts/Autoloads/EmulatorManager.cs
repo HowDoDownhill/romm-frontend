@@ -28,6 +28,39 @@ public class EmulatorMeta
     
     [JsonPropertyName("install_recipe")]
     public Dictionary<string, InstallRecipe> InstallRecipe { get; set; }
+
+    [JsonPropertyName("settings_fields")]
+    public List<EmulatorSettingField> SettingsFields { get; set; }
+}
+
+public class EmulatorSettingField
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; }
+
+    [JsonPropertyName("label")]
+    public string Label { get; set; }
+
+    [JsonPropertyName("type")]
+    public string Type { get; set; } // "boolean", "string", "dropdown"
+
+    [JsonPropertyName("launch_arg_true")]
+    public string LaunchArgTrue { get; set; }
+
+    [JsonPropertyName("launch_arg_false")]
+    public string LaunchArgFalse { get; set; }
+
+    [JsonPropertyName("launch_arg_format")]
+    public string LaunchArgFormat { get; set; }
+
+    [JsonPropertyName("options")]
+    public Dictionary<string, string> Options { get; set; }
+
+    [JsonPropertyName("default_value_bool")]
+    public bool DefaultValueBool { get; set; }
+
+    [JsonPropertyName("default_value_string")]
+    public string DefaultValueString { get; set; }
 }
 
 public class InstallRecipe
@@ -121,6 +154,84 @@ public partial class EmulatorManager : Node
         }
         */
         return null;
+    }
+
+    public Dictionary<string, EmulatorMeta> GetAllAvailableEmulators()
+    {
+        Dictionary<string, EmulatorMeta> emulators = new Dictionary<string, EmulatorMeta>();
+        string scriptsPath = appInstance.configManager.InstallScriptsPath;
+        if (!DirAccess.DirExistsAbsolute(scriptsPath)) return emulators;
+
+        using var dir = DirAccess.Open(scriptsPath);
+        if (dir != null)
+        {
+            dir.ListDirBegin();
+            string fileName = dir.GetNext();
+            while (fileName != "")
+            {
+                if (dir.CurrentIsDir() && fileName != "." && fileName != "..")
+                {
+                    string metaPath = scriptsPath.PathJoin(fileName).PathJoin("meta.json");
+                    if (FileAccess.FileExists(metaPath))
+                    {
+                        try
+                        {
+                            var metaJson = FileAccess.GetFileAsString(metaPath);
+                            var meta = JsonSerializer.Deserialize<EmulatorMeta>(metaJson);
+                            if (meta != null)
+                            {
+                                emulators[fileName] = meta;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            GD.PrintErr($"Failed to parse meta.json for {fileName}: {ex.Message}");
+                        }
+                    }
+                }
+                fileName = dir.GetNext();
+            }
+        }
+        return emulators;
+    }
+
+    public void SaveEmulatorSetting(string emulatorSlug, string settingId, object value)
+    {
+        string emulatorDir = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorSlug);
+        if (!System.IO.Directory.Exists(emulatorDir))
+        {
+            System.IO.Directory.CreateDirectory(emulatorDir);
+        }
+        string settingsPath = Path.Combine(emulatorDir, "user_settings.json");
+        
+        Dictionary<string, object> settings = new Dictionary<string, object>();
+        if (System.IO.File.Exists(settingsPath))
+        {
+            try
+            {
+                string json = System.IO.File.ReadAllText(settingsPath);
+                settings = JsonSerializer.Deserialize<Dictionary<string, object>>(json) ?? new Dictionary<string, object>();
+            }
+            catch {}
+        }
+        
+        settings[settingId] = value;
+        System.IO.File.WriteAllText(settingsPath, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    public Dictionary<string, JsonElement> LoadEmulatorSettings(string emulatorSlug)
+    {
+        string settingsPath = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorSlug, "user_settings.json");
+        if (System.IO.File.Exists(settingsPath))
+        {
+            try
+            {
+                string json = System.IO.File.ReadAllText(settingsPath);
+                return JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json) ?? new Dictionary<string, JsonElement>();
+            }
+            catch {}
+        }
+        return new Dictionary<string, JsonElement>();
     }
 
     public bool IsEmulatorInstalled(string emulatorName)
@@ -299,6 +410,40 @@ public partial class EmulatorManager : Node
                 GD.Print("No preferred firmware set.");
             }
 
+            // Apply Dynamic Settings
+            if (meta.SettingsFields != null)
+            {
+                var userSettings = LoadEmulatorSettings(mappedEmulator);
+                foreach (var field in meta.SettingsFields)
+                {
+                    if (string.IsNullOrEmpty(field.Id)) continue;
+                    
+                    bool hasValue = userSettings.TryGetValue(field.Id, out JsonElement element);
+
+                    if (field.Type == "boolean")
+                    {
+                        bool val = field.DefaultValueBool;
+                        if (hasValue && element.ValueKind == JsonValueKind.True) val = true;
+                        if (hasValue && element.ValueKind == JsonValueKind.False) val = false;
+
+                        if (val && !string.IsNullOrEmpty(field.LaunchArgTrue))
+                            arguments += " " + field.LaunchArgTrue;
+                        else if (!val && !string.IsNullOrEmpty(field.LaunchArgFalse))
+                            arguments += " " + field.LaunchArgFalse;
+                    }
+                    else if (field.Type == "dropdown" || field.Type == "string")
+                    {
+                        string val = field.DefaultValueString;
+                        if (hasValue && element.ValueKind == JsonValueKind.String) val = element.GetString();
+
+                        if (!string.IsNullOrEmpty(val) && !string.IsNullOrEmpty(field.LaunchArgFormat))
+                        {
+                            arguments += " " + field.LaunchArgFormat.Replace("{value}", val);
+                        }
+                    }
+                }
+            }
+
             GD.Print($"Launching Command: \"{fullExecutablePath}\" {arguments}");
 
             ProcessStartInfo startInfo = new ProcessStartInfo
@@ -374,6 +519,40 @@ public partial class EmulatorManager : Node
                 arguments = arguments.Replace("{bios_path}", Path.GetFullPath(currentSystem.PrefferedFirmware));
             }
             
+            // Apply Dynamic Settings
+            if (meta.SettingsFields != null)
+            {
+                var userSettings = LoadEmulatorSettings(emulatorName);
+                foreach (var field in meta.SettingsFields)
+                {
+                    if (string.IsNullOrEmpty(field.Id)) continue;
+                    
+                    bool hasValue = userSettings.TryGetValue(field.Id, out JsonElement element);
+
+                    if (field.Type == "boolean")
+                    {
+                        bool val = field.DefaultValueBool;
+                        if (hasValue && element.ValueKind == JsonValueKind.True) val = true;
+                        if (hasValue && element.ValueKind == JsonValueKind.False) val = false;
+
+                        if (val && !string.IsNullOrEmpty(field.LaunchArgTrue))
+                            arguments += " " + field.LaunchArgTrue;
+                        else if (!val && !string.IsNullOrEmpty(field.LaunchArgFalse))
+                            arguments += " " + field.LaunchArgFalse;
+                    }
+                    else if (field.Type == "dropdown" || field.Type == "string")
+                    {
+                        string val = field.DefaultValueString;
+                        if (hasValue && element.ValueKind == JsonValueKind.String) val = element.GetString();
+
+                        if (!string.IsNullOrEmpty(val) && !string.IsNullOrEmpty(field.LaunchArgFormat))
+                        {
+                            arguments += " " + field.LaunchArgFormat.Replace("{value}", val);
+                        }
+                    }
+                }
+            }
+
             GD.Print($"Launching: {fullExecutablePath} {arguments}"); 
             
             ProcessStartInfo startInfo = new ProcessStartInfo

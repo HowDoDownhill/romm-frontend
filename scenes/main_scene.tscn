@@ -248,6 +248,27 @@ theme_type_variation = &"FlatButton"
 text = "Cancel Download
 "
 
+[node name="SettingsMenuContainer" type="MarginContainer" parent="Background/VBoxContainer" unique_id=803032780]
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Background/VBoxContainer/SettingsMenuContainer" unique_id=1387841732]
+layout_mode = 2
+
+[node name="SettingsSections" type="Tree" parent="Background/VBoxContainer/SettingsMenuContainer/HBoxContainer" unique_id=2021569588]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.3
+
+[node name="SectionOptions" type="VBoxContainer" parent="Background/VBoxContainer/SettingsMenuContainer/HBoxContainer" unique_id=1529244001]
+layout_mode = 2
+size_flags_horizontal = 3
+
 [node name="FooterButtonsContainer" type="MarginContainer" parent="Background/VBoxContainer" unique_id=1594448033]
 layout_mode = 2
 size_flags_vertical = 3
