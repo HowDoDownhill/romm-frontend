@@ -1,7 +1,6 @@
 [gd_scene format=3 uid="uid://bp0a3h05nfwws"]
 
 [ext_resource type="Script" uid="uid://c1c22gg5ecr81" path="res://scripts/login/LoadingScreen.cs" id="1_ep5rh"]
-[ext_resource type="Texture2D" uid="uid://dxgpruhh7d20e" path="res://assets/background/peak_background.png" id="2_t16uj"]
 
 [node name="LoadingScreen" type="Control" unique_id=1334140658 node_paths=PackedStringArray("_progressBar", "_statusLabel")]
 layout_mode = 3
@@ -14,15 +13,14 @@ script = ExtResource("1_ep5rh")
 _progressBar = NodePath("TextureRect/Panel/VBoxContainer/ProgressBar")
 _statusLabel = NodePath("TextureRect/Panel/VBoxContainer/Label")
 
-[node name="TextureRect" type="TextureRect" parent="." unique_id=289815055]
+[node name="TextureRect" type="ColorRect" parent="." unique_id=1301104698]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-texture = ExtResource("2_t16uj")
-expand_mode = 3
+color = Color(0, 0, 0, 1)
 
 [node name="Panel" type="Panel" parent="TextureRect" unique_id=1844983325]
 layout_mode = 1

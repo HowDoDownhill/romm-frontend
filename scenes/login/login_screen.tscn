@@ -1,7 +1,6 @@
 [gd_scene format=3 uid="uid://c181xd67fwosi"]
 
 [ext_resource type="Script" uid="uid://d0sdyc3lh8p1u" path="res://scripts/login/LoginScreen.cs" id="1_frse4"]
-[ext_resource type="Texture2D" uid="uid://dxgpruhh7d20e" path="res://assets/background/peak_background.png" id="2_cv2ei"]
 
 [node name="LoginScreen" type="Control" unique_id=2048380402 node_paths=PackedStringArray("loginButton", "errorLabel", "rommHostInput", "rommUserInput", "rommPasswordInput", "rommApiKeyInput")]
 layout_mode = 3
@@ -18,15 +17,14 @@ rommUserInput = NodePath("TextureRect/Background/PanelContainer/MarginContainer/
 rommPasswordInput = NodePath("TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/RomMBackendInfo/PasswordInfoContainer/LineEdit")
 rommApiKeyInput = NodePath("TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer/RomMBackendInfo/APIKeyInfoContainer/LineEdit")
 
-[node name="TextureRect" type="TextureRect" parent="." unique_id=1928106699]
+[node name="TextureRect" type="ColorRect" parent="." unique_id=1105768799]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-texture = ExtResource("2_cv2ei")
-expand_mode = 3
+color = Color(0, 0, 0, 1)
 
 [node name="Background" type="Panel" parent="TextureRect" unique_id=878216554]
 layout_mode = 1

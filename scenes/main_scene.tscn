@@ -28,31 +28,39 @@
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_r6p65"]
 
-[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "firmwareSelector", "gameList", "detailsPanelContainer", "gameTitle", "gameDescription", "playDownloadButton", "deleteButton", "downloadsListContainer", "downloadProgressUI", "footerButtonsContainer", "LaunchEmulatorButton", "downloadsPageToggle", "refreshGamesButton")]
+[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "gameList", "detailsPanelContainer", "gameTitle", "gameDescription", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = -1.0
+offset_right = -1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_6l7je")
 headerContainer = NodePath("Background/VBoxContainer/MarginContainer")
 platformLabel = NodePath("Background/VBoxContainer/MarginContainer/Panel/MarginContainer/HBoxContainer/PlatformLabel")
 platformIcon = NodePath("Background/VBoxContainer/MarginContainer/Panel/MarginContainer/HBoxContainer/SystemIcon")
-firmwareSelector = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/SetBiosContainer/SetBiosButton")
 gameList = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/GameList")
 gameListEntryScene = ExtResource("2_rt2n2")
 detailsPanelContainer = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel")
 gameTitle = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/NameMargin/GameName")
 gameDescription = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/DescMargin/GameDesc")
-playDownloadButton = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ButtonsMargin/ButtonsContainer/PlayButton")
-deleteButton = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ButtonsMargin/ButtonsContainer/DeleteButton")
 downloadsListContainer = NodePath("Background/VBoxContainer/DownloadsPageContainer")
 downloadProgressUI = NodePath("Background/VBoxContainer/DownloadsPageContainer/DownloadsPage")
-footerButtonsContainer = NodePath("Background/VBoxContainer/FooterButtonsContainer")
-LaunchEmulatorButton = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/LaunchEmulatorContainer/LaunchEmulatorButton")
-downloadsPageToggle = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/DownloadsButtonConstainer/DownloadPageToggle")
-refreshGamesButton = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/RefreshButtonContainer/RefreshGamesButton")
+gameListFooter = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter")
+downloadsFooter = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/DownloadsFooter")
+settingsFooter = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/SettingsFooter")
+actionBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter/ActionButtonContainer/ActionButton")
+deleteBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter/DeleteGameContainer/DeleteGameButton")
+optionsBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter/MenuContainer/MenuButton")
+filterInstalledGamesBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter/ToggleInstalledContainer/ToggleInstalledButton")
+toggleDownloadsBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter/ToggleDownloadsContainer/ToggleDownloadsButton")
+downloadsToggleDownloadsBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/DownloadsFooter/DownloadsButtonConstainer/DownloadPageToggle")
+navHintBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/DownloadsFooter/NavHintContainer/NavigationHintLabel")
+cancelDownloadBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/DownloadsFooter/CancelDownloadContainer/CancelDownloadsButton")
+settingsSelectBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/SettingsFooter/SettingsSelectContainer/SettingsSelectButton")
+settingsBackBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/SettingsFooter/SettingsBackContainer/SettingsBackButton")
 
 [node name="Background" type="TextureRect" parent="." unique_id=586301297]
 layout_mode = 1
@@ -134,7 +142,8 @@ focus_mode = 2
 script = ExtResource("3_gubc5")
 DepthOffset = 400.0
 XOffset = -300.0
-MinimumOpacity = 0.0
+MinimumOpacity = -0.5
+PreloadItemsHalfCount = 5
 WindowWidthRatio = 0.2
 
 [node name="Panel" type="Panel" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer" unique_id=1330960290]
@@ -191,62 +200,34 @@ theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="ButtonsContainer" type="VBoxContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ButtonsMargin" unique_id=1045750652]
+[node name="InstalledIcon" type="TextureRect" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ButtonsMargin" unique_id=1045750652]
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
-theme_override_constants/separation = 4
-
-[node name="PlayButton" type="Button" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ButtonsMargin/ButtonsContainer" unique_id=1097614377]
-layout_mode = 2
-focus_neighbor_bottom = NodePath("../DeleteButton")
-theme_override_font_sizes/font_size = 16
-text = "Play
-"
-
-[node name="DeleteButton" type="Button" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ButtonsMargin/ButtonsContainer" unique_id=1476300814]
-layout_mode = 2
-text = "Delete"
+expand_mode = 1
+stretch_mode = 5
 
 [node name="DownloadsPageContainer" type="MarginContainer" parent="Background/VBoxContainer" unique_id=1554522468]
 visible = false
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 1
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 1
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
 
-[node name="DownloadsPage" parent="Background/VBoxContainer/DownloadsPageContainer" unique_id=141579046 node_paths=PackedStringArray("downloadsVBox", "cancelDownloadButton") instance=ExtResource("2_6l7je")]
+[node name="DownloadsPage" parent="Background/VBoxContainer/DownloadsPageContainer" unique_id=141579046 node_paths=PackedStringArray("downloadsVBox") instance=ExtResource("2_6l7je")]
 layout_mode = 2
-downloadsVBox = NodePath("VBoxContainer3/VBoxContainer2")
+downloadsVBox = NodePath("VBoxContainer2")
 _downloadEntryScene = ExtResource("4_pu3yx")
-cancelDownloadButton = NodePath("VBoxContainer3/MarginContainer/CancleButton")
 
-[node name="VBoxContainer3" type="VBoxContainer" parent="Background/VBoxContainer/DownloadsPageContainer/DownloadsPage" unique_id=888459564]
+[node name="VBoxContainer2" type="VBoxContainer" parent="Background/VBoxContainer/DownloadsPageContainer/DownloadsPage" unique_id=1354520381]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-
-[node name="VBoxContainer2" type="VBoxContainer" parent="Background/VBoxContainer/DownloadsPageContainer/DownloadsPage/VBoxContainer3" unique_id=1354520381]
-layout_mode = 2
 size_flags_vertical = 3
-
-[node name="MarginContainer" type="MarginContainer" parent="Background/VBoxContainer/DownloadsPageContainer/DownloadsPage/VBoxContainer3" unique_id=1154351311]
-layout_mode = 2
-size_flags_horizontal = 8
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 5
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
-
-[node name="CancleButton" type="Button" parent="Background/VBoxContainer/DownloadsPageContainer/DownloadsPage/VBoxContainer3/MarginContainer" unique_id=1340347745]
-layout_mode = 2
-size_flags_horizontal = 8
-theme_type_variation = &"FlatButton"
-text = "Cancel Download
-"
 
 [node name="SettingsMenuContainer" type="MarginContainer" parent="Background/VBoxContainer" unique_id=803032780]
 visible = false
@@ -281,7 +262,7 @@ theme_override_constants/margin_bottom = 5
 [node name="Panel" type="Panel" parent="Background/VBoxContainer/FooterButtonsContainer" unique_id=1828947604]
 layout_mode = 2
 
-[node name="HBoxContainer" type="HBoxContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel" unique_id=1733423683]
+[node name="GameListFooter" type="HBoxContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel" unique_id=1733423683]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -290,22 +271,24 @@ grow_horizontal = 2
 grow_vertical = 2
 alignment = 2
 
-[node name="SetBiosContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer" unique_id=60579319]
+[node name="ActionButtonContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter" unique_id=60579319]
+custom_minimum_size = Vector2(175, 0)
 layout_mode = 2
-size_flags_horizontal = 8
-size_flags_vertical = 9
 theme_override_constants/margin_left = 5
 theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="SetBiosButton" type="OptionButton" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/SetBiosContainer" unique_id=1997165415]
+[node name="ActionButton" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter/ActionButtonContainer" unique_id=401908397]
 layout_mode = 2
-size_flags_horizontal = 8
+size_flags_horizontal = 13
+size_flags_vertical = 13
 tooltip_text = "Launch the emulator for the currently selected system.
 
 NOTE: launching the emulator from the exectuable from outside the app may restult in your settings not being saved to the instance run from inside the app."
+focus_mode = 0
 theme_type_variation = &"FlatButton"
+theme_override_constants/icon_max_width = 48
 theme_override_styles/normal = SubResource("StyleBoxEmpty_pu3yx")
 theme_override_styles/normal_mirrored = SubResource("StyleBoxEmpty_gubc5")
 theme_override_styles/pressed = SubResource("StyleBoxEmpty_rt2n2")
@@ -317,57 +300,219 @@ theme_override_styles/hover_pressed_mirrored = SubResource("StyleBoxEmpty_e1cbu"
 theme_override_styles/disabled = SubResource("StyleBoxEmpty_mngbo")
 theme_override_styles/disabled_mirrored = SubResource("StyleBoxEmpty_4w45t")
 theme_override_styles/focus = SubResource("StyleBoxEmpty_r6p65")
+text = "Action"
 flat = true
-alignment = 1
-fit_to_longest_item = false
-allow_reselect = true
+alignment = 0
+expand_icon = true
 
-[node name="LaunchEmulatorContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer" unique_id=1773723543]
+[node name="DeleteGameContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter" unique_id=1773723543]
+custom_minimum_size = Vector2(175, 0)
 layout_mode = 2
-size_flags_horizontal = 8
-size_flags_vertical = 9
 theme_override_constants/margin_left = 5
 theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="LaunchEmulatorButton" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/LaunchEmulatorContainer" unique_id=610111342]
+[node name="DeleteGameButton" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter/DeleteGameContainer" unique_id=610111342]
 layout_mode = 2
-size_flags_horizontal = 8
+size_flags_horizontal = 13
+size_flags_vertical = 13
 tooltip_text = "Launch the emulator for the currently selected system.
 
 NOTE: launching the emulator from the exectuable from outside the app may restult in your settings not being saved to the instance run from inside the app."
+focus_mode = 0
 theme_type_variation = &"FlatButton"
-text = "Launch Emulator"
+theme_override_constants/icon_max_width = 48
+text = "Delete Game"
+alignment = 0
+expand_icon = true
 
-[node name="RefreshButtonContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer" unique_id=2067252156]
+[node name="ToggleInstalledContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter" unique_id=1797492776]
+custom_minimum_size = Vector2(175, 0)
 layout_mode = 2
-size_flags_horizontal = 8
-size_flags_vertical = 9
 theme_override_constants/margin_left = 5
 theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="RefreshGamesButton" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/RefreshButtonContainer" unique_id=529449134]
+[node name="ToggleInstalledButton" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter/ToggleInstalledContainer" unique_id=1230347477]
 layout_mode = 2
-size_flags_horizontal = 8
+size_flags_horizontal = 13
+size_flags_vertical = 13
+focus_mode = 0
+theme_type_variation = &"FlatButton"
+theme_override_constants/icon_max_width = 48
+text = "Toggle Installed"
+alignment = 0
+expand_icon = true
+
+[node name="ToggleDownloadsContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter" unique_id=775250903]
+custom_minimum_size = Vector2(175, 0)
+layout_mode = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="ToggleDownloadsButton" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter/ToggleDownloadsContainer" unique_id=1665320228]
+layout_mode = 2
+size_flags_horizontal = 13
+size_flags_vertical = 13
+focus_mode = 0
+theme_type_variation = &"FlatButton"
+theme_override_constants/icon_max_width = 48
+text = "Downloads"
+alignment = 0
+expand_icon = true
+
+[node name="MenuContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter" unique_id=2067252156]
+custom_minimum_size = Vector2(175, 0)
+layout_mode = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="MenuButton" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter/MenuContainer" unique_id=529449134]
+layout_mode = 2
+size_flags_horizontal = 13
+size_flags_vertical = 13
 tooltip_text = "Force refresh games from RomM"
+focus_mode = 0
 theme_type_variation = &"FlatButton"
-text = "Refresh Games
+theme_override_constants/icon_max_width = 48
+text = "Menu
 "
+alignment = 0
+expand_icon = true
 
-[node name="DownloadsButtonConstainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer" unique_id=775250903]
+[node name="DownloadsFooter" type="HBoxContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel" unique_id=543660800]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 2
+
+[node name="NavHintContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/DownloadsFooter" unique_id=1759621279]
+custom_minimum_size = Vector2(175, 0)
 layout_mode = 2
-size_flags_horizontal = 8
-size_flags_vertical = 9
 theme_override_constants/margin_left = 5
 theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="DownloadPageToggle" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/HBoxContainer/DownloadsButtonConstainer" unique_id=1665320228]
+[node name="NavigationHintLabel" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/DownloadsFooter/NavHintContainer" unique_id=2077896962]
 layout_mode = 2
-size_flags_horizontal = 8
+size_flags_horizontal = 13
+size_flags_vertical = 13
+tooltip_text = "Launch the emulator for the currently selected system.
+
+NOTE: launching the emulator from the exectuable from outside the app may restult in your settings not being saved to the instance run from inside the app."
+focus_mode = 0
 theme_type_variation = &"FlatButton"
-text = "Toggle Downloads"
+theme_override_constants/icon_max_width = 48
+theme_override_styles/normal = SubResource("StyleBoxEmpty_pu3yx")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_r6p65")
+text = "Navigate Downloads"
+alignment = 0
+expand_icon = true
+
+[node name="CancelDownloadContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/DownloadsFooter" unique_id=571029368]
+custom_minimum_size = Vector2(175, 0)
+layout_mode = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="CancelDownloadsButton" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/DownloadsFooter/CancelDownloadContainer" unique_id=1203015632]
+layout_mode = 2
+size_flags_horizontal = 13
+size_flags_vertical = 13
+tooltip_text = "Launch the emulator for the currently selected system.
+
+NOTE: launching the emulator from the exectuable from outside the app may restult in your settings not being saved to the instance run from inside the app."
+focus_mode = 0
+theme_type_variation = &"FlatButton"
+theme_override_constants/icon_max_width = 48
+text = "Cancel Download"
+alignment = 0
+expand_icon = true
+
+[node name="DownloadsButtonConstainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/DownloadsFooter" unique_id=242071545]
+custom_minimum_size = Vector2(175, 0)
+layout_mode = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="DownloadPageToggle" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/DownloadsFooter/DownloadsButtonConstainer" unique_id=1996588183]
+layout_mode = 2
+size_flags_horizontal = 13
+size_flags_vertical = 13
+focus_mode = 0
+theme_type_variation = &"FlatButton"
+theme_override_constants/icon_max_width = 48
+text = "Game List"
+alignment = 0
+expand_icon = true
+
+[node name="SettingsFooter" type="HBoxContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel" unique_id=1034791935]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+alignment = 2
+
+[node name="SettingsSelectContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/SettingsFooter" unique_id=589878311]
+custom_minimum_size = Vector2(175, 0)
+layout_mode = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="SettingsSelectButton" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/SettingsFooter/SettingsSelectContainer" unique_id=865988419]
+layout_mode = 2
+size_flags_horizontal = 13
+size_flags_vertical = 13
+tooltip_text = "Launch the emulator for the currently selected system.
+
+NOTE: launching the emulator from the exectuable from outside the app may restult in your settings not being saved to the instance run from inside the app."
+focus_mode = 0
+theme_type_variation = &"FlatButton"
+theme_override_constants/icon_max_width = 48
+theme_override_styles/normal = SubResource("StyleBoxEmpty_pu3yx")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_r6p65")
+text = "Select"
+alignment = 0
+expand_icon = true
+
+[node name="SettingsBackContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/SettingsFooter" unique_id=1122385710]
+custom_minimum_size = Vector2(175, 0)
+layout_mode = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="SettingsBackButton" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/SettingsFooter/SettingsBackContainer" unique_id=621076666]
+layout_mode = 2
+size_flags_horizontal = 13
+size_flags_vertical = 13
+tooltip_text = "Launch the emulator for the currently selected system.
+
+NOTE: launching the emulator from the exectuable from outside the app may restult in your settings not being saved to the instance run from inside the app."
+focus_mode = 0
+theme_type_variation = &"FlatButton"
+theme_override_constants/icon_max_width = 48
+text = "Back"
+alignment = 0
+expand_icon = true

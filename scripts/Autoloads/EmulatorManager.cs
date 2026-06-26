@@ -20,6 +20,9 @@ public class EmulatorMeta
     [JsonPropertyName("emulator_dir_name")]
     public Dictionary<string, string> EmulatorDirName { get; set; }
 
+    [JsonPropertyName("emulator_bios_path")]
+    public Dictionary<string, string> EmulatorBiosPath { get; set; }
+
     [JsonPropertyName("launch_args_with_game")]
     public string LaunchArgsWithGame { get; set; }
     
@@ -90,6 +93,7 @@ public partial class EmulatorManager : Node
     private string executableMapPath;
 
     private Dictionary<string, string> emulatorMap = new Dictionary<string, string>();
+    private Process activeEmulatorProcess = null;
 
     private AppInstance appInstance;
 
@@ -399,15 +403,61 @@ public partial class EmulatorManager : Node
 
             arguments = arguments.Replace("{rom_path}", romPath);
 
+            string actualBiosPath = null;
             if (!string.IsNullOrEmpty(game.System.PrefferedFirmware))
             {
-                string biosPath = Path.GetFullPath(game.System.PrefferedFirmware);
-                GD.Print($"Preferred Firmware Path: {biosPath}");
-                arguments = arguments.Replace("{bios_path}", biosPath);
+                actualBiosPath = Path.GetFullPath(game.System.PrefferedFirmware);
             }
             else
             {
-                GD.Print("No preferred firmware set.");
+                string biosFolder = appInstance.configManager.BiosPath.PathJoin(game.System.Slug);
+                if (DirAccess.DirExistsAbsolute(biosFolder))
+                {
+                    var files = DirAccess.GetFilesAt(biosFolder);
+                    if (files.Length > 0)
+                    {
+                        actualBiosPath = Path.GetFullPath(biosFolder.PathJoin(files[0]));
+                    }
+                }
+            }
+
+            if (!string.IsNullOrEmpty(actualBiosPath))
+            {
+                GD.Print($"Using Firmware Path: {actualBiosPath}");
+                if (arguments.Contains("{bios_path}"))
+                {
+                    arguments = arguments.Replace("{bios_path}", actualBiosPath);
+                }
+
+                // Copy the bios directory contents to the emulator's local bios directory if configured
+                if (meta.EmulatorBiosPath != null && meta.EmulatorBiosPath.ContainsKey(osName))
+                {
+                    string biosSourceDir = Path.GetDirectoryName(actualBiosPath);
+                    string emulatorBiosDir = Path.GetFullPath(Path.Combine(installDir, meta.EmulatorBiosPath[osName]));
+                    if (DirAccess.DirExistsAbsolute(biosSourceDir))
+                    {
+                        if (!DirAccess.DirExistsAbsolute(emulatorBiosDir))
+                        {
+                            DirAccess.MakeDirRecursiveAbsolute(emulatorBiosDir);
+                        }
+                        var files = DirAccess.GetFilesAt(biosSourceDir);
+                        foreach (var file in files)
+                        {
+                            string sourceFile = Path.Combine(biosSourceDir, file);
+                            string destFile = Path.Combine(emulatorBiosDir, file);
+                            if (!Godot.FileAccess.FileExists(destFile))
+                            {
+                                System.IO.File.Copy(sourceFile, destFile, true);
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                GD.Print("No firmware found. Stripping {bios_path} argument.");
+                arguments = System.Text.RegularExpressions.Regex.Replace(arguments, @"\s*-+[-a-zA-Z0-9_]+\s+""?\{bios_path\}""?", "");
+                arguments = arguments.Replace("\"{bios_path}\"", "").Replace("{bios_path}", "");
             }
 
             // Apply Dynamic Settings
@@ -445,6 +495,7 @@ public partial class EmulatorManager : Node
             }
 
             GD.Print($"Launching Command: \"{fullExecutablePath}\" {arguments}");
+            OS.Alert($"Launching Command:\nExecutable: {fullExecutablePath}\nArguments: {arguments}", "Debug: Emulator Launch");
 
             ProcessStartInfo startInfo = new ProcessStartInfo
             {
@@ -458,11 +509,13 @@ public partial class EmulatorManager : Node
             Process emulatorProcess = Process.Start(startInfo);
             if (emulatorProcess != null)
             {
+                activeEmulatorProcess = emulatorProcess;
                 GD.Print($"Emulator launched with PID: {emulatorProcess.Id}");
                 emulatorProcess.EnableRaisingEvents = true;
                 emulatorProcess.Exited += (sender, e) =>
                 {
                     GD.Print("Emulator was closed.");
+                    activeEmulatorProcess = null;
                 };
             }
             else
@@ -474,6 +527,41 @@ public partial class EmulatorManager : Node
         {
             GD.PrintErr($"An exception occurred while launching the emulator: {ex.Message}");
             GD.PrintErr($"Stack Trace: {ex.StackTrace}");
+        }
+    }
+
+    public string GetEmulatorLaunchArgs(string emulatorName)
+    {
+        var emulators = GetAllAvailableEmulators();
+        if (emulators.TryGetValue(emulatorName, out EmulatorMeta meta))
+        {
+            return meta.LaunchArgsWithoutGame;
+        }
+        return "";
+    }
+
+    public bool IsEmulatorRunning
+    {
+        get
+        {
+            if (activeEmulatorProcess != null && !activeEmulatorProcess.HasExited)
+            {
+                return true;
+            }
+            return false;
+        }
+    }
+
+    public void CloseEmulator()
+    {
+        if (activeEmulatorProcess != null && !activeEmulatorProcess.HasExited)
+        {
+            activeEmulatorProcess.CloseMainWindow();
+            if (!activeEmulatorProcess.WaitForExit(5000))
+            {
+                activeEmulatorProcess.Kill();
+            }
+            activeEmulatorProcess = null;
         }
     }
 
@@ -514,9 +602,62 @@ public partial class EmulatorManager : Node
 
             var currentSystem = mainScene.gameSystems[mainScene.currentGameSystemIndex];
             
-            if (currentSystem != null && !string.IsNullOrEmpty(currentSystem.PrefferedFirmware))
+            if (currentSystem != null)
             {
-                arguments = arguments.Replace("{bios_path}", Path.GetFullPath(currentSystem.PrefferedFirmware));
+                string actualBiosPath = null;
+                if (!string.IsNullOrEmpty(currentSystem.PrefferedFirmware))
+                {
+                    actualBiosPath = Path.GetFullPath(currentSystem.PrefferedFirmware);
+                }
+                else
+                {
+                    string biosFolder = appInstance.configManager.BiosPath.PathJoin(currentSystem.Slug);
+                    if (DirAccess.DirExistsAbsolute(biosFolder))
+                    {
+                        var files = DirAccess.GetFilesAt(biosFolder);
+                        if (files.Length > 0)
+                        {
+                            actualBiosPath = Path.GetFullPath(biosFolder.PathJoin(files[0]));
+                        }
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(actualBiosPath))
+                {
+                    if (arguments.Contains("{bios_path}"))
+                    {
+                        arguments = arguments.Replace("{bios_path}", actualBiosPath);
+                    }
+
+                    // Copy the bios directory contents to the emulator's local bios directory if configured
+                    if (meta.EmulatorBiosPath != null && meta.EmulatorBiosPath.ContainsKey(osName))
+                    {
+                        string biosSourceDir = Path.GetDirectoryName(actualBiosPath);
+                        string emulatorBiosDir = Path.GetFullPath(Path.Combine(installDir, meta.EmulatorBiosPath[osName]));
+                        if (DirAccess.DirExistsAbsolute(biosSourceDir))
+                        {
+                            if (!DirAccess.DirExistsAbsolute(emulatorBiosDir))
+                            {
+                                DirAccess.MakeDirRecursiveAbsolute(emulatorBiosDir);
+                            }
+                            var files = DirAccess.GetFilesAt(biosSourceDir);
+                            foreach (var file in files)
+                            {
+                                string sourceFile = Path.Combine(biosSourceDir, file);
+                                string destFile = Path.Combine(emulatorBiosDir, file);
+                                if (!Godot.FileAccess.FileExists(destFile))
+                                {
+                                    System.IO.File.Copy(sourceFile, destFile, true);
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    arguments = System.Text.RegularExpressions.Regex.Replace(arguments, @"\s*-+[-a-zA-Z0-9_]+\s+""?\{bios_path\}""?", "");
+                    arguments = arguments.Replace("\"{bios_path}\"", "").Replace("{bios_path}", "");
+                }
             }
             
             // Apply Dynamic Settings
@@ -554,6 +695,7 @@ public partial class EmulatorManager : Node
             }
 
             GD.Print($"Launching: {fullExecutablePath} {arguments}"); 
+            OS.Alert($"Launching Command:\nExecutable: {fullExecutablePath}\nArguments: {arguments}", "Debug: Emulator Launch");
             
             ProcessStartInfo startInfo = new ProcessStartInfo
             {

@@ -11,6 +11,50 @@ public partial class DownloadProgressUI : Panel
     private string currentlySelectedFile;
 
     private AppInstance appInstance;
+
+    public void CycleSelection(int direction)
+    {
+        var children = downloadsVBox.GetChildren();
+        if (children.Count == 0) return;
+
+        var entries = new List<DownloadEntryUI>();
+        foreach (var child in children)
+        {
+            if (child is DownloadEntryUI entry) entries.Add(entry);
+        }
+
+        if (entries.Count == 0) return;
+
+        DownloadEntryUI current = null;
+        if (!string.IsNullOrEmpty(currentlySelectedFile) && downloadEntries.TryGetValue(currentlySelectedFile, out var e))
+        {
+            current = e;
+        }
+
+        int index = -1;
+        if (current != null)
+        {
+            index = entries.IndexOf(current);
+        }
+
+        if (index == -1)
+        {
+            entries[0].GrabFocus();
+            return;
+        }
+
+        index += direction;
+        if (index < 0) index = entries.Count - 1;
+        if (index >= entries.Count) index = 0;
+
+        entries[index].GrabFocus();
+    }
+
+    public void CancelSelectedDownload()
+    {
+        OnCancelDownloadButtonPressed();
+    }
+
     public override void _Ready()
     {
         appInstance = GetNode<AppInstance>("/root/AppInstance");

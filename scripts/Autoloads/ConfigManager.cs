@@ -20,6 +20,10 @@ public partial class ConfigManager : Node
     public string RomMPassword { get; private set; }
     public string RomMApiKey { get; private set; }
     public bool RomMValidLoginLastUsed { get; private set; }
+    public bool HideGamesWithoutBoxArt { get; private set; }
+
+    public int EmulatorCloseHotkeyCount { get; private set; }
+    public Godot.Collections.Array EmulatorCloseHotkeys { get; private set; }
 
     private AppInstance appInstance;
 
@@ -130,7 +134,12 @@ public partial class ConfigManager : Node
         RomMPassword = (string)config.GetValue("RomM", "Password", "");
         RomMApiKey = (string)config.GetValue("RomM", "ApiKey", "");
         RomMValidLoginLastUsed = (bool)config.GetValue("RomM", "ValidLoginLastUsed", "");
+        HideGamesWithoutBoxArt = (bool)config.GetValue("UI", "HideGamesWithoutBoxArt", false);
         
+        EmulatorCloseHotkeyCount = (int)config.GetValue("Input", "EmulatorCloseHotkeyCount", 4);
+        var defaultKeys = new Godot.Collections.Array { (int)JoyButton.LeftShoulder, (int)JoyButton.RightShoulder, (int)JoyButton.Back, (int)JoyButton.Start };
+        EmulatorCloseHotkeys = (Godot.Collections.Array)config.GetValue("Input", "EmulatorCloseHotkeys", defaultKeys);
+        ApplyInputMap();
     }
 
     private void SetDefaultConfig()
@@ -147,7 +156,11 @@ public partial class ConfigManager : Node
         RomMPassword = "";
         RomMApiKey = "";
         RomMValidLoginLastUsed = false;
+        HideGamesWithoutBoxArt = false;
         
+        EmulatorCloseHotkeyCount = 4;
+        EmulatorCloseHotkeys = new Godot.Collections.Array { (int)JoyButton.LeftShoulder, (int)JoyButton.RightShoulder, (int)JoyButton.Back, (int)JoyButton.Start };
+
         config.SetValue("Paths", "RomsPath", RomsPath);
         config.SetValue("Paths", "BiosPath", BiosPath);
         config.SetValue("Paths", "EmulatorsPath", EmulatorsPath);
@@ -160,7 +173,11 @@ public partial class ConfigManager : Node
         config.SetValue("RomM", "Password", RomMPassword);
         config.SetValue("RomM", "ApiKey", RomMApiKey);
         config.SetValue("RomM", "ValidLoginLastUsed", RomMValidLoginLastUsed);
+        config.SetValue("UI", "HideGamesWithoutBoxArt", HideGamesWithoutBoxArt);
+        config.SetValue("Input", "EmulatorCloseHotkeyCount", EmulatorCloseHotkeyCount);
+        config.SetValue("Input", "EmulatorCloseHotkeys", EmulatorCloseHotkeys);
         config.Save(configDir);
+        ApplyInputMap();
     }
     
     public void SaveConfig()
@@ -177,7 +194,11 @@ public partial class ConfigManager : Node
         config.SetValue("RomM", "Password", RomMPassword);
         config.SetValue("RomM", "ApiKey", RomMApiKey);
         config.SetValue("RomM", "ValidLoginLastUsed", RomMValidLoginLastUsed);
+        config.SetValue("UI", "HideGamesWithoutBoxArt", HideGamesWithoutBoxArt);
+        config.SetValue("Input", "EmulatorCloseHotkeyCount", EmulatorCloseHotkeyCount);
+        config.SetValue("Input", "EmulatorCloseHotkeys", EmulatorCloseHotkeys);
         config.Save(configDir);
+        ApplyInputMap();
     }
 
     public void SaveValidLoginLastUsed(bool value)
@@ -194,5 +215,44 @@ public partial class ConfigManager : Node
         RomMApiKey = apiKey;
         RomMValidLoginLastUsed = true;
         SaveConfig();
+    }
+
+    public void SaveGameListSettings(bool hideWithoutBoxArt)
+    {
+        HideGamesWithoutBoxArt = hideWithoutBoxArt;
+        SaveConfig();
+    }
+
+    public void SaveInputSettings(int count, Godot.Collections.Array keys)
+    {
+        EmulatorCloseHotkeyCount = count;
+        EmulatorCloseHotkeys = keys;
+        SaveConfig();
+    }
+
+    public void ApplyInputMap()
+    {
+        for (int i = 1; i <= 10; i++)
+        {
+            if (InputMap.HasAction($"CloseKey{i}"))
+            {
+                InputMap.EraseAction($"CloseKey{i}");
+            }
+        }
+        for (int i = 0; i < EmulatorCloseHotkeyCount; i++)
+        {
+            string actionName = $"CloseKey{i + 1}";
+            InputMap.AddAction(actionName);
+            var ev = new InputEventJoypadButton();
+            if (i < EmulatorCloseHotkeys.Count)
+            {
+                ev.ButtonIndex = (JoyButton)EmulatorCloseHotkeys[i].AsInt32();
+            }
+            else
+            {
+                ev.ButtonIndex = JoyButton.Invalid;
+            }
+            InputMap.ActionAddEvent(actionName, ev);
+        }
     }
 }

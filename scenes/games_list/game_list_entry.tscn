@@ -2,11 +2,9 @@
 
 [node name="TextureRect" type="TextureRect" unique_id=2014039112]
 custom_minimum_size = Vector2(400, 600)
-anchors_preset = -1
-anchor_right = 0.208
-anchor_bottom = 0.37
-offset_right = -199.36002
-offset_bottom = -199.6
+offset_top = 1.0
+offset_right = 400.0
+offset_bottom = 601.0
 expand_mode = 1
 stretch_mode = 5
 
@@ -33,4 +31,3 @@ offset_right = 40.0
 grow_vertical = 0
 expand_mode = 1
 stretch_mode = 5
-

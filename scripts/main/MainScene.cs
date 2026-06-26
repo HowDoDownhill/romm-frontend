@@ -14,13 +14,11 @@ public partial class MainScene : Control
     [Export] private MarginContainer headerContainer;
     [Export] private Label platformLabel;
     [Export] private TextureRect platformIcon;
-    [Export] private OptionButton firmwareSelector;
-    
-    
 
     public List<GameSystem> gameSystems = new List<GameSystem>();
     public Dictionary<int, List<Game>> games { get; set; } = new Dictionary<int, List<Game>>();
     private List<Game> currentlyShownGames = new List<Game>();
+    private bool _showOnlyInstalledGames = false;
     public int currentGameSystemIndex;
     public Game currentlySelectedGame; 
     
@@ -35,8 +33,7 @@ public partial class MainScene : Control
     [Export] private TextureRect gameMarquee;
     [Export] private Label gameTitle;
     [Export] private RichTextLabel gameDescription;
-    [Export] private Button playDownloadButton;
-    [Export] private Button deleteButton;
+    [Export] private TextureRect installedIcon;
 
     
     //Downloads List
@@ -45,12 +42,30 @@ public partial class MainScene : Control
     [Export] private DownloadProgressUI downloadProgressUI;
         
     //Footer
-    [ExportGroup("FooterButtons")]
-    [Export] private MarginContainer footerButtonsContainer;
-    [Export] private Button LaunchEmulatorButton;
-    [Export] private Button downloadsPageToggle;
-    [Export] private Button refreshGamesButton;
+    [ExportGroup("Footer Buttons & Containers")]
+    [Export] private Control gameListFooter;
+    [Export] private Control downloadsFooter;
+    [Export] private Control settingsFooter;
     
+    [Export] private Button actionBtn;
+    [Export] private Button deleteBtn;
+    [Export] private Button optionsBtn;
+    [Export] private Button filterInstalledGamesBtn;
+    [Export] private Button toggleDownloadsBtn;
+    [Export] private Button downloadsToggleDownloadsBtn;
+    [Export] private Button navHintBtn;
+    [Export] private Button cancelDownloadBtn;
+    [Export] private Button settingsSelectBtn;
+    [Export] private Button settingsBackBtn;
+
+    [ExportGroup("PopupOptions")]
+    [Export] public Node LaunchEmulatorPopupOption;
+    [Export] public Node SelectBiosPopupOption;
+    [Export] public Node SettingsPopupOption;
+    [Export] public Node RefreshGamesPopupOption;
+    [Export] public Node QuitPopupOption;
+
+
 
     //Global access to other systems
     private AppInstance appInstance;
@@ -78,9 +93,7 @@ public partial class MainScene : Control
         SelectSystemByIndex(0);
         SetupGameList();
         SetupDownloadsList();
-        SetupButtonBindings();
-        SetupFirmwareSelector();
-        
+        SetupFooterUI();
         // Setup Settings
         settingsMenuContainer = GetNodeOrNull<MarginContainer>("Background/VBoxContainer/SettingsMenuContainer");
         if (settingsMenuContainer != null)
@@ -102,6 +115,35 @@ public partial class MainScene : Control
     
     public override void _Input(InputEvent @event)
     {
+        if (appInstance.emulatorManager != null && appInstance.emulatorManager.IsEmulatorRunning)
+        {
+            bool isComboPressed = true;
+            int hotkeyCount = appInstance.configManager.EmulatorCloseHotkeyCount;
+            if (hotkeyCount > 0)
+            {
+                for (int i = 1; i <= hotkeyCount; i++)
+                {
+                    if (!Input.IsActionPressed($"CloseKey{i}"))
+                    {
+                        isComboPressed = false;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                isComboPressed = false;
+            }
+
+            if(isComboPressed)  
+            {
+                appInstance.emulatorManager.CloseEmulator();
+                GetViewport().SetInputAsHandled();
+            }
+
+            return;
+        }
+
         if (@event.IsActionPressed("ToggleSettings"))
         {
             if (settingsMenuContainer != null)
@@ -110,13 +152,19 @@ public partial class MainScene : Control
                 if (settingsMenuContainer.Visible)
                 {
                     settingsMenuContainer.Visible = false;
+                    if (settingsFooter != null) settingsFooter.Visible = false;
                     if (gamesListContainer != null) gamesListContainer.Visible = true;
+                    if (gameListFooter != null) gameListFooter.Visible = (downloadsListContainer == null || !downloadsListContainer.Visible);
+                    if (downloadsFooter != null) downloadsFooter.Visible = (downloadsListContainer != null && downloadsListContainer.Visible);
                     gameList?.GrabFocus();
                 }
                 else
                 {
                     settingsMenuContainer.Visible = true;
+                    if (settingsFooter != null) settingsFooter.Visible = true;
                     if (gamesListContainer != null) gamesListContainer.Visible = false;
+                    if (gameListFooter != null) gameListFooter.Visible = false;
+                    if (downloadsFooter != null) downloadsFooter.Visible = false;
                     settingsSectionsTree?.GrabFocus();
                 }
                 UpdateHeaderLabel();
@@ -127,59 +175,204 @@ public partial class MainScene : Control
 
         if (settingsMenuContainer != null && settingsMenuContainer.Visible)
         {
+            var focusOwner = GetViewport().GuiGetFocusOwner();
+            bool isFocusInTree = (focusOwner == settingsSectionsTree);
+            bool isFocusInOptions = (focusOwner != null && sectionOptionsContainer.IsAncestorOf(focusOwner));
+
             if (@event.IsActionPressed("ui_cancel") || @event.IsActionPressed("Back"))
             {
-                var gamesListContainer = gameList?.GetParent()?.GetParent<Control>();
-                settingsMenuContainer.Visible = false;
-                if (gamesListContainer != null) gamesListContainer.Visible = true;
-                UpdateHeaderLabel();
-                gameList?.GrabFocus();
+                if (isFocusInOptions)
+                {
+                    settingsSectionsTree?.GrabFocus();
+                }
+                else
+                {
+                    var gamesListContainer = gameList?.GetParent()?.GetParent<Control>();
+                    settingsMenuContainer.Visible = false;
+                    if (settingsFooter != null) settingsFooter.Visible = false;
+                    if (gamesListContainer != null) gamesListContainer.Visible = true;
+                    if (gameListFooter != null) gameListFooter.Visible = (downloadsListContainer == null || !downloadsListContainer.Visible);
+                    if (downloadsFooter != null) downloadsFooter.Visible = (downloadsListContainer != null && downloadsListContainer.Visible);
+                    UpdateHeaderLabel();
+                    gameList?.GrabFocus();
+                }
                 GetViewport().SetInputAsHandled();
+                return;
             }
+            else if (@event.IsActionPressed("ui_accept") || @event.IsActionPressed("Select"))
+            {
+                if (isFocusInTree)
+                {
+                    var visibleForm = GetVisibleSettingsForm();
+                    if (visibleForm != null)
+                    {
+                        var firstFocusable = FindFirstFocusable(visibleForm);
+                        if (firstFocusable != null)
+                        {
+                            firstFocusable.GrabFocus();
+                            GetViewport().SetInputAsHandled();
+                            return;
+                        }
+                    }
+                }
+            }
+            else if (@event.IsActionPressed("ui_left", true) || @event.IsActionPressed("ui_right", true))
+            {
+                if (isFocusInOptions)
+                {
+                    int direction = @event.IsAction("ui_right") ? 1 : -1;
+                    CycleFocusedOption(direction);
+                    GetViewport().SetInputAsHandled();
+                    return;
+                }
+            }
+
             // Block other custom input processing while settings is open
             return; 
         }
 
-        if(@event.IsActionPressed("CylceSystemUp"))
+        if(@event.IsActionPressed("CylceSystemUp") && (downloadsListContainer == null || !downloadsListContainer.Visible))
         {
-            if (downloadsListContainer != null && downloadsListContainer.Visible) return;
             CycleSelectedSystemNext();
+            GetViewport().SetInputAsHandled();
             return;
         }
         
-        if (@event.IsActionPressed("CycleSystemDown"))
+        if (@event.IsActionPressed("CycleSystemDown") && (downloadsListContainer == null || !downloadsListContainer.Visible))
         {
-            if (downloadsListContainer != null && downloadsListContainer.Visible) return;
             CycleSelectedSystemLast();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (@event.IsActionPressed("Select") && (downloadsListContainer == null || !downloadsListContainer.Visible))
+        {
+            OnPlayDownloadButtonPressed();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (@event.IsActionPressed("ToggleInstalled") && (downloadsListContainer == null || !downloadsListContainer.Visible))
+        {
+            OnFilterInstalledGamesPressed();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (@event.IsActionPressed("DeleteGame") && (downloadsListContainer == null || !downloadsListContainer.Visible))
+        {
+            if (deleteBtn != null && !deleteBtn.Disabled && deleteBtn.Visible)
+            {
+                OnDeleteButtonPressed();
+            }
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (@event.IsActionPressed("ToggleDownloadsPage"))
+        {
+            SwapLists();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (@event.IsActionPressed("CancelDownload"))
+        {
+            if (downloadsListContainer != null && downloadsListContainer.Visible)
+            {
+                OnCancelDownloadPressed();
+                GetViewport().SetInputAsHandled();
+            }
+            return;
+        }
+
+        if (@event.IsActionPressed("ui_up", true) || @event.IsActionPressed("MoveUp"))
+        {
+            if (downloadsListContainer != null && downloadsListContainer.Visible)
+            {
+                if (downloadProgressUI is DownloadProgressUI dpUI) dpUI.CycleSelection(-1);
+                GetViewport().SetInputAsHandled();
+            }
+            return;
+        }
+        
+        if (@event.IsActionPressed("ui_down", true) || @event.IsActionPressed("MoveDown"))
+        {
+            if (downloadsListContainer != null && downloadsListContainer.Visible)
+            {
+                if (downloadProgressUI is DownloadProgressUI dpUI) dpUI.CycleSelection(1);
+                GetViewport().SetInputAsHandled();
+            }
             return;
         }
     }
 
-    public void SetupButtonBindings()
+    public void SetupFooterUI()
     {
-        if (playDownloadButton != null)
-        {
-            playDownloadButton.Pressed += OnPlayDownloadButtonPressed; 
-        }
+        // Setup icons and text programmatically
+        SetupButton(actionBtn, "Select", "Play");
+        if (actionBtn != null) actionBtn.Pressed += OnPlayDownloadButtonPressed;
 
-        if (downloadsPageToggle != null)
-        {
-            downloadsPageToggle.Pressed += SwapLists;
-        }
+        SetupButton(deleteBtn, "DeleteGame", "Delete");
+        if (deleteBtn != null) deleteBtn.Pressed += OnDeleteButtonPressed;
 
-        if (deleteButton != null)
+        SetupButton(settingsSelectBtn, "Select", "Select");
+        SetupButton(settingsBackBtn, "Back", "Back");
+
+        SetupButton(optionsBtn, "ToggleSettings", "Options");
+        if (optionsBtn != null) optionsBtn.Pressed += OnOptionsPressed;
+
+        SetupButton(filterInstalledGamesBtn, "ToggleInstalled", "All Games");
+        if (filterInstalledGamesBtn != null) filterInstalledGamesBtn.Pressed += OnFilterInstalledGamesPressed;
+
+        SetupButton(toggleDownloadsBtn, "ToggleDownloadsPage", "Downloads");
+        if (toggleDownloadsBtn != null) toggleDownloadsBtn.Pressed += SwapLists;
+        
+        SetupButton(downloadsToggleDownloadsBtn, "ToggleDownloadsPage", "Games");
+        if (downloadsToggleDownloadsBtn != null) downloadsToggleDownloadsBtn.Pressed += SwapLists;
+
+        SetupButton(navHintBtn, "MoveUp", "Navigate");
+        if (navHintBtn != null) navHintBtn.Disabled = true;
+
+        SetupButton(cancelDownloadBtn, "CancelDownload", "Cancel");
+        if (cancelDownloadBtn != null) cancelDownloadBtn.Pressed += OnCancelDownloadPressed;
+    }
+
+    private void SetupButton(Button btn, string iconPath, string defaultText)
+    {
+        if (btn == null) return;
+        
+        btn.Text = defaultText;
+        btn.ThemeTypeVariation = "FlatButton";
+        
+        var iconTex = new ControllerIconTexture();
+        iconTex.path = iconPath;
+        btn.Icon = iconTex;
+    }
+
+
+
+    private void OnOptionsPressed()
+    {
+        // Placeholder for user to hook up popup options
+    }
+
+    private void OnFilterInstalledGamesPressed()
+    {
+        _showOnlyInstalledGames = !_showOnlyInstalledGames;
+        if (filterInstalledGamesBtn != null)
         {
-            deleteButton.Pressed += OnDeleteButtonPressed;
+            filterInstalledGamesBtn.Text = _showOnlyInstalledGames ? "Installed" : "All Games";
         }
         
-        if (refreshGamesButton != null)
-        {
-            refreshGamesButton.Pressed += appInstance.cacheManager.rebuildGameCache;
-        }
+        ApplyFiltersAndRefresh();
+    }
 
-        if (LaunchEmulatorButton != null)
+    private void OnCancelDownloadPressed()
+    {
+        if (downloadProgressUI is DownloadProgressUI dpUI)
         {
-            LaunchEmulatorButton.Pressed += OnLaunchEmulatorButtonPressed;
+            dpUI.CancelSelectedDownload();
         }
     }
     
@@ -207,13 +400,7 @@ public partial class MainScene : Control
         }
     }
     
-    private void SetupFirmwareSelector()
-    {
-        if (firmwareSelector != null)
-        {
-            firmwareSelector.ItemSelected += OnFirmwareSelected;
-        }
-    }
+
 
     private void SwapLists()
     {
@@ -233,6 +420,9 @@ public partial class MainScene : Control
             {
                 gameList.GrabFocus();
             }
+
+            if (gameListFooter != null) gameListFooter.Visible = !downloadsListContainer.Visible;
+            if (downloadsFooter != null) downloadsFooter.Visible = downloadsListContainer.Visible;
             
             UpdateHeaderLabel();
         }
@@ -384,73 +574,56 @@ public partial class MainScene : Control
 
         currentlySelectedGame = null;
 
+        ApplyFiltersAndRefresh();
+
+        if (currentlyShownGames.Any())
+        {
+            OnGameSelected(0L);
+            // Restore focus to the game list when returning to games view
+            if (downloadsListContainer != null && !downloadsListContainer.Visible && 
+                (settingsMenuContainer == null || !settingsMenuContainer.Visible))
+            {
+                gameList.GrabFocus();
+            }
+        
+            UpdateHeaderLabel();
+        }
+        else
+        {
+            GD.Print($"No games found in cache for system {system.Name}");
+        }
+    }
+    
+    private void ApplyFiltersAndRefresh()
+    {
+        if (currentGameSystemIndex < 0 || currentGameSystemIndex >= gameSystems.Count) return;
+        var system = gameSystems[currentGameSystemIndex];
+        
         if (games.TryGetValue(system.Id, out List<Game> cachedGames))
         {
-            currentlyShownGames = cachedGames;
-            RefreshGameList();
-
-            if (currentlyShownGames.Any())
+            if (appInstance.configManager.HideGamesWithoutBoxArt)
             {
-                OnGameSelected(0L);
-                // Restore focus to the game list when returning to games view
-                if (!downloadsListContainer.Visible)
-                {
-                    gameList.GrabFocus();
-                }
-            
-                UpdateHeaderLabel();
+                currentlyShownGames = cachedGames.Where(g => !string.IsNullOrEmpty(g.PathCover3d) || !string.IsNullOrEmpty(g.PathCoverLarge) || !string.IsNullOrEmpty(g.CoverArtUrl)).ToList();
             }
+            else
+            {
+                currentlyShownGames = cachedGames;
+            }
+
+            if (_showOnlyInstalledGames)
+            {
+                currentlyShownGames = currentlyShownGames.Where(g => CheckIfGameIsDownloaded(g)).ToList();
+            }
+
+            RefreshGameList();
         }
         else
         {
             currentlyShownGames = new List<Game>();
-            GD.Print($"No games found in cache for system {system.Name}");
-        }
-        
-        UpdateFooterButtons();
-        PopulateFirmwareSelector(system);
-    }
-    
-    private void PopulateFirmwareSelector(GameSystem system)
-    {
-        if (firmwareSelector == null)
-        {
-            GD.Print("Firmware selector is null");
-            return;
-        }
-
-        firmwareSelector.Clear();
-        GD.Print($"Populating firmware selector for {system.Name}");
-        var hasFirmwares = system.AvailableFirmwares != null && system.AvailableFirmwares.Any();
-        firmwareSelector.Visible = hasFirmwares;
-        GD.Print($"Firmware selector visible: {hasFirmwares}");
-
-        if (hasFirmwares)
-        {
-            GD.Print($"{system.AvailableFirmwares.Count} available firmwares found.");
-            foreach (var firmware in system.AvailableFirmwares)
-            {
-                firmwareSelector.AddItem(firmware.FileName);
-            }
-
-            var preferredFirmwareIndex = system.AvailableFirmwares.FindIndex(f => f.FullPath == system.PrefferedFirmware);
-            if (preferredFirmwareIndex != -1)
-            {
-                firmwareSelector.Select(preferredFirmwareIndex);
-                GD.Print($"Selected preferred firmware: {Path.GetFullPath(system.PrefferedFirmware)}");
-            }
+            RefreshGameList();
         }
     }
     
-    private void OnFirmwareSelected(long index)
-    {
-        var system = gameSystems[currentGameSystemIndex];
-        if (index >= 0 && index < system.AvailableFirmwares.Count)
-        {
-            system.PrefferedFirmware = system.AvailableFirmwares[(int)index].FullPath;
-            GD.Print($"Selected preferred firmware: {system.PrefferedFirmware}");
-        }
-    }
 
     public void RefreshGameList()
     {
@@ -543,6 +716,10 @@ public partial class MainScene : Control
                     titleLabel.Visible = false;
                     textureLoaded = true;
                 }
+                else
+                {
+                    appInstance.assetManager.RequestGameAssets(game);
+                }
 
                 TextureRect installedIcon = entry.GetNodeOrNull<TextureRect>("InstalledIcon");
                 if (installedIcon != null)
@@ -577,17 +754,18 @@ public partial class MainScene : Control
                 textureLoaded = false;
             }
 
-            VisibleOnScreenNotifier2D visibilityNotifier = new VisibleOnScreenNotifier2D();
-            visibilityNotifier.Rect = new Rect2(0, -600, 200, 1400); // Expanded rect to load items before they become visible
-            visibilityNotifier.ScreenEntered += () => 
+            entry.Visible = false;
+            entry.VisibilityChanged += () => 
             {
-                TryLoadImage();
+                if (entry.Visible)
+                {
+                    TryLoadImage();
+                }
+                else
+                {
+                    TryUnloadImage();
+                }
             };
-            visibilityNotifier.ScreenExited += () =>
-            {
-                TryUnloadImage();
-            };
-            entry.AddChild(visibilityNotifier);
 
             // Subscribe to asset downloads in background
             AssetManager.AssetDownloadedEventHandler onAssetDownloaded = null;
@@ -596,7 +774,7 @@ public partial class MainScene : Control
                 if (downloadedGameId == game.Id && (assetType == "box3d" || assetType == "box2d"))
                 {
                     textureLoaded = false;
-                    if (visibilityNotifier.IsOnScreen())
+                    if (entry.Visible)
                     {
                         TryLoadImage();
                     }
@@ -614,6 +792,13 @@ public partial class MainScene : Control
 
         if (gameList.HasMethod("Refresh"))
         {
+            int targetIndex = 0;
+            if (currentlySelectedGame != null)
+            {
+                targetIndex = currentlyShownGames.FindIndex(g => g.Id == currentlySelectedGame.Id);
+                if (targetIndex == -1) targetIndex = 0;
+            }
+            gameList.Set("SelectedIndex", targetIndex);
             gameList.Call("Refresh");
         }
     }
@@ -720,56 +905,50 @@ public partial class MainScene : Control
     {
         bool isGameDownloadedLocally = CheckIfGameIsDownloaded(game);
 
-        if (playDownloadButton != null)
+        if (installedIcon != null)
         {
-            playDownloadButton.Visible = true;
+            installedIcon.Visible = isGameDownloadedLocally;
         }
 
-        else
+        if (actionBtn == null) return;
+
+        bool isDownloading = false;
+        if (game.Files != null && game.Files.Any())
         {
-            return;
+            isDownloading = appInstance.downloadManager.IsDownloading(game.Files[0].FileName);
         }
 
         if (isGameDownloadedLocally)
         {
             if (appInstance.emulatorManager.IsEmulatorInstalled(appInstance.emulatorManager.GetMappedEmulator(game.PlatformSlug)))
             {
-                playDownloadButton.Text = "Play";
-                playDownloadButton.Disabled = false; 
+                actionBtn.Text = "Play";
+                actionBtn.Disabled = false; 
             }
-
             else
             {
-                playDownloadButton.Text = "Install Emulator";
+                actionBtn.Text = "Install Emulator";
+                actionBtn.Disabled = false;
             }
         }
-
         else
         {
-            playDownloadButton.Text = "Download";
-            playDownloadButton.Disabled = false;
-        }
-
-        if (deleteButton != null)
-        {
-            deleteButton.Visible = isGameDownloadedLocally;
-        }
-    }
-
-    public void UpdateFooterButtons()
-    {
-        if (LaunchEmulatorButton != null)
-        {
-            string emulatorName = gameSystems[currentGameSystemIndex].MappedEmulator;
-            
-            if (appInstance.emulatorManager.IsEmulatorInstalled(emulatorName))
+            if (isDownloading)
             {
-                LaunchEmulatorButton.Text = "Launch Emulator";
+                actionBtn.Text = "Downloading...";
+                actionBtn.Disabled = true;
             }
             else
             {
-                LaunchEmulatorButton.Text = "Install Emulator";
+                actionBtn.Text = "Download";
+                actionBtn.Disabled = false;
             }
+        }
+
+        if (deleteBtn != null)
+        {
+            // Grey out the X button if not downloaded
+            deleteBtn.Disabled = !isGameDownloadedLocally;
         }
     }
     
@@ -781,10 +960,10 @@ public partial class MainScene : Control
         
         string emulatorName = appInstance.emulatorManager.GetMappedEmulator(currentlySelectedGame.PlatformSlug);
 
-        if (playDownloadButton.Text == "Install Emulator")
+        if (actionBtn.Text == "Install Emulator")
         {
-            playDownloadButton.Disabled = true; 
-            appInstance.emulatorManager.InstallEmulator(emulatorName); 
+            actionBtn.Disabled = true; 
+            _ = appInstance.emulatorManager.InstallEmulator(emulatorName); 
             return; 
         }
 
@@ -797,22 +976,6 @@ public partial class MainScene : Control
         else
         {
             DownloadGame(currentlySelectedGame);
-        }
-    }
-
-    private void OnLaunchEmulatorButtonPressed()
-    {
-        if (LaunchEmulatorButton != null)
-        {
-            if (LaunchEmulatorButton.Text == "Install Emulator")
-            {
-                appInstance.emulatorManager.InstallEmulator(gameSystems[currentGameSystemIndex].MappedEmulator);
-            }
-
-            else
-            {
-                appInstance.emulatorManager.LaunchEmulatorWithoutGame(gameSystems[currentGameSystemIndex].MappedEmulator);
-            }
         }
     }
     
@@ -848,7 +1011,8 @@ public partial class MainScene : Control
             tempZipPath, 
             appInstance.rommApi.GetAuthHeaders(),
             (path) => HandleRomDownloadCompletion(path, game));
-        
+            
+        UpdateDetailsPanelButtons(game);
     }
     
     private void HandleRomDownloadCompletion(string tempZipPath, Game game)
@@ -901,7 +1065,6 @@ public partial class MainScene : Control
         }
 
         UpdateDetailsPanelButtons(game);
-        UpdateFooterButtons();
     }
     
     private void OnDownloadCompleted(string fileName, bool success)
@@ -913,7 +1076,7 @@ public partial class MainScene : Control
     {
         if (currentlySelectedGame == null) return;
         DeleteLocalGame(currentlySelectedGame);
-        RefreshGameList();
+        ApplyFiltersAndRefresh();
         UpdateDetailsPanelButtons(currentlySelectedGame);
     }
 
@@ -966,6 +1129,14 @@ public partial class MainScene : Control
         TreeItem general = settingsSectionsTree.CreateItem(root);
         general.SetText(0, "General Settings");
         
+        TreeItem gameListSettings = settingsSectionsTree.CreateItem(root);
+        gameListSettings.SetText(0, "Game List Settings");
+        GenerateGameListSettingsForm();
+        
+        TreeItem inputSettingsItem = settingsSectionsTree.CreateItem(root);
+        inputSettingsItem.SetText(0, "Input Settings");
+        GenerateInputSettingsForm();
+        
         TreeItem connection = settingsSectionsTree.CreateItem(root);
         connection.SetText(0, "Connection Settings");
 
@@ -987,6 +1158,191 @@ public partial class MainScene : Control
         }
 
         settingsSectionsTree.ItemSelected += OnSettingsTreeItemSelected;
+    }
+
+    private Control GetVisibleSettingsForm()
+    {
+        if (sectionOptionsContainer == null) return null;
+        foreach (Node child in sectionOptionsContainer.GetChildren())
+        {
+            if (child is Control c && c.Visible) return c;
+        }
+        return null;
+    }
+
+    private Control FindFirstFocusable(Node node)
+    {
+        if (node is Control c && c.FocusMode != Control.FocusModeEnum.None && c.Visible) return c;
+        foreach (Node child in node.GetChildren())
+        {
+            Control found = FindFirstFocusable(child);
+            if (found != null) return found;
+        }
+        return null;
+    }
+
+    private void CycleFocusedOption(int direction)
+    {
+        var focusOwner = GetViewport().GuiGetFocusOwner();
+        if (focusOwner == null) return;
+
+        if (focusOwner is OptionButton optBtn)
+        {
+            if (optBtn.ItemCount == 0) return;
+            int newIdx = optBtn.Selected + direction;
+            if (newIdx < 0) newIdx = optBtn.ItemCount - 1;
+            if (newIdx >= optBtn.ItemCount) newIdx = 0;
+            optBtn.Select(newIdx);
+            optBtn.EmitSignal(OptionButton.SignalName.ItemSelected, newIdx);
+        }
+        else if (focusOwner is BaseButton btn && btn.ToggleMode)
+        {
+            bool toggled = !btn.ButtonPressed;
+            if (direction == 1 && !btn.ButtonPressed) toggled = true;
+            else if (direction == -1 && btn.ButtonPressed) toggled = false;
+            else return; 
+            
+            btn.ButtonPressed = toggled;
+            btn.EmitSignal(BaseButton.SignalName.Toggled, btn.ButtonPressed);
+        }
+        else if (focusOwner is SpinBox spinBox)
+        {
+            double step = spinBox.Step > 0 ? spinBox.Step : 1;
+            double newValue = spinBox.Value + (direction * step);
+            if (newValue < spinBox.MinValue) newValue = spinBox.MaxValue;
+            if (newValue > spinBox.MaxValue) newValue = spinBox.MinValue;
+            spinBox.Value = newValue;
+        }
+    }
+
+    private void GenerateGameListSettingsForm()
+    {
+        if (sectionOptionsContainer == null) return;
+        
+        string nodeName = "GameListSettings";
+        if (sectionOptionsContainer.HasNode(nodeName)) return;
+
+        MarginContainer formContainer = new MarginContainer();
+        formContainer.Name = nodeName;
+        formContainer.Visible = false;
+        
+        VBoxContainer vbox = new VBoxContainer();
+        formContainer.AddChild(vbox);
+        sectionOptionsContainer.AddChild(formContainer);
+
+        HBoxContainer fieldBox = new HBoxContainer();
+        
+        Label label = new Label();
+        label.Text = "Hide games without box art";
+        label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        fieldBox.AddChild(label);
+
+        CheckButton checkbox = new CheckButton();
+        checkbox.ButtonPressed = appInstance.configManager.HideGamesWithoutBoxArt;
+        
+        checkbox.Toggled += (bool toggledOn) => 
+        {
+            appInstance.configManager.SaveGameListSettings(toggledOn);
+            if (gameSystems != null && currentGameSystemIndex >= 0 && currentGameSystemIndex < gameSystems.Count)
+            {
+                OnSystemSelected(gameSystems[currentGameSystemIndex]);
+            }
+        };
+        fieldBox.AddChild(checkbox);
+        vbox.AddChild(fieldBox);
+    }
+
+    private void GenerateInputSettingsForm()
+    {
+        if (sectionOptionsContainer == null) return;
+        
+        string nodeName = "InputSettings";
+        if (sectionOptionsContainer.HasNode(nodeName)) return;
+
+        MarginContainer formContainer = new MarginContainer();
+        formContainer.Name = nodeName;
+        formContainer.Visible = false;
+        
+        VBoxContainer vbox = new VBoxContainer();
+        formContainer.AddChild(vbox);
+        sectionOptionsContainer.AddChild(formContainer);
+
+        HBoxContainer countBox = new HBoxContainer();
+        Label countLabel = new Label();
+        countLabel.Text = "Number of Emulator Close Hotkeys";
+        countLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        countBox.AddChild(countLabel);
+
+        SpinBox countSpin = new SpinBox();
+        countSpin.MinValue = 1;
+        countSpin.MaxValue = 10;
+        countSpin.Value = appInstance.configManager.EmulatorCloseHotkeyCount;
+        countBox.AddChild(countSpin);
+        vbox.AddChild(countBox);
+
+        VBoxContainer keysBox = new VBoxContainer();
+        vbox.AddChild(keysBox);
+
+        void RebuildKeysBox(int count)
+        {
+            foreach (Node child in keysBox.GetChildren())
+            {
+                keysBox.RemoveChild(child);
+                child.QueueFree();
+            }
+            
+            var currentKeys = appInstance.configManager.EmulatorCloseHotkeys;
+            
+            for (int i = 0; i < count; i++)
+            {
+                HBoxContainer keyBox = new HBoxContainer();
+                Label keyLabel = new Label();
+                keyLabel.Text = $"Close Key {i + 1}";
+                keyLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+                
+                OptionButton opt = new OptionButton();
+                foreach (JoyButton btn in Enum.GetValues(typeof(JoyButton)))
+                {
+                    opt.AddItem(btn.ToString(), (int)btn);
+                }
+
+                if (i < currentKeys.Count)
+                {
+                    int btnVal = currentKeys[i].AsInt32();
+                    for(int idx = 0; idx < opt.ItemCount; idx++)
+                    {
+                        if(opt.GetItemId(idx) == btnVal)
+                        {
+                            opt.Select(idx);
+                            break;
+                        }
+                    }
+                }
+                
+                int localI = i;
+                opt.ItemSelected += (long index) => 
+                {
+                    int selectedBtn = opt.GetItemId((int)index);
+                    var newKeys = new Godot.Collections.Array(appInstance.configManager.EmulatorCloseHotkeys);
+                    while(newKeys.Count <= localI) newKeys.Add(0);
+                    newKeys[localI] = selectedBtn;
+                    appInstance.configManager.SaveInputSettings(appInstance.configManager.EmulatorCloseHotkeyCount, newKeys);
+                };
+
+                keyBox.AddChild(keyLabel);
+                keyBox.AddChild(opt);
+                keysBox.AddChild(keyBox);
+            }
+        }
+
+        RebuildKeysBox(appInstance.configManager.EmulatorCloseHotkeyCount);
+
+        countSpin.ValueChanged += (double val) =>
+        {
+            int newCount = (int)val;
+            appInstance.configManager.SaveInputSettings(newCount, appInstance.configManager.EmulatorCloseHotkeys);
+            RebuildKeysBox(newCount);
+        };
     }
 
     private void GenerateEmulatorSettingsForm(string slug, EmulatorMeta meta)

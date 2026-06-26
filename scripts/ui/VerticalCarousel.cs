@@ -10,6 +10,7 @@ public partial class VerticalCarousel : Control
     [Export] public float MinimumOpacity = 0.3f;
     [Export] public float AnimationDuration = 0.25f;
     [Export] public int VisibleItemsHalfCount = 4;
+    [Export] public int PreloadItemsHalfCount = 2;
     [Export] public bool ScaleItemsToWindow = true;
     [Export] public float WindowWidthRatio = 0.25f;
 
@@ -132,7 +133,7 @@ public partial class VerticalCarousel : Control
             // Ensure ZIndex remains positive so items don't render behind the root background
             child.ZIndex = VisibleItemsHalfCount - Mathf.RoundToInt(absDiff);
 
-            if (absDiff > VisibleItemsHalfCount)
+            if (absDiff > VisibleItemsHalfCount + PreloadItemsHalfCount)
             {
                 // Hide off-screen items to save rendering, but place them roughly where they should be if they fade in
                 child.Visible = false;

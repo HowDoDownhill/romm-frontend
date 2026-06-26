@@ -10,8 +10,13 @@
     "linux": "pcsx2",
     "macos": "pcsx2"
   },
-  "launch_args_with_game": "-batch -fullscreen -portable -bigpicture -bios \"{bios_path}\" -- \"{rom_path}\"",
-  "launch_args_without_game": "-portable -bios \"{bios_path}\"",
+  "emulator_bios_path": {
+    "windows": "bios",
+    "linux": "bios",
+    "macos": "bios"
+  },
+  "launch_args_with_game": "-batch -fullscreen -portable -bigpicture -- \"{rom_path}\"",
+  "launch_args_without_game": "-portable",
   "install_recipe": {
     "windows": {
       "type": "github_release",

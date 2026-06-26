@@ -1,4 +1,4 @@
-﻿using Godot;
+using Godot;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -79,6 +79,11 @@ public partial class DownloadManager : Node
                     download.Request.GetBodySize());
             }
         }
+    }
+
+    public bool IsDownloading(string fileName)
+    {
+        return activeDownloads.Any(d => d.FileName == fileName);
     }
 
     public void CancelDownload(string fileName)
