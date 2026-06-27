@@ -2,12 +2,10 @@ using Godot;
 
 public partial class ConfigManager : Node
 {
+    public string ApplicationRootDirectory;
+    private string configurationFilePath;
+    private ConfigFile configurationFile;
 
-    public string rootDir;
-    private string configDir;
-    private ConfigFile config;
-    
-    
     public string RomsPath { get; private set; }
     public string BiosPath { get; private set; }
     public string EmulatorsPath { get; private set; }
@@ -27,183 +25,142 @@ public partial class ConfigManager : Node
 
     private AppInstance appInstance;
 
+    private static readonly string[] requiredSubdirectories = new string[]
+    {
+        "roms",
+        "bios",
+        "emulators",
+        "downloads",
+        "install_scripts",
+        "tools",
+        "assets",
+        "assets/covers_3d",
+        "assets/covers_2d",
+        "assets/marquees",
+        "assets/covers_fallback",
+        "assets/screenshots"
+    };
+
     public override void _Ready()
     {
         appInstance = GetNode<AppInstance>("/root/AppInstance");
-        appInstance.configManager = this; 
-        
-        ChooseRootDir();
-        CheckFilesystem();
-        LoadConfig();
+        appInstance.configManager = this;
+
+        DetermineApplicationRootDirectory();
+        EnsureRequiredDirectoriesExist();
+        LoadConfiguration();
     }
-    
-    public void ChooseRootDir()
+
+    public void DetermineApplicationRootDirectory()
     {
         if (OS.HasFeature("editor"))
         {
-            rootDir = ProjectSettings.GlobalizePath("res://");
-            rootDir = rootDir.Remove(rootDir.Length-1);
-            GD.Print(rootDir); 
-
+            ApplicationRootDirectory = ProjectSettings.GlobalizePath("res://");
+            ApplicationRootDirectory = ApplicationRootDirectory.Remove(ApplicationRootDirectory.Length - 1);
         }
         else
         {
-            rootDir = OS.GetExecutablePath().GetBaseDir();
+            ApplicationRootDirectory = OS.GetExecutablePath().GetBaseDir();
         }
-        configDir = rootDir + "/config.cfg";
-        config = new ConfigFile();
+        configurationFilePath = ApplicationRootDirectory + "/config.cfg";
+        configurationFile = new ConfigFile();
     }
-    
-    private void CheckFilesystem()
+
+    private void EnsureRequiredDirectoriesExist()
     {
-        if(!DirAccess.DirExistsAbsolute(rootDir + "/roms/"))
+        foreach (string subdirectoryRelativePath in requiredSubdirectories)
         {
-            DirAccess.MakeDirAbsolute(rootDir + "/roms/");
-        }
-
-        if (!DirAccess.DirExistsAbsolute(rootDir + "/bios/"))
-        {
-            DirAccess.MakeDirAbsolute(rootDir + "/bios/");
-        }
-        
-        if(!DirAccess.DirExistsAbsolute(rootDir + "/emulators/"))
-        {
-            DirAccess.MakeDirAbsolute(rootDir + "/emulators/");
-        }
-
-        if (!DirAccess.DirExistsAbsolute(rootDir + "/downloads/"))
-        {
-            DirAccess.MakeDirAbsolute(rootDir + "/downloads/");
-        }
-
-        if (!DirAccess.DirExistsAbsolute(rootDir + "/install_scripts/"))
-        {
-            DirAccess.MakeDirAbsolute(rootDir + "/install_scripts/");
-        }
-        
-        if (!DirAccess.DirExistsAbsolute(rootDir + "/tools/"))
-        {
-            DirAccess.MakeDirAbsolute(rootDir + "/tools/");
-        }
-
-        if (!DirAccess.DirExistsAbsolute(rootDir + "/assets/"))
-        {
-            DirAccess.MakeDirAbsolute(rootDir + "/assets/");
-        }
-        if (!DirAccess.DirExistsAbsolute(rootDir + "/assets/covers_3d/"))
-        {
-            DirAccess.MakeDirAbsolute(rootDir + "/assets/covers_3d/");
-        }
-        if (!DirAccess.DirExistsAbsolute(rootDir + "/assets/covers_2d/"))
-        {
-            DirAccess.MakeDirAbsolute(rootDir + "/assets/covers_2d/");
-        }
-        if (!DirAccess.DirExistsAbsolute(rootDir + "/assets/marquees/"))
-        {
-            DirAccess.MakeDirAbsolute(rootDir + "/assets/marquees/");
-        }
-        if (!DirAccess.DirExistsAbsolute(rootDir + "/assets/covers_fallback/"))
-        {
-            DirAccess.MakeDirAbsolute(rootDir + "/assets/covers_fallback/");
-        }
-        if (!DirAccess.DirExistsAbsolute(rootDir + "/assets/screenshots/"))
-        {
-            DirAccess.MakeDirAbsolute(rootDir + "/assets/screenshots/");
+            string fullDirectoryPath = ApplicationRootDirectory + "/" + subdirectoryRelativePath + "/";
+            if (!DirAccess.DirExistsAbsolute(fullDirectoryPath))
+            {
+                DirAccess.MakeDirAbsolute(fullDirectoryPath);
+            }
         }
     }
 
-    private void LoadConfig()
+    private void LoadConfiguration()
     {
-        Error err = config.Load(configDir);
-        
-        if (err != Error.Ok)
+        Error loadError = configurationFile.Load(configurationFilePath);
+
+        if (loadError != Error.Ok)
         {
-            SetDefaultConfig();
+            SetDefaultConfiguration();
             return;
         }
 
-        RomsPath = (string)config.GetValue("Paths", "RomsRomsPath", $"{rootDir}/roms/");
-        BiosPath = (string)config.GetValue("Paths", "BiosPath", $"{rootDir}/bios/");
-        EmulatorsPath = (string)config.GetValue("Paths", "EmulatorsPath", $"{rootDir}/emulators/");
-        DownloadsPath = (string)config.GetValue("Paths", "DownloadsPath", $"{rootDir}/downloads/");
-        InstallScriptsPath = (string)config.GetValue("Paths", "InstallScriptsPath", $"{rootDir}/install_scripts/");
-        ToolsPath = (string)config.GetValue("Paths", "ToolsPath", $"{rootDir}/tools/");
-        AssetsPath = (string)config.GetValue("Paths", "AssetsPath", $"{rootDir}/assets/");
-        RomMHost = (string)config.GetValue("RomM", "Host", "");
-        RomMUsername = (string)config.GetValue("RomM", "Username", "");
-        RomMPassword = (string)config.GetValue("RomM", "Password", "");
-        RomMApiKey = (string)config.GetValue("RomM", "ApiKey", "");
-        RomMValidLoginLastUsed = (bool)config.GetValue("RomM", "ValidLoginLastUsed", "");
-        HideGamesWithoutBoxArt = (bool)config.GetValue("UI", "HideGamesWithoutBoxArt", false);
-        
-        EmulatorCloseHotkeyCount = (int)config.GetValue("Input", "EmulatorCloseHotkeyCount", 4);
-        var defaultKeys = new Godot.Collections.Array { (int)JoyButton.LeftShoulder, (int)JoyButton.RightShoulder, (int)JoyButton.Back, (int)JoyButton.Start };
-        EmulatorCloseHotkeys = (Godot.Collections.Array)config.GetValue("Input", "EmulatorCloseHotkeys", defaultKeys);
+        RomsPath = (string)configurationFile.GetValue("Paths", "RomsRomsPath", $"{ApplicationRootDirectory}/roms/");
+        BiosPath = (string)configurationFile.GetValue("Paths", "BiosPath", $"{ApplicationRootDirectory}/bios/");
+        EmulatorsPath = (string)configurationFile.GetValue("Paths", "EmulatorsPath", $"{ApplicationRootDirectory}/emulators/");
+        DownloadsPath = (string)configurationFile.GetValue("Paths", "DownloadsPath", $"{ApplicationRootDirectory}/downloads/");
+        InstallScriptsPath = (string)configurationFile.GetValue("Paths", "InstallScriptsPath", $"{ApplicationRootDirectory}/install_scripts/");
+        ToolsPath = (string)configurationFile.GetValue("Paths", "ToolsPath", $"{ApplicationRootDirectory}/tools/");
+        AssetsPath = (string)configurationFile.GetValue("Paths", "AssetsPath", $"{ApplicationRootDirectory}/assets/");
+        RomMHost = (string)configurationFile.GetValue("RomM", "Host", "");
+        RomMUsername = (string)configurationFile.GetValue("RomM", "Username", "");
+        RomMPassword = (string)configurationFile.GetValue("RomM", "Password", "");
+        RomMApiKey = (string)configurationFile.GetValue("RomM", "ApiKey", "");
+        RomMValidLoginLastUsed = (bool)configurationFile.GetValue("RomM", "ValidLoginLastUsed", "");
+        HideGamesWithoutBoxArt = (bool)configurationFile.GetValue("UI", "HideGamesWithoutBoxArt", false);
+
+        EmulatorCloseHotkeyCount = (int)configurationFile.GetValue("Input", "EmulatorCloseHotkeyCount", 4);
+        var defaultHotkeyButtons = new Godot.Collections.Array { (int)JoyButton.LeftShoulder, (int)JoyButton.RightShoulder, (int)JoyButton.Back, (int)JoyButton.Start };
+        EmulatorCloseHotkeys = (Godot.Collections.Array)configurationFile.GetValue("Input", "EmulatorCloseHotkeys", defaultHotkeyButtons);
         ApplyInputMap();
     }
 
-    private void SetDefaultConfig()
+    private void SetDefaultConfiguration()
     {
-        RomsPath = $"{rootDir}/roms/";
-        BiosPath = $"{rootDir}/bios/";
-        EmulatorsPath = $"{rootDir}/emulators/";
-        DownloadsPath = $"{rootDir}/downloads/";
-        InstallScriptsPath = $"{rootDir}/install_scripts/";
-        ToolsPath = $"{rootDir}/tools/";
-        AssetsPath = $"{rootDir}/assets/";
+        RomsPath = $"{ApplicationRootDirectory}/roms/";
+        BiosPath = $"{ApplicationRootDirectory}/bios/";
+        EmulatorsPath = $"{ApplicationRootDirectory}/emulators/";
+        DownloadsPath = $"{ApplicationRootDirectory}/downloads/";
+        InstallScriptsPath = $"{ApplicationRootDirectory}/install_scripts/";
+        ToolsPath = $"{ApplicationRootDirectory}/tools/";
+        AssetsPath = $"{ApplicationRootDirectory}/assets/";
         RomMHost = "";
         RomMUsername = "";
         RomMPassword = "";
         RomMApiKey = "";
         RomMValidLoginLastUsed = false;
         HideGamesWithoutBoxArt = false;
-        
+
         EmulatorCloseHotkeyCount = 4;
         EmulatorCloseHotkeys = new Godot.Collections.Array { (int)JoyButton.LeftShoulder, (int)JoyButton.RightShoulder, (int)JoyButton.Back, (int)JoyButton.Start };
 
-        config.SetValue("Paths", "RomsPath", RomsPath);
-        config.SetValue("Paths", "BiosPath", BiosPath);
-        config.SetValue("Paths", "EmulatorsPath", EmulatorsPath);
-        config.SetValue("Paths", "DownloadsPath", DownloadsPath);
-        config.SetValue("Paths", "InstallScriptsPath", InstallScriptsPath);
-        config.SetValue("Paths", "ToolsPath", ToolsPath);
-        config.SetValue("Paths", "AssetsPath", AssetsPath);
-        config.SetValue("RomM", "Host", RomMHost);
-        config.SetValue("RomM", "Username", RomMUsername);
-        config.SetValue("RomM", "Password", RomMPassword);
-        config.SetValue("RomM", "ApiKey", RomMApiKey);
-        config.SetValue("RomM", "ValidLoginLastUsed", RomMValidLoginLastUsed);
-        config.SetValue("UI", "HideGamesWithoutBoxArt", HideGamesWithoutBoxArt);
-        config.SetValue("Input", "EmulatorCloseHotkeyCount", EmulatorCloseHotkeyCount);
-        config.SetValue("Input", "EmulatorCloseHotkeys", EmulatorCloseHotkeys);
-        config.Save(configDir);
-        ApplyInputMap();
-    }
-    
-    public void SaveConfig()
-    {
-        config.SetValue("Paths", "RomsPath", RomsPath);
-        config.SetValue("Paths", "BiosPath", BiosPath);
-        config.SetValue("Paths", "EmulatorsPath", EmulatorsPath);
-        config.SetValue("Paths", "DownloadsPath", DownloadsPath);
-        config.SetValue("Paths", "InstallScriptsPath", InstallScriptsPath);
-        config.SetValue("Paths", "ToolsPath", ToolsPath);
-        config.SetValue("Paths", "AssetsPath", AssetsPath);
-        config.SetValue("RomM", "Host", RomMHost);
-        config.SetValue("RomM", "Username", RomMUsername);
-        config.SetValue("RomM", "Password", RomMPassword);
-        config.SetValue("RomM", "ApiKey", RomMApiKey);
-        config.SetValue("RomM", "ValidLoginLastUsed", RomMValidLoginLastUsed);
-        config.SetValue("UI", "HideGamesWithoutBoxArt", HideGamesWithoutBoxArt);
-        config.SetValue("Input", "EmulatorCloseHotkeyCount", EmulatorCloseHotkeyCount);
-        config.SetValue("Input", "EmulatorCloseHotkeys", EmulatorCloseHotkeys);
-        config.Save(configDir);
+        WriteAllConfigurationValues();
+        configurationFile.Save(configurationFilePath);
         ApplyInputMap();
     }
 
-    public void SaveValidLoginLastUsed(bool value)
+    private void WriteAllConfigurationValues()
     {
-        RomMValidLoginLastUsed = value;
+        configurationFile.SetValue("Paths", "RomsPath", RomsPath);
+        configurationFile.SetValue("Paths", "BiosPath", BiosPath);
+        configurationFile.SetValue("Paths", "EmulatorsPath", EmulatorsPath);
+        configurationFile.SetValue("Paths", "DownloadsPath", DownloadsPath);
+        configurationFile.SetValue("Paths", "InstallScriptsPath", InstallScriptsPath);
+        configurationFile.SetValue("Paths", "ToolsPath", ToolsPath);
+        configurationFile.SetValue("Paths", "AssetsPath", AssetsPath);
+        configurationFile.SetValue("RomM", "Host", RomMHost);
+        configurationFile.SetValue("RomM", "Username", RomMUsername);
+        configurationFile.SetValue("RomM", "Password", RomMPassword);
+        configurationFile.SetValue("RomM", "ApiKey", RomMApiKey);
+        configurationFile.SetValue("RomM", "ValidLoginLastUsed", RomMValidLoginLastUsed);
+        configurationFile.SetValue("UI", "HideGamesWithoutBoxArt", HideGamesWithoutBoxArt);
+        configurationFile.SetValue("Input", "EmulatorCloseHotkeyCount", EmulatorCloseHotkeyCount);
+        configurationFile.SetValue("Input", "EmulatorCloseHotkeys", EmulatorCloseHotkeys);
+    }
+
+    public void SaveConfig()
+    {
+        WriteAllConfigurationValues();
+        configurationFile.Save(configurationFilePath);
+        ApplyInputMap();
+    }
+
+    public void SaveValidLoginLastUsed(bool isValidLogin)
+    {
+        RomMValidLoginLastUsed = isValidLogin;
         SaveConfig();
     }
 
@@ -217,42 +174,42 @@ public partial class ConfigManager : Node
         SaveConfig();
     }
 
-    public void SaveGameListSettings(bool hideWithoutBoxArt)
+    public void SaveGameListSettings(bool shouldHideGamesWithoutBoxArt)
     {
-        HideGamesWithoutBoxArt = hideWithoutBoxArt;
+        HideGamesWithoutBoxArt = shouldHideGamesWithoutBoxArt;
         SaveConfig();
     }
 
-    public void SaveInputSettings(int count, Godot.Collections.Array keys)
+    public void SaveInputSettings(int hotkeyCount, Godot.Collections.Array hotkeyButtons)
     {
-        EmulatorCloseHotkeyCount = count;
-        EmulatorCloseHotkeys = keys;
+        EmulatorCloseHotkeyCount = hotkeyCount;
+        EmulatorCloseHotkeys = hotkeyButtons;
         SaveConfig();
     }
 
     public void ApplyInputMap()
     {
-        for (int i = 1; i <= 10; i++)
+        for (int actionIndex = 1; actionIndex <= 10; actionIndex++)
         {
-            if (InputMap.HasAction($"CloseKey{i}"))
+            if (InputMap.HasAction($"CloseKey{actionIndex}"))
             {
-                InputMap.EraseAction($"CloseKey{i}");
+                InputMap.EraseAction($"CloseKey{actionIndex}");
             }
         }
-        for (int i = 0; i < EmulatorCloseHotkeyCount; i++)
+        for (int hotkeyIndex = 0; hotkeyIndex < EmulatorCloseHotkeyCount; hotkeyIndex++)
         {
-            string actionName = $"CloseKey{i + 1}";
-            InputMap.AddAction(actionName);
-            var ev = new InputEventJoypadButton();
-            if (i < EmulatorCloseHotkeys.Count)
+            string inputActionName = $"CloseKey{hotkeyIndex + 1}";
+            InputMap.AddAction(inputActionName);
+            var joypadButtonEvent = new InputEventJoypadButton();
+            if (hotkeyIndex < EmulatorCloseHotkeys.Count)
             {
-                ev.ButtonIndex = (JoyButton)EmulatorCloseHotkeys[i].AsInt32();
+                joypadButtonEvent.ButtonIndex = (JoyButton)EmulatorCloseHotkeys[hotkeyIndex].AsInt32();
             }
             else
             {
-                ev.ButtonIndex = JoyButton.Invalid;
+                joypadButtonEvent.ButtonIndex = JoyButton.Invalid;
             }
-            InputMap.ActionAddEvent(actionName, ev);
+            InputMap.ActionAddEvent(inputActionName, joypadButtonEvent);
         }
     }
 }

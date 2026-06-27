@@ -12,137 +12,121 @@ public partial class AssetManager : Node
     public delegate void AssetDownloadedEventHandler(int gameId, string assetType);
 
     private AppInstance appInstance;
-    private ConcurrentQueue<(int gameId, string assetType, string url, string localPath)> _downloadQueue = new();
-    private int _concurrentDownloads = 2;
-    private int _activeWorkers = 0;
-    private CancellationTokenSource _cts = new CancellationTokenSource();
+    private ConcurrentQueue<(int gameId, string assetType, string downloadUrl, string localFilePath)> pendingAssetDownloadQueue = new();
+    private int maximumConcurrentDownloadWorkers = 2;
+    private int activeDownloadWorkerCount = 0;
+    private CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
 
-    // Track which game IDs have already been queued to avoid duplicate requests
-    private readonly HashSet<int> _requestedGameIds = new();
+    private readonly HashSet<int> previouslyRequestedGameIds = new();
 
     public override void _Ready()
     {
         appInstance = GetNode<AppInstance>("/root/AppInstance");
-        appInstance.assetManager = this; 
+        appInstance.assetManager = this;
     }
 
-    /// <summary>
-    /// Request assets for a single game. Call this when a game entry becomes
-    /// near-visible in the carousel. Already-cached and in-flight games are skipped.
-    /// </summary>
     public void RequestGameAssets(Game game)
     {
         if (game == null) return;
 
-        // Skip if we've already queued this game's assets
-        lock (_requestedGameIds)
+        lock (previouslyRequestedGameIds)
         {
-            if (!_requestedGameIds.Add(game.Id)) return;
+            if (!previouslyRequestedGameIds.Add(game.Id)) return;
         }
 
-        QueueGameAssets(game);
-        EnsureWorkersRunning();
+        EnqueueGameAssetDownloads(game);
+        EnsureDownloadWorkersAreRunning();
     }
 
-    private void QueueGameAssets(Game game)
+    private void EnqueueGameAssetDownloads(Game game)
     {
-        string assetsPath = appInstance.configManager.AssetsPath;
-        if (string.IsNullOrEmpty(assetsPath)) return;
+        string assetsDirectoryPath = appInstance.configManager.AssetsPath;
+        if (string.IsNullOrEmpty(assetsDirectoryPath)) return;
 
-        // 3D Cover
-        string path3d = Path.Combine(assetsPath, "covers_3d", $"{game.Id}.png");
-        if (!File.Exists(path3d))
+        string threeDimensionalCoverPath = Path.Combine(assetsDirectoryPath, "covers_3d", $"{game.Id}.png");
+        if (!File.Exists(threeDimensionalCoverPath))
         {
-            string url3d;
+            string threeDimensionalCoverUrl;
             if (!string.IsNullOrEmpty(game.PathCover3d))
             {
-                string path = game.PathCover3d.TrimStart('/');
-                url3d = game.PathCover3d.StartsWith("http") ? game.PathCover3d : $"{appInstance.rommApi.ApiHost}/{path}";
+                string relativePath = game.PathCover3d.TrimStart('/');
+                threeDimensionalCoverUrl = game.PathCover3d.StartsWith("http") ? game.PathCover3d : $"{appInstance.rommApi.ApiHost}/{relativePath}";
             }
             else
             {
-                url3d = $"{appInstance.rommApi.ApiHost}/assets/romm/resources/roms/{game.PlatformId}/{game.Id}/box3d/box3d.png";
+                threeDimensionalCoverUrl = $"{appInstance.rommApi.ApiHost}/assets/romm/resources/roms/{game.PlatformId}/{game.Id}/box3d/box3d.png";
             }
-            _downloadQueue.Enqueue((game.Id, "box3d", url3d, path3d));
+            pendingAssetDownloadQueue.Enqueue((game.Id, "box3d", threeDimensionalCoverUrl, threeDimensionalCoverPath));
         }
 
-        // 2D Cover (box2d, using large cover as requested)
-        string path2d = Path.Combine(assetsPath, "covers_2d", $"{game.Id}.png");
-        if (!File.Exists(path2d))
+        string twoDimensionalCoverPath = Path.Combine(assetsDirectoryPath, "covers_2d", $"{game.Id}.png");
+        if (!File.Exists(twoDimensionalCoverPath))
         {
-            string url2d;
+            string twoDimensionalCoverUrl;
             if (!string.IsNullOrEmpty(game.PathCoverLarge))
             {
-                string path = game.PathCoverLarge.TrimStart('/');
-                url2d = game.PathCoverLarge.StartsWith("http") ? game.PathCoverLarge : $"{appInstance.rommApi.ApiHost}/{path}";
+                string relativePath = game.PathCoverLarge.TrimStart('/');
+                twoDimensionalCoverUrl = game.PathCoverLarge.StartsWith("http") ? game.PathCoverLarge : $"{appInstance.rommApi.ApiHost}/{relativePath}";
             }
             else
             {
-                url2d = $"{appInstance.rommApi.ApiHost}/assets/romm/resources/roms/{game.PlatformId}/{game.Id}/cover/big.png";
+                twoDimensionalCoverUrl = $"{appInstance.rommApi.ApiHost}/assets/romm/resources/roms/{game.PlatformId}/{game.Id}/cover/big.png";
             }
-            _downloadQueue.Enqueue((game.Id, "box2d", url2d, path2d));
-        } 
-        
-        // Marquee
-        string pathMarquee = Path.Combine(assetsPath, "marquees", $"{game.Id}.png");
-        if (!File.Exists(pathMarquee))
-        {
-            string urlMarquee = $"{appInstance.rommApi.ApiHost}/assets/romm/resources/roms/{game.PlatformId}/{game.Id}/marquee/marquee.png";
-            _downloadQueue.Enqueue((game.Id, "marquee", urlMarquee, pathMarquee));
+            pendingAssetDownloadQueue.Enqueue((game.Id, "box2d", twoDimensionalCoverUrl, twoDimensionalCoverPath));
         }
 
-        // Screenshot
-        string pathScreenshot = Path.Combine(assetsPath, "screenshots", $"{game.Id}.jpg");
-        if (!File.Exists(pathScreenshot))
+        string marqueeImagePath = Path.Combine(assetsDirectoryPath, "marquees", $"{game.Id}.png");
+        if (!File.Exists(marqueeImagePath))
         {
-            string urlScreenshot = $"{appInstance.rommApi.ApiHost}/assets/romm/resources/roms/{game.PlatformId}/{game.Id}/screenshot/0.jpg";
-            _downloadQueue.Enqueue((game.Id, "screenshot", urlScreenshot, pathScreenshot));
+            string marqueeImageUrl = $"{appInstance.rommApi.ApiHost}/assets/romm/resources/roms/{game.PlatformId}/{game.Id}/marquee/marquee.png";
+            pendingAssetDownloadQueue.Enqueue((game.Id, "marquee", marqueeImageUrl, marqueeImagePath));
+        }
+
+        string screenshotImagePath = Path.Combine(assetsDirectoryPath, "screenshots", $"{game.Id}.jpg");
+        if (!File.Exists(screenshotImagePath))
+        {
+            string screenshotImageUrl = $"{appInstance.rommApi.ApiHost}/assets/romm/resources/roms/{game.PlatformId}/{game.Id}/screenshot/0.jpg";
+            pendingAssetDownloadQueue.Enqueue((game.Id, "screenshot", screenshotImageUrl, screenshotImagePath));
         }
     }
 
-    /// <summary>
-    /// Spin up download workers if none are currently running.
-    /// </summary>
-    private void EnsureWorkersRunning()
+    private void EnsureDownloadWorkersAreRunning()
     {
-        if (_activeWorkers >= _concurrentDownloads) return;
+        if (activeDownloadWorkerCount >= maximumConcurrentDownloadWorkers) return;
 
-        int workersToStart = _concurrentDownloads - _activeWorkers;
-        for (int i = 0; i < workersToStart; i++)
+        int workersToSpawn = maximumConcurrentDownloadWorkers - activeDownloadWorkerCount;
+        for (int workerIndex = 0; workerIndex < workersToSpawn; workerIndex++)
         {
-            Interlocked.Increment(ref _activeWorkers);
-            _ = DownloadWorkerAsync(_cts.Token);
+            Interlocked.Increment(ref activeDownloadWorkerCount);
+            _ = RunAssetDownloadWorkerAsync(cancellationTokenSource.Token);
         }
     }
 
-    private async Task DownloadWorkerAsync(CancellationToken token)
+    private async Task RunAssetDownloadWorkerAsync(CancellationToken cancellationToken)
     {
         try
         {
-            while (!token.IsCancellationRequested)
+            while (!cancellationToken.IsCancellationRequested)
             {
-                if (_downloadQueue.TryDequeue(out var task))
+                if (pendingAssetDownloadQueue.TryDequeue(out var downloadTask))
                 {
-                    bool success = await appInstance.rommApi.DownloadAssetAsync(task.url, task.localPath);
-                    if (success)
+                    bool downloadSucceeded = await appInstance.rommApi.DownloadAssetAsync(downloadTask.downloadUrl, downloadTask.localFilePath);
+                    if (downloadSucceeded)
                     {
-                        // Emit signal on main thread
-                        CallDeferred(MethodName.EmitAssetDownloaded, task.gameId, task.assetType);
+                        CallDeferred(MethodName.EmitAssetDownloaded, downloadTask.gameId, downloadTask.assetType);
                     }
 
-                    // Add a small delay to prevent flooding the router
-                    await Task.Delay(100, token);
+                    await Task.Delay(100, cancellationToken);
                 }
                 else
                 {
-                    // Queue is empty, exit worker
                     break;
                 }
             }
         }
         finally
         {
-            Interlocked.Decrement(ref _activeWorkers);
+            Interlocked.Decrement(ref activeDownloadWorkerCount);
         }
     }
 

@@ -25,5 +25,125 @@
       "asset_regex": ".*linux-x86_64$",
       "extract": false
     }
-  }
+  },
+  "settings_fields": [
+    {
+      "id": "upscale",
+      "label": "Upscale",
+      "type": "dropdown",
+      "config_file_relative_path": "portable_data/config/config.json",
+      "config_section": "video",
+      "config_key": "upscale",
+      "default_value_string": "1",
+      "options": {
+        "1x": "1",
+        "2x": "2",
+        "3x": "3",
+        "4x": "4",
+        "5x": "5",
+        "6x": "6",
+        "7x": "7",
+        "8x": "8"
+      }
+    },
+    {
+      "id": "ssaa",
+      "label": "SSAA",
+      "type": "boolean",
+      "config_file_relative_path": "portable_data/config/config.json",
+      "config_section": "video",
+      "config_key": "ssaa",
+      "default_value_bool": false
+    },
+    {
+      "id": "integer_scaling",
+      "label": "Integer Scaling",
+      "type": "boolean",
+      "config_file_relative_path": "portable_data/config/config.json",
+      "config_section": "video",
+      "config_key": "integer_scaling",
+      "default_value_bool": false
+    },
+    {
+      "id": "fullscreen",
+      "label": "Fullscreen",
+      "type": "boolean",
+      "config_file_relative_path": "portable_data/config/config.json",
+      "config_section": "video",
+      "config_key": "fullscreen",
+      "default_value_bool": false
+    },
+    {
+      "id": "widescreen",
+      "label": "Widescreen",
+      "type": "boolean",
+      "config_file_relative_path": "portable_data/config/config.json",
+      "config_section": "video",
+      "config_key": "widescreen",
+      "default_value_bool": false
+    },
+    {
+      "id": "vsync",
+      "label": "VSync",
+      "type": "boolean",
+      "config_file_relative_path": "portable_data/config/config.json",
+      "config_section": "video",
+      "config_key": "vsync",
+      "default_value_bool": true
+    },
+    {
+      "id": "crt",
+      "label": "CRT Filter",
+      "type": "boolean",
+      "config_file_relative_path": "portable_data/config/config.json",
+      "config_section": "video",
+      "config_key": "crt",
+      "default_value_bool": false
+    },
+    {
+      "id": "overclock",
+      "label": "Overclock",
+      "type": "boolean",
+      "config_file_relative_path": "portable_data/config/config.json",
+      "config_section": "emulation",
+      "config_key": "overclock",
+      "default_value_bool": false
+    },
+    {
+      "id": "disable_expansion_pak",
+      "label": "Disable Expansion Pak",
+      "type": "boolean",
+      "config_file_relative_path": "portable_data/config/config.json",
+      "config_section": "emulation",
+      "config_key": "disable_expansion_pak",
+      "default_value_bool": false
+    },
+    {
+      "id": "usb",
+      "label": "Enable USB",
+      "type": "boolean",
+      "config_file_relative_path": "portable_data/config/config.json",
+      "config_section": "emulation",
+      "config_key": "usb",
+      "default_value_bool": false
+    },
+    {
+      "id": "rewind",
+      "label": "Enable Rewind",
+      "type": "boolean",
+      "config_file_relative_path": "portable_data/config/config.json",
+      "config_section": "emulation",
+      "config_key": "rewind",
+      "default_value_bool": false
+    },
+    {
+      "id": "emulate_vru",
+      "label": "Emulate VRU",
+      "type": "boolean",
+      "config_file_relative_path": "portable_data/config/config.json",
+      "config_section": "input",
+      "config_key": "emulate_vru",
+      "default_value_bool": false
+    }
+  ]
 }

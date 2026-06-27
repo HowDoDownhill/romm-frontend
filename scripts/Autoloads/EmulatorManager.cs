@@ -6,8 +6,156 @@ using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
+using System.Text.Json.Nodes;
 using FileAccess = Godot.FileAccess;
 using DirAccess = Godot.DirAccess;
+
+public interface IConfigurationUpdater
+{
+    bool CanHandle(string filePath);
+    void UpdateValue(string filePath, string section, string key, string stringValue, object rawValue);
+}
+
+public class IniConfigurationUpdater : IConfigurationUpdater
+{
+    public bool CanHandle(string filePath)
+    {
+        return filePath.EndsWith(".ini", StringComparison.OrdinalIgnoreCase) ||
+               filePath.EndsWith(".cfg", StringComparison.OrdinalIgnoreCase) ||
+               !filePath.EndsWith(".json", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public void UpdateValue(string configurationFilePath, string targetSection, string targetKey, string stringValue, object rawValue)
+    {
+        if (!System.IO.File.Exists(configurationFilePath))
+        {
+            return;
+        }
+
+        string[] configurationLines = System.IO.File.ReadAllLines(configurationFilePath);
+        System.Collections.Generic.List<string> updatedConfigurationLines = new System.Collections.Generic.List<string>();
+        bool isInsideTargetSection = false;
+        bool hasUpdatedTargetKey = false;
+
+        foreach (string currentLine in configurationLines)
+        {
+            string trimmedCurrentLine = currentLine.Trim();
+
+            if (trimmedCurrentLine.StartsWith("[") && trimmedCurrentLine.EndsWith("]"))
+            {
+                if (isInsideTargetSection && !hasUpdatedTargetKey)
+                {
+                    updatedConfigurationLines.Add($"{targetKey} = {stringValue}");
+                    hasUpdatedTargetKey = true;
+                }
+                
+                string currentSection = trimmedCurrentLine.Substring(1, trimmedCurrentLine.Length - 2);
+                isInsideTargetSection = (currentSection == targetSection);
+                updatedConfigurationLines.Add(currentLine);
+            }
+            else if (isInsideTargetSection && !hasUpdatedTargetKey)
+            {
+                int equalsIndex = currentLine.IndexOf('=');
+                if (equalsIndex != -1)
+                {
+                    string keyName = currentLine.Substring(0, equalsIndex).Trim();
+                    if (keyName == targetKey)
+                    {
+                        updatedConfigurationLines.Add($"{keyName} = {stringValue}");
+                        hasUpdatedTargetKey = true;
+                    }
+                    else
+                    {
+                        updatedConfigurationLines.Add(currentLine);
+                    }
+                }
+                else
+                {
+                    updatedConfigurationLines.Add(currentLine);
+                }
+            }
+            else
+            {
+                updatedConfigurationLines.Add(currentLine);
+            }
+        }
+
+        if (isInsideTargetSection && !hasUpdatedTargetKey)
+        {
+            updatedConfigurationLines.Add($"{targetKey} = {stringValue}");
+            hasUpdatedTargetKey = true;
+        }
+        else if (!hasUpdatedTargetKey)
+        {
+            updatedConfigurationLines.Add("");
+            updatedConfigurationLines.Add($"[{targetSection}]");
+            updatedConfigurationLines.Add($"{targetKey} = {stringValue}");
+        }
+
+        System.IO.File.WriteAllLines(configurationFilePath, updatedConfigurationLines);
+    }
+}
+
+public class JsonConfigurationUpdater : IConfigurationUpdater
+{
+    public bool CanHandle(string filePath)
+    {
+        return filePath.EndsWith(".json", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public void UpdateValue(string configurationFilePath, string targetSection, string targetKey, string stringValue, object rawValue)
+    {
+        string directory = Path.GetDirectoryName(configurationFilePath);
+        if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        JsonNode jsonNode = null;
+        if (System.IO.File.Exists(configurationFilePath))
+        {
+            try
+            {
+                string json = System.IO.File.ReadAllText(configurationFilePath);
+                jsonNode = JsonNode.Parse(json);
+            }
+            catch { }
+        }
+
+        if (jsonNode == null)
+        {
+            jsonNode = new JsonObject();
+        }
+
+        var jsonObject = jsonNode.AsObject();
+        if (!jsonObject.ContainsKey(targetSection))
+        {
+            jsonObject[targetSection] = new JsonObject();
+        }
+
+        var sectionObject = jsonObject[targetSection].AsObject();
+
+        if (rawValue is bool boolVal) sectionObject[targetKey] = boolVal;
+        else if (rawValue is string strVal)
+        {
+            if (int.TryParse(strVal, out int intVal)) sectionObject[targetKey] = intVal;
+            else sectionObject[targetKey] = strVal;
+        }
+        else if (rawValue is JsonElement elem)
+        {
+            if (elem.ValueKind == JsonValueKind.True) sectionObject[targetKey] = true;
+            else if (elem.ValueKind == JsonValueKind.False) sectionObject[targetKey] = false;
+            else if (elem.ValueKind == JsonValueKind.String) sectionObject[targetKey] = elem.GetString();
+            else if (elem.ValueKind == JsonValueKind.Number) sectionObject[targetKey] = elem.GetDouble();
+        }
+        else if (rawValue is JsonArray jsonArray)
+        {
+            sectionObject[targetKey] = jsonArray;
+        }
+
+        System.IO.File.WriteAllText(configurationFilePath, jsonObject.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+    }
+}
 
 public class EmulatorMeta
 {
@@ -16,7 +164,7 @@ public class EmulatorMeta
 
     [JsonPropertyName("executable_name")]
     public Dictionary<string, string> ExecutableName { get; set; }
-    
+
     [JsonPropertyName("emulator_dir_name")]
     public Dictionary<string, string> EmulatorDirName { get; set; }
 
@@ -25,10 +173,10 @@ public class EmulatorMeta
 
     [JsonPropertyName("launch_args_with_game")]
     public string LaunchArgsWithGame { get; set; }
-    
+
     [JsonPropertyName("launch_args_without_game")]
     public string LaunchArgsWithoutGame { get; set; }
-    
+
     [JsonPropertyName("install_recipe")]
     public Dictionary<string, InstallRecipe> InstallRecipe { get; set; }
 
@@ -45,7 +193,7 @@ public class EmulatorSettingField
     public string Label { get; set; }
 
     [JsonPropertyName("type")]
-    public string Type { get; set; } // "boolean", "string", "dropdown"
+    public string Type { get; set; }
 
     [JsonPropertyName("launch_arg_true")]
     public string LaunchArgTrue { get; set; }
@@ -55,6 +203,15 @@ public class EmulatorSettingField
 
     [JsonPropertyName("launch_arg_format")]
     public string LaunchArgFormat { get; set; }
+
+    [JsonPropertyName("config_file_relative_path")]
+    public string ConfigFileRelativePath { get; set; }
+
+    [JsonPropertyName("config_section")]
+    public string ConfigSection { get; set; }
+
+    [JsonPropertyName("config_key")]
+    public string ConfigKey { get; set; }
 
     [JsonPropertyName("options")]
     public Dictionary<string, string> Options { get; set; }
@@ -89,49 +246,47 @@ public class InstallRecipe
 
 public partial class EmulatorManager : Node
 {
-    private string emulatorMapPath;
-    private string executableMapPath;
+    [Signal]
+    public delegate void EmulatorInstallationCompletedEventHandler(string emulatorName, bool wasSuccessful);
 
-    private Dictionary<string, string> emulatorMap = new Dictionary<string, string>();
+    private string emulatorMapFilePath;
+    private string executableMapFilePath;
+
+    private Dictionary<string, string> systemToEmulatorMap = new Dictionary<string, string>();
     private Process activeEmulatorProcess = null;
 
     private AppInstance appInstance;
 
-    public MainScene mainScene;
-
     public override void _Ready()
     {
         appInstance = GetNode<AppInstance>("/root/AppInstance");
-        appInstance.emulatorManager = this; 
+        appInstance.emulatorManager = this;
 
-        SetPaths();
+        InitializeFilePaths();
         LoadOrGenerateEmulatorMap();
     }
 
-    private void SetPaths()
+    private void InitializeFilePaths()
     {
-        emulatorMapPath = Path.Combine(appInstance.configManager.EmulatorsPath, "EmulatorMap.json");
-        GD.Print(emulatorMapPath);
-        executableMapPath = Path.Combine(appInstance.configManager.EmulatorsPath, "ExecutableMap.json");
-        GD.Print(executableMapPath);
+        emulatorMapFilePath = Path.Combine(appInstance.configManager.EmulatorsPath, "EmulatorMap.json");
+        executableMapFilePath = Path.Combine(appInstance.configManager.EmulatorsPath, "ExecutableMap.json");
     }
 
     private void LoadOrGenerateEmulatorMap()
     {
-        if (!FileAccess.FileExists(emulatorMapPath) || !FileAccess.FileExists(executableMapPath))
+        if (!FileAccess.FileExists(emulatorMapFilePath) || !FileAccess.FileExists(executableMapFilePath))
         {
             GenerateDefaultMaps();
         }
 
         try
         {
-            string jsonString = FileAccess.GetFileAsString(emulatorMapPath);
-            emulatorMap = JsonSerializer.Deserialize<Dictionary<string, string>>(jsonString);
-            GD.Print("Loaded emulator map from user directory.");
+            string mapJsonContent = FileAccess.GetFileAsString(emulatorMapFilePath);
+            systemToEmulatorMap = JsonSerializer.Deserialize<Dictionary<string, string>>(mapJsonContent);
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            GD.PrintErr($"Failed to load emulator map: {e.Message}");
+            GD.PrintErr($"Failed to load emulator map: {exception.Message}");
         }
     }
 
@@ -139,165 +294,199 @@ public partial class EmulatorManager : Node
     {
         if (string.IsNullOrEmpty(systemSlug)) return null;
 
-        if (emulatorMap.ContainsKey(systemSlug))
+        if (systemToEmulatorMap.ContainsKey(systemSlug))
         {
-            return emulatorMap[systemSlug]; 
+            return systemToEmulatorMap[systemSlug];
         }
-        
-        /*
-        foreach (var kvp in emulatorMap)
-        {
-            var slugs = kvp.Key.Split(',');
-            foreach (var slug in slugs)
-            {
-                if (slug.Trim().Equals(systemSlug, StringComparison.OrdinalIgnoreCase))
-                {
-                    return kvp.Value;
-                }
-            }
-        }
-        */
+
         return null;
     }
 
     public Dictionary<string, EmulatorMeta> GetAllAvailableEmulators()
     {
-        Dictionary<string, EmulatorMeta> emulators = new Dictionary<string, EmulatorMeta>();
-        string scriptsPath = appInstance.configManager.InstallScriptsPath;
-        if (!DirAccess.DirExistsAbsolute(scriptsPath)) return emulators;
+        Dictionary<string, EmulatorMeta> availableEmulators = new Dictionary<string, EmulatorMeta>();
+        string installScriptsDirectoryPath = appInstance.configManager.InstallScriptsPath;
+        if (!DirAccess.DirExistsAbsolute(installScriptsDirectoryPath)) return availableEmulators;
 
-        using var dir = DirAccess.Open(scriptsPath);
-        if (dir != null)
+        using var installScriptsDirectory = DirAccess.Open(installScriptsDirectoryPath);
+        if (installScriptsDirectory != null)
         {
-            dir.ListDirBegin();
-            string fileName = dir.GetNext();
-            while (fileName != "")
+            installScriptsDirectory.ListDirBegin();
+            string directoryEntryName = installScriptsDirectory.GetNext();
+            while (directoryEntryName != "")
             {
-                if (dir.CurrentIsDir() && fileName != "." && fileName != "..")
+                if (installScriptsDirectory.CurrentIsDir() && directoryEntryName != "." && directoryEntryName != "..")
                 {
-                    string metaPath = scriptsPath.PathJoin(fileName).PathJoin("meta.json");
-                    if (FileAccess.FileExists(metaPath))
+                    string metadataFilePath = installScriptsDirectoryPath.PathJoin(directoryEntryName).PathJoin("meta.json");
+                    if (FileAccess.FileExists(metadataFilePath))
                     {
                         try
                         {
-                            var metaJson = FileAccess.GetFileAsString(metaPath);
-                            var meta = JsonSerializer.Deserialize<EmulatorMeta>(metaJson);
-                            if (meta != null)
+                            var metadataJsonContent = FileAccess.GetFileAsString(metadataFilePath);
+                            var emulatorMetadata = JsonSerializer.Deserialize<EmulatorMeta>(metadataJsonContent);
+                            if (emulatorMetadata != null)
                             {
-                                emulators[fileName] = meta;
+                                availableEmulators[directoryEntryName] = emulatorMetadata;
                             }
                         }
-                        catch (Exception ex)
+                        catch (Exception exception)
                         {
-                            GD.PrintErr($"Failed to parse meta.json for {fileName}: {ex.Message}");
+                            GD.PrintErr($"Failed to parse meta.json for {directoryEntryName}: {exception.Message}");
                         }
                     }
                 }
-                fileName = dir.GetNext();
+                directoryEntryName = installScriptsDirectory.GetNext();
             }
         }
-        return emulators;
+        return availableEmulators;
     }
 
-    public void SaveEmulatorSetting(string emulatorSlug, string settingId, object value)
+    public void SaveEmulatorSetting(string emulatorSlug, string settingId, object settingValue)
     {
-        string emulatorDir = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorSlug);
-        if (!System.IO.Directory.Exists(emulatorDir))
+        string emulatorDirectoryPath = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorSlug);
+        if (!System.IO.Directory.Exists(emulatorDirectoryPath))
         {
-            System.IO.Directory.CreateDirectory(emulatorDir);
+            System.IO.Directory.CreateDirectory(emulatorDirectoryPath);
         }
-        string settingsPath = Path.Combine(emulatorDir, "user_settings.json");
-        
-        Dictionary<string, object> settings = new Dictionary<string, object>();
-        if (System.IO.File.Exists(settingsPath))
+        string userSettingsFilePath = Path.Combine(emulatorDirectoryPath, "user_settings.json");
+
+        Dictionary<string, object> userSettings = new Dictionary<string, object>();
+        if (System.IO.File.Exists(userSettingsFilePath))
         {
             try
             {
-                string json = System.IO.File.ReadAllText(settingsPath);
-                settings = JsonSerializer.Deserialize<Dictionary<string, object>>(json) ?? new Dictionary<string, object>();
+                string existingSettingsJson = System.IO.File.ReadAllText(userSettingsFilePath);
+                userSettings = JsonSerializer.Deserialize<Dictionary<string, object>>(existingSettingsJson) ?? new Dictionary<string, object>();
             }
             catch {}
         }
-        
-        settings[settingId] = value;
-        System.IO.File.WriteAllText(settingsPath, JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true }));
+
+        userSettings[settingId] = settingValue;
+        System.IO.File.WriteAllText(userSettingsFilePath, JsonSerializer.Serialize(userSettings, new JsonSerializerOptions { WriteIndented = true }));
+
+        EmulatorMeta emulatorMetadata = LoadEmulatorMetadataFromDisk(emulatorSlug);
+        if (emulatorMetadata != null && emulatorMetadata.SettingsFields != null)
+        {
+            EmulatorSettingField targetSettingField = emulatorMetadata.SettingsFields.Find(field => field.Id == settingId);
+            if (targetSettingField != null && !string.IsNullOrEmpty(targetSettingField.ConfigFileRelativePath) && !string.IsNullOrEmpty(targetSettingField.ConfigSection) && !string.IsNullOrEmpty(targetSettingField.ConfigKey))
+            {
+                string currentOperatingSystem = OS.GetName().ToLower();
+                if (emulatorMetadata.EmulatorDirName != null && emulatorMetadata.EmulatorDirName.ContainsKey(currentOperatingSystem))
+                {
+                    string targetEmulatorInstallDirectory = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorMetadata.EmulatorDirName[currentOperatingSystem]);
+                    string configurationFilePath = Path.Combine(targetEmulatorInstallDirectory, targetSettingField.ConfigFileRelativePath);
+
+                    string stringValue = "";
+                    if (settingValue is bool booleanValue)
+                    {
+                        stringValue = booleanValue ? "true" : "false";
+                    }
+                    else if (settingValue is string rawStringValue)
+                    {
+                        stringValue = rawStringValue;
+                    }
+                    else if (settingValue is JsonElement jsonElement)
+                    {
+                        if (jsonElement.ValueKind == JsonValueKind.True) stringValue = "true";
+                        else if (jsonElement.ValueKind == JsonValueKind.False) stringValue = "false";
+                        else if (jsonElement.ValueKind == JsonValueKind.String) stringValue = jsonElement.GetString();
+                    }
+                    
+                    var updaters = new IConfigurationUpdater[]
+                    {
+                        new JsonConfigurationUpdater(),
+                        new IniConfigurationUpdater()
+                    };
+
+                    foreach (var updater in updaters)
+                    {
+                        if (updater.CanHandle(configurationFilePath))
+                        {
+                            updater.UpdateValue(configurationFilePath, targetSettingField.ConfigSection, targetSettingField.ConfigKey, stringValue, settingValue);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
     }
+
+
 
     public Dictionary<string, JsonElement> LoadEmulatorSettings(string emulatorSlug)
     {
-        string settingsPath = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorSlug, "user_settings.json");
-        if (System.IO.File.Exists(settingsPath))
+        string userSettingsFilePath = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorSlug, "user_settings.json");
+        if (System.IO.File.Exists(userSettingsFilePath))
         {
             try
             {
-                string json = System.IO.File.ReadAllText(settingsPath);
-                return JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json) ?? new Dictionary<string, JsonElement>();
+                string settingsJsonContent = System.IO.File.ReadAllText(userSettingsFilePath);
+                return JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(settingsJsonContent) ?? new Dictionary<string, JsonElement>();
             }
             catch {}
         }
         return new Dictionary<string, JsonElement>();
     }
 
+    private EmulatorMeta LoadEmulatorMetadataFromDisk(string emulatorName)
+    {
+        string metadataFilePath = appInstance.configManager.InstallScriptsPath.PathJoin(emulatorName).PathJoin("meta.json");
+        if (!FileAccess.FileExists(metadataFilePath))
+        {
+            return null;
+        }
+
+        try
+        {
+            var metadataJsonContent = FileAccess.GetFileAsString(metadataFilePath);
+            return JsonSerializer.Deserialize<EmulatorMeta>(metadataJsonContent);
+        }
+        catch (Exception exception)
+        {
+            GD.PrintErr($"Failed to load emulator metadata for {emulatorName}: {exception.Message}");
+            return null;
+        }
+    }
+
     public bool IsEmulatorInstalled(string emulatorName)
     {
         if (string.IsNullOrEmpty(emulatorName)) return false;
 
-        string metaPath = appInstance.configManager.InstallScriptsPath.PathJoin(emulatorName).PathJoin("meta.json");
-        if (!FileAccess.FileExists(metaPath))
+        var emulatorMetadata = LoadEmulatorMetadataFromDisk(emulatorName);
+        if (emulatorMetadata == null) return false;
+
+        string currentOperatingSystem = OS.GetName().ToLower();
+
+        if (emulatorMetadata.EmulatorDirName == null || emulatorMetadata.ExecutableName == null ||
+            !emulatorMetadata.EmulatorDirName.ContainsKey(currentOperatingSystem) || !emulatorMetadata.ExecutableName.ContainsKey(currentOperatingSystem))
         {
             return false;
         }
 
-        try
-        {
-            var metaJson = FileAccess.GetFileAsString(metaPath);
-            var meta = JsonSerializer.Deserialize<EmulatorMeta>(metaJson);
-            
-            string osName = OS.GetName().ToLower();
-            
-            if (meta == null || meta.EmulatorDirName == null || meta.ExecutableName == null ||
-                !meta.EmulatorDirName.ContainsKey(osName) || !meta.ExecutableName.ContainsKey(osName))
-            {
-                 return false;
-            }
+        string emulatorInstallDirectory = appInstance.configManager.EmulatorsPath.PathJoin(emulatorName);
+        string executableRelativePath = emulatorMetadata.ExecutableName[currentOperatingSystem];
+        string fullExecutablePath = Path.GetFullPath(Path.Combine(emulatorInstallDirectory, executableRelativePath));
 
-            string installDir = appInstance.configManager.EmulatorsPath.PathJoin(emulatorName); 
-            
-            string executableRelativePath = meta.ExecutableName[osName];
-            string fullExecutablePath = Path.Combine(installDir, executableRelativePath);
-            fullExecutablePath = Path.GetFullPath(fullExecutablePath);
-            GD.Print(fullExecutablePath);
-
-            return FileAccess.FileExists(fullExecutablePath);
-        }
-        catch (Exception e)
-        {
-             GD.PrintErr($"Error checking if emulator is installed: {e.Message}");
-             return false;
-        }
+        return FileAccess.FileExists(fullExecutablePath);
     }
-    
+
     public async Task InstallEmulator(string emulatorName)
     {
-        string emulatorScriptDir = appInstance.configManager.InstallScriptsPath.PathJoin(emulatorName);
-        string metaPath = emulatorScriptDir.PathJoin("meta.json");
-        
-        if (!FileAccess.FileExists(metaPath))
+        var emulatorMetadata = LoadEmulatorMetadataFromDisk(emulatorName);
+        if (emulatorMetadata == null)
         {
-            GD.PrintErr($"Emulator recipe not found at: {metaPath}");
+            GD.PrintErr($"Emulator recipe not found for: {emulatorName}");
+            EmitSignal(SignalName.EmulatorInstallationCompleted, emulatorName, false);
             return;
         }
 
-        string osName = OS.GetName().ToLower();
+        string currentOperatingSystem = OS.GetName().ToLower();
 
         try
         {
-            var metaJson = FileAccess.GetFileAsString(metaPath);
-            var meta = JsonSerializer.Deserialize<EmulatorMeta>(metaJson);
+            bool installationSucceeded = await UniversalInstaller.Install(appInstance, emulatorName, emulatorMetadata, currentOperatingSystem);
 
-            bool success = await UniversalInstaller.Install(appInstance, emulatorName, meta, osName);
-
-            if (success)
+            if (installationSucceeded)
             {
                 GD.Print($"Successfully installed {emulatorName}.");
             }
@@ -305,82 +494,187 @@ public partial class EmulatorManager : Node
             {
                 GD.PrintErr($"Failed to install {emulatorName}.");
             }
+
+            EmitSignal(SignalName.EmulatorInstallationCompleted, emulatorName, installationSucceeded);
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            GD.PrintErr($"Exception during install: {ex.Message}");
+            GD.PrintErr($"Exception during install: {exception.Message}");
+            EmitSignal(SignalName.EmulatorInstallationCompleted, emulatorName, false);
+        }
+    }
+
+    private string ResolveFirmwarePath(GameSystem gameSystem)
+    {
+        if (gameSystem == null) return null;
+
+        if (!string.IsNullOrEmpty(gameSystem.PrefferedFirmware))
+        {
+            return Path.GetFullPath(gameSystem.PrefferedFirmware);
         }
 
-        mainScene.UpdateDetailsPanelButtons(mainScene.currentlySelectedGame);  
+        string biosDirectoryPath = appInstance.configManager.BiosPath.PathJoin(gameSystem.Slug);
+        if (DirAccess.DirExistsAbsolute(biosDirectoryPath))
+        {
+            var biosFiles = DirAccess.GetFilesAt(biosDirectoryPath);
+            if (biosFiles.Length > 0)
+            {
+                return Path.GetFullPath(biosDirectoryPath.PathJoin(biosFiles[0]));
+            }
+        }
+
+        return null;
+    }
+
+    private void CopyBiosFilesToEmulatorDirectory(string biosSourceDirectoryPath, string emulatorBiosDirectoryPath)
+    {
+        if (!DirAccess.DirExistsAbsolute(biosSourceDirectoryPath)) return;
+
+        if (!DirAccess.DirExistsAbsolute(emulatorBiosDirectoryPath))
+        {
+            DirAccess.MakeDirRecursiveAbsolute(emulatorBiosDirectoryPath);
+        }
+
+        var biosFileNames = DirAccess.GetFilesAt(biosSourceDirectoryPath);
+        foreach (var biosFileName in biosFileNames)
+        {
+            string sourceFilePath = Path.Combine(biosSourceDirectoryPath, biosFileName);
+            string destinationFilePath = Path.Combine(emulatorBiosDirectoryPath, biosFileName);
+            if (!Godot.FileAccess.FileExists(destinationFilePath))
+            {
+                System.IO.File.Copy(sourceFilePath, destinationFilePath, true);
+            }
+        }
+    }
+
+    private string StripBiosPathPlaceholderFromArguments(string launchArguments)
+    {
+        launchArguments = System.Text.RegularExpressions.Regex.Replace(launchArguments, @"\s*-+[-a-zA-Z0-9_]+\s+""?\{bios_path\}""?", "");
+        launchArguments = launchArguments.Replace("\"{bios_path}\"", "").Replace("{bios_path}", "");
+        return launchArguments;
+    }
+
+    private string AppendDynamicSettingsToArguments(string launchArguments, string emulatorName, EmulatorMeta emulatorMetadata)
+    {
+        if (emulatorMetadata.SettingsFields == null) return launchArguments;
+
+        var savedUserSettings = LoadEmulatorSettings(emulatorName);
+        foreach (var settingField in emulatorMetadata.SettingsFields)
+        {
+            if (string.IsNullOrEmpty(settingField.Id)) continue;
+
+            bool hasUserOverride = savedUserSettings.TryGetValue(settingField.Id, out JsonElement settingElement);
+
+            if (settingField.Type == "boolean")
+            {
+                bool booleanSettingValue = settingField.DefaultValueBool;
+                if (hasUserOverride && settingElement.ValueKind == JsonValueKind.True) booleanSettingValue = true;
+                if (hasUserOverride && settingElement.ValueKind == JsonValueKind.False) booleanSettingValue = false;
+
+                if (booleanSettingValue && !string.IsNullOrEmpty(settingField.LaunchArgTrue))
+                    launchArguments += " " + settingField.LaunchArgTrue;
+                else if (!booleanSettingValue && !string.IsNullOrEmpty(settingField.LaunchArgFalse))
+                    launchArguments += " " + settingField.LaunchArgFalse;
+            }
+            else if (settingField.Type == "dropdown" || settingField.Type == "string")
+            {
+                string stringSettingValue = settingField.DefaultValueString;
+                if (hasUserOverride && settingElement.ValueKind == JsonValueKind.String) stringSettingValue = settingElement.GetString();
+
+                if (!string.IsNullOrEmpty(stringSettingValue) && !string.IsNullOrEmpty(settingField.LaunchArgFormat))
+                {
+                    launchArguments += " " + settingField.LaunchArgFormat.Replace("{value}", stringSettingValue);
+                }
+            }
+        }
+
+        return launchArguments;
+    }
+
+    private string ApplyBiosArgumentsAndCopyFiles(string launchArguments, string firmwarePath, string emulatorInstallDirectory, EmulatorMeta emulatorMetadata, string currentOperatingSystem)
+    {
+        if (!string.IsNullOrEmpty(firmwarePath))
+        {
+            if (launchArguments.Contains("{bios_path}"))
+            {
+                launchArguments = launchArguments.Replace("{bios_path}", firmwarePath);
+            }
+
+            if (emulatorMetadata.EmulatorBiosPath != null && emulatorMetadata.EmulatorBiosPath.ContainsKey(currentOperatingSystem))
+            {
+                string biosSourceDirectoryPath = Path.GetDirectoryName(firmwarePath);
+                string emulatorBiosDirectoryPath = Path.GetFullPath(Path.Combine(emulatorInstallDirectory, emulatorMetadata.EmulatorBiosPath[currentOperatingSystem]));
+                CopyBiosFilesToEmulatorDirectory(biosSourceDirectoryPath, emulatorBiosDirectoryPath);
+            }
+        }
+        else
+        {
+            launchArguments = StripBiosPathPlaceholderFromArguments(launchArguments);
+        }
+
+        return launchArguments;
+    }
+
+    private Process BuildAndStartEmulatorProcess(string executablePath, string launchArguments, string workingDirectory)
+    {
+        ProcessStartInfo processStartInfo = new ProcessStartInfo
+        {
+            FileName = executablePath,
+            Arguments = launchArguments,
+            WorkingDirectory = workingDirectory,
+            CreateNoWindow = true,
+            UseShellExecute = false
+        };
+
+        return Process.Start(processStartInfo);
     }
 
     public void LaunchEmulatorWithGame(Game game)
     {
-        GD.Print("--- Launching Emulator with Game ---");
-
         if (game == null)
         {
             GD.PrintErr("Game object is null.");
             return;
         }
-        GD.Print($"Game: {game.Name}");
 
         if (game.System == null)
         {
             GD.PrintErr("Game.System is null.");
             return;
         }
-        GD.Print($"Game System: {game.System.Name}");
-        GD.Print($"Game System Slug: {game.System.Slug}");
 
-        string mappedEmulator = GetMappedEmulator(game.System.Slug);
-        if (string.IsNullOrEmpty(mappedEmulator))
+        string mappedEmulatorName = GetMappedEmulator(game.System.Slug);
+        if (string.IsNullOrEmpty(mappedEmulatorName))
         {
             GD.PrintErr($"No emulator mapped for system: {game.System.Name} ({game.System.Slug})");
             return;
         }
-        GD.Print($"Mapped Emulator: {mappedEmulator}");
 
-        string metaPath = appInstance.configManager.InstallScriptsPath.PathJoin(mappedEmulator).PathJoin("meta.json");
-        if (!FileAccess.FileExists(metaPath))
+        var emulatorMetadata = LoadEmulatorMetadataFromDisk(mappedEmulatorName);
+        if (emulatorMetadata == null)
         {
-            GD.PrintErr($"Meta file not found: {metaPath}");
+            GD.PrintErr($"Meta file not found for emulator: {mappedEmulatorName}");
             return;
         }
-        GD.Print($"Meta Path: {metaPath}");
 
         try
         {
-            string osName = OS.GetName().ToLower();
-            GD.Print($"Operating System: {osName}");
+            string currentOperatingSystem = OS.GetName().ToLower();
 
-            var metaJson = FileAccess.GetFileAsString(metaPath);
-            var meta = JsonSerializer.Deserialize<EmulatorMeta>(metaJson);
-
-            if (meta == null)
-            {
-                GD.PrintErr("meta.json could not be deserialized.");
-                return;
-            }
-            if (meta.EmulatorDirName == null || !meta.EmulatorDirName.ContainsKey(osName))
+            if (emulatorMetadata.EmulatorDirName == null || !emulatorMetadata.EmulatorDirName.ContainsKey(currentOperatingSystem))
             {
                 GD.PrintErr("EmulatorDirName is missing or does not contain key for the current OS.");
                 return;
             }
-            if (meta.ExecutableName == null || !meta.ExecutableName.ContainsKey(osName))
+            if (emulatorMetadata.ExecutableName == null || !emulatorMetadata.ExecutableName.ContainsKey(currentOperatingSystem))
             {
                 GD.PrintErr("ExecutableName is missing or does not contain key for the current OS.");
                 return;
             }
 
-            string installDir = Path.Combine(appInstance.configManager.EmulatorsPath, meta.EmulatorDirName[osName]);
-            GD.Print($"Install Directory: {installDir}");
-
-            string executableRelativePath = meta.ExecutableName[osName];
-            GD.Print($"Executable Relative Path: {executableRelativePath}");
-
-            string fullExecutablePath = Path.Combine(installDir, executableRelativePath);
-            GD.Print($"Full Executable Path: {fullExecutablePath}");
+            string emulatorInstallDirectory = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorMetadata.EmulatorDirName[currentOperatingSystem]);
+            string executableRelativePath = emulatorMetadata.ExecutableName[currentOperatingSystem];
+            string fullExecutablePath = Path.Combine(emulatorInstallDirectory, executableRelativePath);
 
             if (game.Files == null || game.Files.Count == 0)
             {
@@ -388,133 +682,28 @@ public partial class EmulatorManager : Node
                 return;
             }
             string romFileName = game.Files[0].FileName;
-            GD.Print($"ROM File Name: {romFileName}");
+            string fullRomPath = Path.GetFullPath(Path.Combine(appInstance.configManager.RomsPath, game.System.Slug, romFileName));
 
-            string romPath = Path.GetFullPath(Path.Combine(appInstance.configManager.RomsPath, game.System.Slug, romFileName));
-            GD.Print($"ROM Path: {romPath}");
-
-            string arguments = meta.LaunchArgsWithGame;
-            if (string.IsNullOrEmpty(arguments))
+            string launchArguments = emulatorMetadata.LaunchArgsWithGame;
+            if (string.IsNullOrEmpty(launchArguments))
             {
                 GD.PrintErr("LaunchArgsWithGame is not defined in meta.json.");
                 return;
             }
-            GD.Print($"Raw Arguments: {arguments}");
 
-            arguments = arguments.Replace("{rom_path}", romPath);
+            launchArguments = launchArguments.Replace("{rom_path}", fullRomPath);
 
-            string actualBiosPath = null;
-            if (!string.IsNullOrEmpty(game.System.PrefferedFirmware))
-            {
-                actualBiosPath = Path.GetFullPath(game.System.PrefferedFirmware);
-            }
-            else
-            {
-                string biosFolder = appInstance.configManager.BiosPath.PathJoin(game.System.Slug);
-                if (DirAccess.DirExistsAbsolute(biosFolder))
-                {
-                    var files = DirAccess.GetFilesAt(biosFolder);
-                    if (files.Length > 0)
-                    {
-                        actualBiosPath = Path.GetFullPath(biosFolder.PathJoin(files[0]));
-                    }
-                }
-            }
+            string firmwarePath = ResolveFirmwarePath(game.System);
+            launchArguments = ApplyBiosArgumentsAndCopyFiles(launchArguments, firmwarePath, emulatorInstallDirectory, emulatorMetadata, currentOperatingSystem);
+            launchArguments = AppendDynamicSettingsToArguments(launchArguments, mappedEmulatorName, emulatorMetadata);
 
-            if (!string.IsNullOrEmpty(actualBiosPath))
-            {
-                GD.Print($"Using Firmware Path: {actualBiosPath}");
-                if (arguments.Contains("{bios_path}"))
-                {
-                    arguments = arguments.Replace("{bios_path}", actualBiosPath);
-                }
-
-                // Copy the bios directory contents to the emulator's local bios directory if configured
-                if (meta.EmulatorBiosPath != null && meta.EmulatorBiosPath.ContainsKey(osName))
-                {
-                    string biosSourceDir = Path.GetDirectoryName(actualBiosPath);
-                    string emulatorBiosDir = Path.GetFullPath(Path.Combine(installDir, meta.EmulatorBiosPath[osName]));
-                    if (DirAccess.DirExistsAbsolute(biosSourceDir))
-                    {
-                        if (!DirAccess.DirExistsAbsolute(emulatorBiosDir))
-                        {
-                            DirAccess.MakeDirRecursiveAbsolute(emulatorBiosDir);
-                        }
-                        var files = DirAccess.GetFilesAt(biosSourceDir);
-                        foreach (var file in files)
-                        {
-                            string sourceFile = Path.Combine(biosSourceDir, file);
-                            string destFile = Path.Combine(emulatorBiosDir, file);
-                            if (!Godot.FileAccess.FileExists(destFile))
-                            {
-                                System.IO.File.Copy(sourceFile, destFile, true);
-                            }
-                        }
-                    }
-                }
-            }
-            else
-            {
-                GD.Print("No firmware found. Stripping {bios_path} argument.");
-                arguments = System.Text.RegularExpressions.Regex.Replace(arguments, @"\s*-+[-a-zA-Z0-9_]+\s+""?\{bios_path\}""?", "");
-                arguments = arguments.Replace("\"{bios_path}\"", "").Replace("{bios_path}", "");
-            }
-
-            // Apply Dynamic Settings
-            if (meta.SettingsFields != null)
-            {
-                var userSettings = LoadEmulatorSettings(mappedEmulator);
-                foreach (var field in meta.SettingsFields)
-                {
-                    if (string.IsNullOrEmpty(field.Id)) continue;
-                    
-                    bool hasValue = userSettings.TryGetValue(field.Id, out JsonElement element);
-
-                    if (field.Type == "boolean")
-                    {
-                        bool val = field.DefaultValueBool;
-                        if (hasValue && element.ValueKind == JsonValueKind.True) val = true;
-                        if (hasValue && element.ValueKind == JsonValueKind.False) val = false;
-
-                        if (val && !string.IsNullOrEmpty(field.LaunchArgTrue))
-                            arguments += " " + field.LaunchArgTrue;
-                        else if (!val && !string.IsNullOrEmpty(field.LaunchArgFalse))
-                            arguments += " " + field.LaunchArgFalse;
-                    }
-                    else if (field.Type == "dropdown" || field.Type == "string")
-                    {
-                        string val = field.DefaultValueString;
-                        if (hasValue && element.ValueKind == JsonValueKind.String) val = element.GetString();
-
-                        if (!string.IsNullOrEmpty(val) && !string.IsNullOrEmpty(field.LaunchArgFormat))
-                        {
-                            arguments += " " + field.LaunchArgFormat.Replace("{value}", val);
-                        }
-                    }
-                }
-            }
-
-            GD.Print($"Launching Command: \"{fullExecutablePath}\" {arguments}");
-            OS.Alert($"Launching Command:\nExecutable: {fullExecutablePath}\nArguments: {arguments}", "Debug: Emulator Launch");
-
-            ProcessStartInfo startInfo = new ProcessStartInfo
-            {
-                FileName = fullExecutablePath,
-                Arguments = arguments,
-                WorkingDirectory = installDir,
-                CreateNoWindow = true,
-                UseShellExecute = false
-            };
-
-            Process emulatorProcess = Process.Start(startInfo);
+            Process emulatorProcess = BuildAndStartEmulatorProcess(fullExecutablePath, launchArguments, emulatorInstallDirectory);
             if (emulatorProcess != null)
             {
                 activeEmulatorProcess = emulatorProcess;
-                GD.Print($"Emulator launched with PID: {emulatorProcess.Id}");
                 emulatorProcess.EnableRaisingEvents = true;
-                emulatorProcess.Exited += (sender, e) =>
+                emulatorProcess.Exited += (sender, exitEventArgs) =>
                 {
-                    GD.Print("Emulator was closed.");
                     activeEmulatorProcess = null;
                 };
             }
@@ -523,19 +712,19 @@ public partial class EmulatorManager : Node
                 GD.PrintErr("Failed to start emulator process. Process.Start returned null.");
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            GD.PrintErr($"An exception occurred while launching the emulator: {ex.Message}");
-            GD.PrintErr($"Stack Trace: {ex.StackTrace}");
+            GD.PrintErr($"An exception occurred while launching the emulator: {exception.Message}");
+            GD.PrintErr($"Stack Trace: {exception.StackTrace}");
         }
     }
 
     public string GetEmulatorLaunchArgs(string emulatorName)
     {
-        var emulators = GetAllAvailableEmulators();
-        if (emulators.TryGetValue(emulatorName, out EmulatorMeta meta))
+        var availableEmulators = GetAllAvailableEmulators();
+        if (availableEmulators.TryGetValue(emulatorName, out EmulatorMeta emulatorMetadata))
         {
-            return meta.LaunchArgsWithoutGame;
+            return emulatorMetadata.LaunchArgsWithoutGame;
         }
         return "";
     }
@@ -565,7 +754,7 @@ public partial class EmulatorManager : Node
         }
     }
 
-    public void LaunchEmulatorWithoutGame(string emulatorName)
+    public void LaunchEmulatorWithoutGame(string emulatorName, GameSystem currentGameSystem)
     {
         if (string.IsNullOrEmpty(emulatorName))
         {
@@ -573,159 +762,57 @@ public partial class EmulatorManager : Node
             return;
         }
 
-        string metaPath = appInstance.configManager.InstallScriptsPath.PathJoin(emulatorName).PathJoin("meta.json");
-        
-        if (!FileAccess.FileExists(metaPath))
+        var emulatorMetadata = LoadEmulatorMetadataFromDisk(emulatorName);
+        if (emulatorMetadata == null)
         {
-            GD.PrintErr($"Meta file not found for mapped emulator: {metaPath}");
+            GD.PrintErr($"Meta file not found for emulator: {emulatorName}");
             return;
         }
-        
-        try 
+
+        try
         {
-            string osName = OS.GetName().ToLower();
-            var metaJson = FileAccess.GetFileAsString(metaPath);
-            var meta = JsonSerializer.Deserialize<EmulatorMeta>(metaJson);
-            
-            if (meta == null || meta.EmulatorDirName == null || meta.ExecutableName == null ||
-                !meta.EmulatorDirName.ContainsKey(osName) || !meta.ExecutableName.ContainsKey(osName))
+            string currentOperatingSystem = OS.GetName().ToLower();
+
+            if (emulatorMetadata.EmulatorDirName == null || emulatorMetadata.ExecutableName == null ||
+                !emulatorMetadata.EmulatorDirName.ContainsKey(currentOperatingSystem) || !emulatorMetadata.ExecutableName.ContainsKey(currentOperatingSystem))
             {
-                 GD.PrintErr($"Incomplete meta.json for {emulatorName} on OS: {osName}");
-                 return;
+                GD.PrintErr($"Incomplete meta.json for {emulatorName} on OS: {currentOperatingSystem}");
+                return;
             }
 
-            string installDir = appInstance.configManager.EmulatorsPath + meta.EmulatorDirName[osName];
-            string executableRelativePath = meta.ExecutableName[osName];
-            string fullExecutablePath = Path.Join(installDir, executableRelativePath);
-            
-            string arguments = meta.LaunchArgsWithoutGame;
+            string emulatorInstallDirectory = appInstance.configManager.EmulatorsPath + emulatorMetadata.EmulatorDirName[currentOperatingSystem];
+            string executableRelativePath = emulatorMetadata.ExecutableName[currentOperatingSystem];
+            string fullExecutablePath = Path.Join(emulatorInstallDirectory, executableRelativePath);
 
-            var currentSystem = mainScene.gameSystems[mainScene.currentGameSystemIndex];
-            
-            if (currentSystem != null)
+            string launchArguments = emulatorMetadata.LaunchArgsWithoutGame;
+
+            if (currentGameSystem != null)
             {
-                string actualBiosPath = null;
-                if (!string.IsNullOrEmpty(currentSystem.PrefferedFirmware))
-                {
-                    actualBiosPath = Path.GetFullPath(currentSystem.PrefferedFirmware);
-                }
-                else
-                {
-                    string biosFolder = appInstance.configManager.BiosPath.PathJoin(currentSystem.Slug);
-                    if (DirAccess.DirExistsAbsolute(biosFolder))
-                    {
-                        var files = DirAccess.GetFilesAt(biosFolder);
-                        if (files.Length > 0)
-                        {
-                            actualBiosPath = Path.GetFullPath(biosFolder.PathJoin(files[0]));
-                        }
-                    }
-                }
-
-                if (!string.IsNullOrEmpty(actualBiosPath))
-                {
-                    if (arguments.Contains("{bios_path}"))
-                    {
-                        arguments = arguments.Replace("{bios_path}", actualBiosPath);
-                    }
-
-                    // Copy the bios directory contents to the emulator's local bios directory if configured
-                    if (meta.EmulatorBiosPath != null && meta.EmulatorBiosPath.ContainsKey(osName))
-                    {
-                        string biosSourceDir = Path.GetDirectoryName(actualBiosPath);
-                        string emulatorBiosDir = Path.GetFullPath(Path.Combine(installDir, meta.EmulatorBiosPath[osName]));
-                        if (DirAccess.DirExistsAbsolute(biosSourceDir))
-                        {
-                            if (!DirAccess.DirExistsAbsolute(emulatorBiosDir))
-                            {
-                                DirAccess.MakeDirRecursiveAbsolute(emulatorBiosDir);
-                            }
-                            var files = DirAccess.GetFilesAt(biosSourceDir);
-                            foreach (var file in files)
-                            {
-                                string sourceFile = Path.Combine(biosSourceDir, file);
-                                string destFile = Path.Combine(emulatorBiosDir, file);
-                                if (!Godot.FileAccess.FileExists(destFile))
-                                {
-                                    System.IO.File.Copy(sourceFile, destFile, true);
-                                }
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    arguments = System.Text.RegularExpressions.Regex.Replace(arguments, @"\s*-+[-a-zA-Z0-9_]+\s+""?\{bios_path\}""?", "");
-                    arguments = arguments.Replace("\"{bios_path}\"", "").Replace("{bios_path}", "");
-                }
-            }
-            
-            // Apply Dynamic Settings
-            if (meta.SettingsFields != null)
-            {
-                var userSettings = LoadEmulatorSettings(emulatorName);
-                foreach (var field in meta.SettingsFields)
-                {
-                    if (string.IsNullOrEmpty(field.Id)) continue;
-                    
-                    bool hasValue = userSettings.TryGetValue(field.Id, out JsonElement element);
-
-                    if (field.Type == "boolean")
-                    {
-                        bool val = field.DefaultValueBool;
-                        if (hasValue && element.ValueKind == JsonValueKind.True) val = true;
-                        if (hasValue && element.ValueKind == JsonValueKind.False) val = false;
-
-                        if (val && !string.IsNullOrEmpty(field.LaunchArgTrue))
-                            arguments += " " + field.LaunchArgTrue;
-                        else if (!val && !string.IsNullOrEmpty(field.LaunchArgFalse))
-                            arguments += " " + field.LaunchArgFalse;
-                    }
-                    else if (field.Type == "dropdown" || field.Type == "string")
-                    {
-                        string val = field.DefaultValueString;
-                        if (hasValue && element.ValueKind == JsonValueKind.String) val = element.GetString();
-
-                        if (!string.IsNullOrEmpty(val) && !string.IsNullOrEmpty(field.LaunchArgFormat))
-                        {
-                            arguments += " " + field.LaunchArgFormat.Replace("{value}", val);
-                        }
-                    }
-                }
+                string firmwarePath = ResolveFirmwarePath(currentGameSystem);
+                launchArguments = ApplyBiosArgumentsAndCopyFiles(launchArguments, firmwarePath, emulatorInstallDirectory, emulatorMetadata, currentOperatingSystem);
             }
 
-            GD.Print($"Launching: {fullExecutablePath} {arguments}"); 
-            OS.Alert($"Launching Command:\nExecutable: {fullExecutablePath}\nArguments: {arguments}", "Debug: Emulator Launch");
-            
-            ProcessStartInfo startInfo = new ProcessStartInfo
-            {
-                FileName = fullExecutablePath,
-                Arguments = arguments,
-                WorkingDirectory = installDir, 
-                CreateNoWindow = true,
-                UseShellExecute = false
-            };
+            launchArguments = AppendDynamicSettingsToArguments(launchArguments, emulatorName, emulatorMetadata);
 
-            Process emulatorProcess = Process.Start(startInfo);
+            Process emulatorProcess = BuildAndStartEmulatorProcess(fullExecutablePath, launchArguments, emulatorInstallDirectory);
             if (emulatorProcess != null)
             {
-                GD.Print($"Emulator launched with PID: {emulatorProcess.Id}");
                 emulatorProcess.EnableRaisingEvents = true;
-                emulatorProcess.Exited += (sender, e) => 
+                emulatorProcess.Exited += (sender, exitEventArgs) =>
                 {
                     GD.Print("Emulator was closed.");
                 };
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            GD.PrintErr($"Failed to launch emulator: {ex.Message}");
+            GD.PrintErr($"Failed to launch emulator: {exception.Message}");
         }
     }
-    
+
     private void GenerateDefaultMaps()
     {
-        var platformEmulatorMap = new Dictionary<string, string>
+        var defaultPlatformToEmulatorMap = new Dictionary<string, string>
         {
             {"ngc", "dolphin"},
             {"wii", "dolphin"},
@@ -746,31 +833,27 @@ public partial class EmulatorManager : Node
             {"genesis", "ares"},
             {"dc", "flycast"}
         };
-        
+
         try
         {
-            string jsonString = JsonSerializer.Serialize(platformEmulatorMap, new JsonSerializerOptions { WriteIndented = true });
-            using var file = FileAccess.Open(emulatorMapPath, FileAccess.ModeFlags.Write);
-            file.StoreString(jsonString);
-            GD.Print("Generated default emulator map.");
+            string serializedMapJson = JsonSerializer.Serialize(defaultPlatformToEmulatorMap, new JsonSerializerOptions { WriteIndented = true });
+            using var emulatorMapFile = FileAccess.Open(emulatorMapFilePath, FileAccess.ModeFlags.Write);
+            emulatorMapFile.StoreString(serializedMapJson);
         }
-        
-        catch (Exception e)
+        catch (Exception exception)
         {
-            GD.PrintErr($"Failed to generate default emulator map: {e.Message}");
+            GD.PrintErr($"Failed to generate default emulator map: {exception.Message}");
         }
-        
+
         try
         {
-            string jsonString = JsonSerializer.Serialize(executableMapPath, new JsonSerializerOptions { WriteIndented = true });
-            using var file = FileAccess.Open(executableMapPath, FileAccess.ModeFlags.Write);
-            file.StoreString(jsonString);
-            GD.Print("Generated default executable map.");
+            string serializedExecutableJson = JsonSerializer.Serialize(executableMapFilePath, new JsonSerializerOptions { WriteIndented = true });
+            using var executableMapFile = FileAccess.Open(executableMapFilePath, FileAccess.ModeFlags.Write);
+            executableMapFile.StoreString(serializedExecutableJson);
         }
-        
-        catch (Exception e)
+        catch (Exception exception)
         {
-            GD.PrintErr($"Failed to generate default exectuable map: {e.Message}");
+            GD.PrintErr($"Failed to generate default executable map: {exception.Message}");
         }
     }
 }

@@ -10,101 +10,100 @@ using System.Threading.Tasks;
 
 public partial class RomMAPI : Node
 {
-    private readonly System.Net.Http.HttpClient _httpClient = new System.Net.Http.HttpClient();
-    public string ApiHost => apiHost;
-    private string apiHost;
-    private string _authToken;
-    private bool _useBasicAuth = false;
+    private readonly System.Net.Http.HttpClient httpClient = new System.Net.Http.HttpClient();
+    public string ApiHost => apiHostUrl;
+    private string apiHostUrl;
+    private string authenticationToken;
+    private bool isUsingBasicAuthentication = false;
 
     private AppInstance appInstance;
 
     public override void _Ready()
     {
         appInstance = GetNode<AppInstance>("/root/AppInstance");
-        appInstance.rommApi = this; 
+        appInstance.rommApi = this;
     }
 
     public async Task<(bool isSuccess, string errorMessage)> AuthenticateAsync(string username, string password, string host, string apiKey)
     {
-        apiHost = host.EndsWith("/") ? host.TrimEnd('/') : host;
+        apiHostUrl = host.EndsWith("/") ? host.TrimEnd('/') : host;
 
-        if (!apiHost.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && 
-            !apiHost.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        if (!apiHostUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) &&
+            !apiHostUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
         {
             return (false, "Host must start with http:// or https://");
         }
 
-        _httpClient.DefaultRequestHeaders.Clear();
-        _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        _useBasicAuth = false;
+        httpClient.DefaultRequestHeaders.Clear();
+        httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        isUsingBasicAuthentication = false;
 
         if (!string.IsNullOrEmpty(apiKey))
         {
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-            
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
             try
             {
-                HttpResponseMessage testResponse = await _httpClient.GetAsync($"{apiHost}/api/platforms");
-                if (testResponse.IsSuccessStatusCode)
+                HttpResponseMessage apiKeyTestResponse = await httpClient.GetAsync($"{apiHostUrl}/api/platforms");
+                if (apiKeyTestResponse.IsSuccessStatusCode)
                 {
-                    _authToken = apiKey;
+                    authenticationToken = apiKey;
                     return (true, null);
                 }
-                return (false, $"Server rejected API key: {testResponse.StatusCode}");
+                return (false, $"Server rejected API key: {apiKeyTestResponse.StatusCode}");
             }
-            catch (Exception e)
+            catch (Exception exception)
             {
-                return (false, $"Connection failed: {e.Message}");
+                return (false, $"Connection failed: {exception.Message}");
             }
         }
 
-        var requestBody = new Dictionary<string, string>
+        var tokenRequestBody = new Dictionary<string, string>
         {
             { "grant_type", "password" },
             { "username", username },
             { "password", password },
             { "scope", "platforms.read roms.read" }
         };
-        var content = new FormUrlEncodedContent(requestBody);
+        var encodedFormContent = new FormUrlEncodedContent(tokenRequestBody);
 
         try
         {
-            HttpResponseMessage response = await _httpClient.PostAsync($"{apiHost}/api/token", content);
+            HttpResponseMessage tokenResponse = await httpClient.PostAsync($"{apiHostUrl}/api/token", encodedFormContent);
 
-            if (response.IsSuccessStatusCode)
+            if (tokenResponse.IsSuccessStatusCode)
             {
-                string responseBody = await response.Content.ReadAsStringAsync();
-                var responseData = JsonSerializer.Deserialize<Dictionary<string, string>>(responseBody);
-                
-                if (responseData != null && responseData.ContainsKey("access_token"))
+                string tokenResponseBody = await tokenResponse.Content.ReadAsStringAsync();
+                var deserializedTokenResponse = JsonSerializer.Deserialize<Dictionary<string, string>>(tokenResponseBody);
+
+                if (deserializedTokenResponse != null && deserializedTokenResponse.ContainsKey("access_token"))
                 {
-                    _authToken = responseData["access_token"];
-                    _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", _authToken);
+                    authenticationToken = deserializedTokenResponse["access_token"];
+                    httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", authenticationToken);
                     return (true, null);
                 }
             }
-            
-            var authHeaderValue = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{username}:{password}"));
-            _httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", authHeaderValue);
-            
-            HttpResponseMessage basicAuthTest = await _httpClient.GetAsync($"{apiHost}/api/platforms");
-            if (basicAuthTest.IsSuccessStatusCode)
+
+            var base64EncodedCredentials = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{username}:{password}"));
+            httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", base64EncodedCredentials);
+
+            HttpResponseMessage basicAuthTestResponse = await httpClient.GetAsync($"{apiHostUrl}/api/platforms");
+            if (basicAuthTestResponse.IsSuccessStatusCode)
             {
-                _useBasicAuth = true;
+                isUsingBasicAuthentication = true;
                 return (true, null);
             }
 
-            string errorContent = await response.Content.ReadAsStringAsync();
-            return (false, $"Login failed: {response.StatusCode} / {basicAuthTest.StatusCode}");
+            return (false, $"Login failed: {tokenResponse.StatusCode} / {basicAuthTestResponse.StatusCode}");
         }
-        catch (HttpRequestException e)
+        catch (HttpRequestException exception)
         {
-            GD.PrintErr($"Authentication request failed: {e.Message}");
+            GD.PrintErr($"Authentication request failed: {exception.Message}");
             return (false, "Could not connect to server.");
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            GD.PrintErr($"An unexpected error occurred: {e.Message}");
+            GD.PrintErr($"An unexpected error occurred: {exception.Message}");
             return (false, "An unexpected error occurred.");
         }
     }
@@ -113,70 +112,69 @@ public partial class RomMAPI : Node
     {
         try
         {
-            HttpResponseMessage response = await _httpClient.GetAsync($"{apiHost}/api/platforms");
+            HttpResponseMessage platformsResponse = await httpClient.GetAsync($"{apiHostUrl}/api/platforms");
 
-            if (response.IsSuccessStatusCode)
+            if (platformsResponse.IsSuccessStatusCode)
             {
-                string responseBody = await response.Content.ReadAsStringAsync();
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                List<GameSystem> systems = JsonSerializer.Deserialize<List<GameSystem>>(responseBody, options);
-                
-                if (systems != null)
+                string platformsResponseBody = await platformsResponse.Content.ReadAsStringAsync();
+                var deserializationOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                List<GameSystem> allGameSystems = JsonSerializer.Deserialize<List<GameSystem>>(platformsResponseBody, deserializationOptions);
+
+                if (allGameSystems != null)
                 {
-                    foreach (var system in systems)
+                    foreach (var gameSystem in allGameSystems)
                     {
-                        if (appInstance.emulatorManager.GetMappedEmulator(system.Slug) != "")
+                        if (appInstance.emulatorManager.GetMappedEmulator(gameSystem.Slug) != "")
                         {
-                            system.MappedEmulator = appInstance.emulatorManager.GetMappedEmulator(system.Slug);
+                            gameSystem.MappedEmulator = appInstance.emulatorManager.GetMappedEmulator(gameSystem.Slug);
                         }
                     }
-                    return systems.Where(s => s.RomCount > 0).ToList();
+                    return allGameSystems.Where(system => system.RomCount > 0).ToList();
                 }
             }
             else
             {
-                GD.PrintErr($"Failed to fetch systems. Status code: {response.StatusCode}");
+                GD.PrintErr($"Failed to fetch systems. Status code: {platformsResponse.StatusCode}");
             }
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            GD.PrintErr($"GetSystems request failed: {e.Message}");
+            GD.PrintErr($"GetSystems request failed: {exception.Message}");
         }
 
         return new List<GameSystem>();
     }
 
-    public async Task<GameResponse> GetGamesAsync(GameSystem system, int page = 1, int size = 100)
+    public async Task<GameResponse> GetGamesAsync(GameSystem gameSystem, int pageNumber = 1, int pageSize = 100)
     {
         try
         {
-            int offset = (page - 1) * size;
-            string requestUrl = $"{apiHost}/api/roms?platform_ids={system.Id}&limit={size}&offset={offset}&include=path_cover_3d,path_cover_large";
-            GD.Print($"Requesting games from URL: {requestUrl}");
-            HttpResponseMessage response = await _httpClient.GetAsync(requestUrl);
-            string responseBody = await response.Content.ReadAsStringAsync();
+            int queryOffset = (pageNumber - 1) * pageSize;
+            string gamesRequestUrl = $"{apiHostUrl}/api/roms?platform_ids={gameSystem.Id}&limit={pageSize}&offset={queryOffset}&include=path_cover_3d,path_cover_large";
+            HttpResponseMessage gamesResponse = await httpClient.GetAsync(gamesRequestUrl);
+            string gamesResponseBody = await gamesResponse.Content.ReadAsStringAsync();
 
-            if (response.IsSuccessStatusCode)
+            if (gamesResponse.IsSuccessStatusCode)
             {
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                return JsonSerializer.Deserialize<GameResponse>(responseBody, options);
+                var deserializationOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                return JsonSerializer.Deserialize<GameResponse>(gamesResponseBody, deserializationOptions);
             }
             else
             {
-                GD.PrintErr($"GetGamesAsync failed for system {system.Name}. Status: {response.StatusCode}. Body: {responseBody}");
+                GD.PrintErr($"GetGamesAsync failed for system {gameSystem.Name}. Status: {gamesResponse.StatusCode}. Body: {gamesResponseBody}");
             }
         }
-        catch (HttpRequestException e)
+        catch (HttpRequestException exception)
         {
-            GD.PrintErr($"GetGames request failed: {e.Message}");
+            GD.PrintErr($"GetGames request failed: {exception.Message}");
         }
-        catch (JsonException e)
+        catch (JsonException exception)
         {
-            GD.PrintErr($"GetGames JSON deserialization failed: {e.Message}");
+            GD.PrintErr($"GetGames JSON deserialization failed: {exception.Message}");
         }
-        catch (UriFormatException e)
+        catch (UriFormatException exception)
         {
-            GD.PrintErr($"Invalid URL format: {e.Message}");
+            GD.PrintErr($"Invalid URL format: {exception.Message}");
         }
 
         return null;
@@ -185,94 +183,90 @@ public partial class RomMAPI : Node
     public string GetRomDownloadUrl(Game game)
     {
         if (game == null) return null;
-        return $"{apiHost}/api/roms/download?rom_ids={game.Id}";
+        return $"{apiHostUrl}/api/roms/download?rom_ids={game.Id}";
     }
 
     public string[] GetAuthHeaders()
     {
-        if (_httpClient.DefaultRequestHeaders.Authorization == null)
+        if (httpClient.DefaultRequestHeaders.Authorization == null)
         {
             return new string[0];
         }
-        return new string[] { $"Authorization: {_httpClient.DefaultRequestHeaders.Authorization}" };
+        return new string[] { $"Authorization: {httpClient.DefaultRequestHeaders.Authorization}" };
     }
-
-    // --- Firmware Methods ---
 
     public async Task<List<Firmware>> GetFirmwareAsync(int? platformId = null)
     {
         try
         {
-            string requestUrl = $"{apiHost}/api/firmware";
+            string firmwareRequestUrl = $"{apiHostUrl}/api/firmware";
             if (platformId.HasValue)
             {
-                requestUrl += $"?platform_id={platformId.Value}";
+                firmwareRequestUrl += $"?platform_id={platformId.Value}";
             }
 
-            GD.Print($"Requesting firmware from URL: {requestUrl}");
-            HttpResponseMessage response = await _httpClient.GetAsync(requestUrl);
+            HttpResponseMessage firmwareResponse = await httpClient.GetAsync(firmwareRequestUrl);
 
-            if (response.IsSuccessStatusCode)
+            if (firmwareResponse.IsSuccessStatusCode)
             {
-                string responseBody = await response.Content.ReadAsStringAsync();
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                List<Firmware> firmwareList = JsonSerializer.Deserialize<List<Firmware>>(responseBody, options);
-                
+                string firmwareResponseBody = await firmwareResponse.Content.ReadAsStringAsync();
+                var deserializationOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                List<Firmware> firmwareList = JsonSerializer.Deserialize<List<Firmware>>(firmwareResponseBody, deserializationOptions);
+
                 return firmwareList ?? new List<Firmware>();
             }
             else
             {
-                GD.PrintErr($"Failed to fetch firmware. Status code: {response.StatusCode}");
+                GD.PrintErr($"Failed to fetch firmware. Status code: {firmwareResponse.StatusCode}");
             }
         }
-        catch (HttpRequestException e)
+        catch (HttpRequestException exception)
         {
-            GD.PrintErr($"GetFirmware request failed: {e.Message}");
+            GD.PrintErr($"GetFirmware request failed: {exception.Message}");
         }
-        catch (JsonException e)
+        catch (JsonException exception)
         {
-            GD.PrintErr($"GetFirmware JSON deserialization failed: {e.Message}");
+            GD.PrintErr($"GetFirmware JSON deserialization failed: {exception.Message}");
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            GD.PrintErr($"An unexpected error occurred: {e.Message}");
+            GD.PrintErr($"An unexpected error occurred: {exception.Message}");
         }
 
         return new List<Firmware>();
     }
 
-    public async Task<Firmware> GetFirmwareByIdAsync(int id)
+    public async Task<Firmware> GetFirmwareByIdAsync(int firmwareId)
     {
         try
         {
-            string requestUrl = $"{apiHost}/api/firmware/{id}";
-            GD.Print($"Requesting firmware from URL: {requestUrl}");
-            
-            HttpResponseMessage response = await _httpClient.GetAsync(requestUrl);
+            string firmwareByIdRequestUrl = $"{apiHostUrl}/api/firmware/{firmwareId}";
 
-            if (response.IsSuccessStatusCode)
+            HttpResponseMessage firmwareResponse = await httpClient.GetAsync(firmwareByIdRequestUrl);
+
+            if (firmwareResponse.IsSuccessStatusCode)
             {
-                string responseBody = await response.Content.ReadAsStringAsync();
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                
-                return JsonSerializer.Deserialize<Firmware>(responseBody, options);
+                string firmwareResponseBody = await firmwareResponse.Content.ReadAsStringAsync();
+                var deserializationOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+
+                return JsonSerializer.Deserialize<Firmware>(firmwareResponseBody, deserializationOptions);
             }
             else
             {
-                GD.PrintErr($"Failed to fetch firmware ID {id}. Status code: {response.StatusCode}");
+                GD.PrintErr($"Failed to fetch firmware ID {firmwareId}. Status code: {firmwareResponse.StatusCode}");
             }
         }
-        catch (HttpRequestException e)
+        catch (HttpRequestException exception)
         {
-            GD.PrintErr($"GetFirmwareById request failed: {e.Message}");
+            GD.PrintErr($"GetFirmwareById request failed: {exception.Message}");
         }
-        catch (JsonException e)
+        catch (JsonException exception)
         {
-            GD.PrintErr($"GetFirmwareById JSON deserialization failed: {e.Message}");
+            GD.PrintErr($"GetFirmwareById JSON deserialization failed: {exception.Message}");
         }
-        catch (System.Exception e)
+        catch (Exception exception)
         {
-            GD.PrintErr($"An unexpected error occurred: {e.Message}");
+            GD.PrintErr($"An unexpected error occurred: {exception.Message}");
         }
 
         return null;
@@ -281,33 +275,31 @@ public partial class RomMAPI : Node
     public string GetFirmwareDownloadUrl(Firmware firmware)
     {
         if (firmware == null) return null;
-        
-        // Safely encode the filename to prevent routing errors
-        string safeFileName = Uri.EscapeDataString(firmware.FileName);
-        
-        // Use the direct binary stream endpoint instead of the batch zip endpoint
-        return $"{apiHost}/api/firmware/{firmware.Id}/content/{safeFileName}";
+
+        string urlEncodedFileName = Uri.EscapeDataString(firmware.FileName);
+
+        return $"{apiHostUrl}/api/firmware/{firmware.Id}/content/{urlEncodedFileName}";
     }
 
-    public async Task<bool> DownloadAssetAsync(string url, string destinationPath)
+    public async Task<bool> DownloadAssetAsync(string assetUrl, string destinationFilePath)
     {
         try
         {
-            var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
-            if (response.IsSuccessStatusCode)
+            var assetResponse = await httpClient.GetAsync(assetUrl, HttpCompletionOption.ResponseHeadersRead);
+            if (assetResponse.IsSuccessStatusCode)
             {
-                using var fileStream = new System.IO.FileStream(destinationPath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None);
-                await response.Content.CopyToAsync(fileStream);
+                using var destinationFileStream = new System.IO.FileStream(destinationFilePath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None);
+                await assetResponse.Content.CopyToAsync(destinationFileStream);
                 return true;
             }
             else
             {
-                GD.PrintErr($"Failed to download asset {url}. Status: {response.StatusCode} {response.ReasonPhrase}");
+                GD.PrintErr($"Failed to download asset {assetUrl}. Status: {assetResponse.StatusCode} {assetResponse.ReasonPhrase}");
             }
         }
-        catch (Exception e)
+        catch (Exception exception)
         {
-            GD.PrintErr($"Failed to download asset {url}: {e.Message}");
+            GD.PrintErr($"Failed to download asset {assetUrl}: {exception.Message}");
         }
         return false;
     }

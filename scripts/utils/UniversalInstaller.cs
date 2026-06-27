@@ -10,203 +10,242 @@ using System.Linq;
 
 public static class UniversalInstaller
 {
-    private static readonly System.Net.Http.HttpClient _httpClient;
+    private static readonly System.Net.Http.HttpClient sharedHttpClient;
 
     static UniversalInstaller()
     {
-        _httpClient = new System.Net.Http.HttpClient();
-        _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("RomM-Frontend/1.0");
+        sharedHttpClient = new System.Net.Http.HttpClient();
+        sharedHttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("RomM-Frontend/1.0");
     }
 
-    public static async Task<bool> Install(AppInstance appInstance, string emulatorName, EmulatorMeta meta, string osName)
+    public static async Task<bool> Install(AppInstance appInstance, string emulatorName, EmulatorMeta emulatorMetadata, string currentOperatingSystem)
     {
-        if (meta.InstallRecipe == null || !meta.InstallRecipe.ContainsKey(osName))
+        if (emulatorMetadata.InstallRecipe == null || !emulatorMetadata.InstallRecipe.ContainsKey(currentOperatingSystem))
         {
-            GD.PrintErr($"No install recipe found for {emulatorName} on {osName}.");
+            GD.PrintErr($"No install recipe found for {emulatorName} on {currentOperatingSystem}.");
             return false;
         }
 
-        var recipe = meta.InstallRecipe[osName];
-        string targetDir = Path.Combine(appInstance.configManager.EmulatorsPath, meta.EmulatorDirName[osName]);
-        
-        string downloadUrl = recipe.Url;
+        var installRecipe = emulatorMetadata.InstallRecipe[currentOperatingSystem];
+        string emulatorTargetDirectory = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorMetadata.EmulatorDirName[currentOperatingSystem]);
 
-        if (recipe.Type == "github_release")
-        {
-            downloadUrl = await GetGithubReleaseAssetUrl(recipe.Repo, recipe.AssetRegex);
-            if (string.IsNullOrEmpty(downloadUrl))
-            {
-                GD.PrintErr("Failed to fetch Github release URL.");
-                return false;
-            }
-        }
-
-        if (string.IsNullOrEmpty(downloadUrl))
+        string resolvedDownloadUrl = await ResolveDownloadUrl(installRecipe);
+        if (string.IsNullOrEmpty(resolvedDownloadUrl))
         {
             GD.PrintErr("No valid download URL found.");
             return false;
         }
 
-        string tempPath = Path.Combine(appInstance.configManager.DownloadsPath, $"{emulatorName}_download.archive");
-        GD.Print($"Downloading {downloadUrl} to {tempPath}");
+        string temporaryArchiveFilePath = Path.Combine(appInstance.configManager.DownloadsPath, $"{emulatorName}_download.archive");
 
-        bool downloaded = await DownloadFileAsync(downloadUrl, tempPath);
-        if (!downloaded) return false;
+        bool downloadSucceeded = await DownloadFileAsync(resolvedDownloadUrl, temporaryArchiveFilePath);
+        if (!downloadSucceeded) return false;
 
-        if (recipe.Extract)
+        if (installRecipe.Extract)
         {
-            GD.Print("Extracting archive...");
-            
-            string extractDest = string.IsNullOrEmpty(recipe.ExtractFolderRegex) 
-                ? targetDir 
+            string extractionDestinationPath = string.IsNullOrEmpty(installRecipe.ExtractFolderRegex)
+                ? emulatorTargetDirectory
                 : appInstance.configManager.EmulatorsPath;
 
-            if (extractDest == targetDir && !Directory.Exists(targetDir))
+            if (extractionDestinationPath == emulatorTargetDirectory && !Directory.Exists(emulatorTargetDirectory))
             {
-                Directory.CreateDirectory(targetDir);
+                Directory.CreateDirectory(emulatorTargetDirectory);
             }
 
-            bool extracted = await ExtractArchiveAsync(appInstance, tempPath, extractDest);
-            if (!extracted) return false;
+            bool extractionSucceeded = await ExtractArchiveAsync(appInstance, temporaryArchiveFilePath, extractionDestinationPath);
+            if (!extractionSucceeded) return false;
 
-            // Handle renaming the extracted folder if necessary
-            if (!string.IsNullOrEmpty(recipe.ExtractFolderRegex))
+            if (!string.IsNullOrEmpty(installRecipe.ExtractFolderRegex))
             {
-                var dirs = Directory.GetDirectories(appInstance.configManager.EmulatorsPath);
-                var regex = new Regex("^" + recipe.ExtractFolderRegex.Replace("*", ".*") + "$", RegexOptions.IgnoreCase);
-                string foundDir = dirs.FirstOrDefault(d => regex.IsMatch(new DirectoryInfo(d).Name));
+                var directoriesInEmulatorsPath = Directory.GetDirectories(appInstance.configManager.EmulatorsPath);
+                var extractFolderPattern = new Regex("^" + installRecipe.ExtractFolderRegex.Replace("*", ".*") + "$", RegexOptions.IgnoreCase);
+                string matchingExtractedDirectory = directoriesInEmulatorsPath.FirstOrDefault(directoryPath => extractFolderPattern.IsMatch(new DirectoryInfo(directoryPath).Name));
 
-                if (foundDir != null)
+                if (matchingExtractedDirectory != null)
                 {
-                    // If target dir already exists, clear it out for update
-                    if (Directory.Exists(targetDir))
+                    if (Directory.Exists(emulatorTargetDirectory))
                     {
-                        Directory.Delete(targetDir, true);
+                        Directory.Delete(emulatorTargetDirectory, true);
                     }
-                    Directory.Move(foundDir, targetDir);
+                    Directory.Move(matchingExtractedDirectory, emulatorTargetDirectory);
                 }
             }
 
-            File.Delete(tempPath);
+            File.Delete(temporaryArchiveFilePath);
         }
         else
         {
-            // Just move the file
-            if (!Directory.Exists(targetDir))
+            if (!Directory.Exists(emulatorTargetDirectory))
             {
-                Directory.CreateDirectory(targetDir);
+                Directory.CreateDirectory(emulatorTargetDirectory);
             }
-            
-            // Assume it's the executable (like an AppImage)
-            string dest = Path.Combine(targetDir, meta.ExecutableName[osName]);
-            if (File.Exists(dest))
+
+            string destinationExecutablePath = Path.Combine(emulatorTargetDirectory, emulatorMetadata.ExecutableName[currentOperatingSystem]);
+            if (File.Exists(destinationExecutablePath))
             {
-                File.Delete(dest);
+                File.Delete(destinationExecutablePath);
             }
-            File.Move(tempPath, dest);
-            
-            // On Linux/Mac, make it executable
-            if (osName != "windows")
+            File.Move(temporaryArchiveFilePath, destinationExecutablePath);
+
+            if (currentOperatingSystem != "windows")
             {
-                try { Process.Start("chmod", $"+x \"{dest}\""); } catch { }
+                try { Process.Start("chmod", $"+x \"{destinationExecutablePath}\""); } catch { }
             }
         }
+
+        CopyDefaultConfigurations(appInstance, emulatorName, emulatorTargetDirectory);
 
         return true;
     }
 
-    private static async Task<string> GetGithubReleaseAssetUrl(string repo, string assetRegex)
+    private static async Task<string> ResolveDownloadUrl(InstallRecipe installRecipe)
     {
-        string apiUrl = $"https://api.github.com/repos/{repo}/releases/latest";
+        switch (installRecipe.Type)
+        {
+            case "github_release":
+                string githubAssetUrl = await FetchGithubReleaseAssetUrl(installRecipe.Repo, installRecipe.AssetRegex);
+                if (string.IsNullOrEmpty(githubAssetUrl))
+                {
+                    GD.PrintErr("Failed to fetch Github release URL.");
+                }
+                return githubAssetUrl;
+
+            case "direct_url":
+                return installRecipe.Url;
+
+            default:
+                GD.PrintErr($"Unknown install recipe type: {installRecipe.Type}");
+                return null;
+        }
+    }
+
+    private static async Task<string> FetchGithubReleaseAssetUrl(string repositorySlug, string assetNameRegexPattern)
+    {
+        string githubApiUrl = $"https://api.github.com/repos/{repositorySlug}/releases/latest";
         try
         {
-            var response = await _httpClient.GetStringAsync(apiUrl);
-            using var doc = JsonDocument.Parse(response);
-            var root = doc.RootElement;
+            var githubApiResponse = await sharedHttpClient.GetStringAsync(githubApiUrl);
+            using var githubApiResponseDocument = JsonDocument.Parse(githubApiResponse);
+            var responseRootElement = githubApiResponseDocument.RootElement;
 
-            if (root.TryGetProperty("assets", out var assets))
+            if (responseRootElement.TryGetProperty("assets", out var releaseAssets))
             {
-                var regex = new Regex(assetRegex, RegexOptions.IgnoreCase);
-                foreach (var asset in assets.EnumerateArray())
+                var assetNamePattern = new Regex(assetNameRegexPattern, RegexOptions.IgnoreCase);
+                foreach (var releaseAsset in releaseAssets.EnumerateArray())
                 {
-                    if (asset.TryGetProperty("name", out var nameProp) && asset.TryGetProperty("browser_download_url", out var urlProp))
+                    if (releaseAsset.TryGetProperty("name", out var assetNameProperty) && releaseAsset.TryGetProperty("browser_download_url", out var downloadUrlProperty))
                     {
-                        if (regex.IsMatch(nameProp.GetString()))
+                        if (assetNamePattern.IsMatch(assetNameProperty.GetString()))
                         {
-                            return urlProp.GetString();
+                            return downloadUrlProperty.GetString();
                         }
                     }
                 }
             }
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            GD.PrintErr($"Github API error: {ex.Message}");
+            GD.PrintErr($"Github API error: {exception.Message}");
         }
         return null;
     }
 
-    private static async Task<bool> DownloadFileAsync(string url, string destPath)
+    private static async Task<bool> DownloadFileAsync(string downloadUrl, string destinationFilePath)
     {
         try
         {
-            var response = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
-            response.EnsureSuccessStatusCode();
+            var httpResponse = await sharedHttpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
+            httpResponse.EnsureSuccessStatusCode();
 
-            using var fs = new FileStream(destPath, FileMode.Create, System.IO.FileAccess.Write, FileShare.None);
-            await response.Content.CopyToAsync(fs);
+            using var destinationFileStream = new FileStream(destinationFilePath, FileMode.Create, System.IO.FileAccess.Write, FileShare.None);
+            await httpResponse.Content.CopyToAsync(destinationFileStream);
             return true;
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            GD.PrintErr($"Download error: {ex.Message}");
+            GD.PrintErr($"Download error: {exception.Message}");
             return false;
         }
     }
 
-    private static Task<bool> ExtractArchiveAsync(AppInstance appInstance, string archivePath, string destDir)
+    private static Task<bool> ExtractArchiveAsync(AppInstance appInstance, string archiveFilePath, string extractionDestinationDirectory)
     {
-        var tcs = new TaskCompletionSource<bool>();
-        string osName = OS.GetName().ToLower();
+        var extractionTaskCompletionSource = new TaskCompletionSource<bool>();
+        string currentOperatingSystem = OS.GetName().ToLower();
 
-        string toolPath = "";
-        string args = "";
+        string archiveToolExecutablePath;
+        string archiveToolArguments;
 
-        if (osName == "windows")
+        if (currentOperatingSystem == "windows")
         {
-            toolPath = Path.Combine(appInstance.configManager.rootDir, "tools", "7zip", "windows", "7za.exe");
-            args = $"x \"{archivePath}\" -o\"{destDir}\" -y";
+            archiveToolExecutablePath = Path.Combine(appInstance.configManager.ApplicationRootDirectory, "tools", "7zip", "windows", "7za.exe");
+            archiveToolArguments = $"x \"{archiveFilePath}\" -o\"{extractionDestinationDirectory}\" -y";
         }
         else
         {
-            toolPath = "7z";
-            args = $"x \"{archivePath}\" -o\"{destDir}\" -y";
+            archiveToolExecutablePath = "7z";
+            archiveToolArguments = $"x \"{archiveFilePath}\" -o\"{extractionDestinationDirectory}\" -y";
         }
 
         try
         {
-            var process = new Process();
-            process.StartInfo.FileName = toolPath;
-            process.StartInfo.Arguments = args;
-            process.StartInfo.UseShellExecute = false;
-            process.StartInfo.CreateNoWindow = true;
-            process.EnableRaisingEvents = true;
+            var extractionProcess = new Process();
+            extractionProcess.StartInfo.FileName = archiveToolExecutablePath;
+            extractionProcess.StartInfo.Arguments = archiveToolArguments;
+            extractionProcess.StartInfo.UseShellExecute = false;
+            extractionProcess.StartInfo.CreateNoWindow = true;
+            extractionProcess.EnableRaisingEvents = true;
 
-            process.Exited += (sender, e) =>
+            extractionProcess.Exited += (sender, exitEventArgs) =>
             {
-                if (process.ExitCode == 0) tcs.SetResult(true);
-                else tcs.SetResult(false);
-                process.Dispose();
+                if (extractionProcess.ExitCode == 0) extractionTaskCompletionSource.SetResult(true);
+                else extractionTaskCompletionSource.SetResult(false);
+                extractionProcess.Dispose();
             };
 
-            process.Start();
+            extractionProcess.Start();
         }
-        catch (Exception ex)
+        catch (Exception exception)
         {
-            GD.PrintErr($"Extraction error: {ex.Message}");
-            tcs.SetResult(false);
+            GD.PrintErr($"Extraction error: {exception.Message}");
+            extractionTaskCompletionSource.SetResult(false);
         }
 
-        return tcs.Task;
+        return extractionTaskCompletionSource.Task;
+    }
+
+    private static void CopyDefaultConfigurations(AppInstance appInstance, string emulatorName, string emulatorTargetDirectory)
+    {
+        string defaultConfigDirectory = Path.Combine(appInstance.configManager.InstallScriptsPath, emulatorName, "default_config");
+        if (Directory.Exists(defaultConfigDirectory))
+        {
+            try
+            {
+                CopyDirectoryRecursively(defaultConfigDirectory, emulatorTargetDirectory);
+                GD.Print($"Copied default configurations for {emulatorName}");
+            }
+            catch (Exception exception)
+            {
+                GD.PrintErr($"Failed to copy default configurations for {emulatorName}: {exception.Message}");
+            }
+        }
+    }
+
+    private static void CopyDirectoryRecursively(string sourceDirectory, string targetDirectory)
+    {
+        if (!Directory.Exists(targetDirectory))
+        {
+            Directory.CreateDirectory(targetDirectory);
+        }
+
+        foreach (string directoryPath in Directory.GetDirectories(sourceDirectory, "*", SearchOption.AllDirectories))
+        {
+            Directory.CreateDirectory(directoryPath.Replace(sourceDirectory, targetDirectory));
+        }
+
+        foreach (string filePath in Directory.GetFiles(sourceDirectory, "*.*", SearchOption.AllDirectories))
+        {
+            File.Copy(filePath, filePath.Replace(sourceDirectory, targetDirectory), true);
+        }
     }
 }

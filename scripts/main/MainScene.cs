@@ -86,7 +86,7 @@ public partial class MainScene : Control
         _mainVBoxContainer = GetNode<VBoxContainer>("Background/VBoxContainer");
         appInstance.downloadManager.DownloadCompleted += OnDownloadCompleted; 
         
-        appInstance.emulatorManager.mainScene = this;
+        appInstance.emulatorManager.EmulatorInstallationCompleted += OnEmulatorInstallationCompleted;
         appInstance.assetManager.AssetDownloaded += OnAssetDownloaded;
         
         GetCache();
@@ -117,6 +117,8 @@ public partial class MainScene : Control
     {
         if (appInstance.emulatorManager != null && appInstance.emulatorManager.IsEmulatorRunning)
         {
+            GetViewport().SetInputAsHandled();
+
             bool isComboPressed = true;
             int hotkeyCount = appInstance.configManager.EmulatorCloseHotkeyCount;
             if (hotkeyCount > 0)
@@ -138,7 +140,6 @@ public partial class MainScene : Control
             if(isComboPressed)  
             {
                 appInstance.emulatorManager.CloseEmulator();
-                GetViewport().SetInputAsHandled();
             }
 
             return;
@@ -539,16 +540,18 @@ public partial class MainScene : Control
 
         if (platformIcon != null)
         {
+            Texture2D texture = null;
             if (!string.IsNullOrEmpty(selectedSystem.IgdbSlug))
             {
-                var texture = FindPlatformIcon(selectedSystem.IgdbSlug, "res://assets/platforms/titles/", new[] { ".svg", ".png" });
-                platformIcon.Texture = texture;
+                texture = FindPlatformIcon(selectedSystem.IgdbSlug, "res://assets/platforms/titles/", new[] { ".svg", ".png" });
             }
-            else
+            
+            if (texture == null && !string.IsNullOrEmpty(selectedSystem.Slug))
             {
-                var texture = FindPlatformIcon(selectedSystem.Slug, "res://assets/platforms/titles/", new[] { ".svg", ".png" });
-                platformIcon.Texture = texture;
+                texture = FindPlatformIcon(selectedSystem.Slug, "res://assets/platforms/titles/", new[] { ".svg", ".png" });
             }
+
+            platformIcon.Texture = texture;
         }
 
         UpdateHeaderLabel();
@@ -947,13 +950,19 @@ public partial class MainScene : Control
 
         if (deleteBtn != null)
         {
-            // Grey out the X button if not downloaded
             deleteBtn.Disabled = !isGameDownloadedLocally;
         }
     }
     
 
-    
+    private void OnEmulatorInstallationCompleted(string emulatorName, bool wasSuccessful)
+    {
+        if (currentlySelectedGame != null)
+        {
+            UpdateDetailsPanelButtons(currentlySelectedGame);
+        }
+    }
+
     private void OnPlayDownloadButtonPressed()
     {
         if (currentlySelectedGame == null) return;

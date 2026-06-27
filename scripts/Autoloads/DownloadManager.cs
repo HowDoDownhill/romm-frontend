@@ -5,20 +5,20 @@ using System.Linq;
 public partial class DownloadManager : Node
 {
     [Signal]
-    public delegate void DownloadProgressUpdatedEventHandler(string fileName, long current, long total);
+    public delegate void DownloadProgressUpdatedEventHandler(string fileName, long currentBytes, long totalBytes);
 
     [Signal]
-    public delegate void DownloadCompletedEventHandler(string fileName, bool success);
+    public delegate void DownloadCompletedEventHandler(string fileName, bool wasSuccessful);
 
     private AppInstance appInstance;
 
     public override void _Ready()
     {
         appInstance = GetNode<AppInstance>("/root/AppInstance");
-        appInstance.downloadManager = this; 
+        appInstance.downloadManager = this;
     }
 
-    private class Download
+    private class ActiveDownloadEntry
     {
         public HttpRequest Request { get; set; }
         public string FileName { get; set; }
@@ -26,98 +26,96 @@ public partial class DownloadManager : Node
         public System.Action<string> CompletionCallback { get; set; }
     }
 
-    private List<Download> activeDownloads = new List<Download>();
+    private List<ActiveDownloadEntry> activeDownloadEntries = new List<ActiveDownloadEntry>();
 
-    public void DownloadFile(string url, string destinationPath, string[] headers, System.Action<string> onComplete)
+    public void DownloadFile(string downloadUrl, string destinationFilePath, string[] requestHeaders, System.Action<string> onDownloadComplete)
     {
-        var request = new HttpRequest();
-        AddChild(request);
+        var httpRequest = new HttpRequest();
+        AddChild(httpRequest);
 
-        var download = new Download
+        var downloadEntry = new ActiveDownloadEntry
         {
-            Request = request,
-            FileName = destinationPath.GetFile(),
-            DestinationPath = destinationPath,
-            CompletionCallback = onComplete
+            Request = httpRequest,
+            FileName = destinationFilePath.GetFile(),
+            DestinationPath = destinationFilePath,
+            CompletionCallback = onDownloadComplete
         };
 
-        activeDownloads.Add(download);
+        activeDownloadEntries.Add(downloadEntry);
 
-        request.DownloadFile = destinationPath;
-        request.UseThreads = true;
-        
-        string[] finalHeaders = headers ?? new string[0];
-        if (!finalHeaders.Any(h => h.StartsWith("User-Agent")))
+        httpRequest.DownloadFile = destinationFilePath;
+        httpRequest.UseThreads = true;
+
+        string[] finalRequestHeaders = requestHeaders ?? new string[0];
+        if (!finalRequestHeaders.Any(header => header.StartsWith("User-Agent")))
         {
-            var headerList = finalHeaders.ToList();
+            var headerList = finalRequestHeaders.ToList();
             headerList.Add("User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-            finalHeaders = headerList.ToArray();
+            finalRequestHeaders = headerList.ToArray();
         }
 
-        var error = request.Request(url, finalHeaders);
-        if (error != Error.Ok)
+        var requestError = httpRequest.Request(downloadUrl, finalRequestHeaders);
+        if (requestError != Error.Ok)
         {
-            GD.PrintErr($"HttpRequest failed to start for {url}. Error: {error}");
-            OnDownloadCompleted(download, (long)HttpRequest.Result.CantConnect, 0);
+            GD.PrintErr($"HttpRequest failed to start for {downloadUrl}. Error: {requestError}");
+            HandleDownloadCompleted(downloadEntry, (long)HttpRequest.Result.CantConnect, 0);
         }
 
-        request.RequestCompleted += (long result, long responseCode, string[] responseHeaders, byte[] body) =>
+        httpRequest.RequestCompleted += (long resultCode, long responseCode, string[] responseHeaders, byte[] responseBody) =>
         {
-            OnDownloadCompleted(download, result, responseCode);
+            HandleDownloadCompleted(downloadEntry, resultCode, responseCode);
         };
     }
 
-    public override void _Process(double delta)
+    public override void _Process(double deltaTime)
     {
-        foreach (var download in activeDownloads.ToList())
+        foreach (var downloadEntry in activeDownloadEntries.ToList())
         {
-            if (download.Request.GetHttpClientStatus() == HttpClient.Status.Body)
+            if (downloadEntry.Request.GetHttpClientStatus() == HttpClient.Status.Body)
             {
                 EmitSignal(SignalName.DownloadProgressUpdated,
-                    download.FileName,
-                    download.Request.GetDownloadedBytes(),
-                    download.Request.GetBodySize());
+                    downloadEntry.FileName,
+                    downloadEntry.Request.GetDownloadedBytes(),
+                    downloadEntry.Request.GetBodySize());
             }
         }
     }
 
     public bool IsDownloading(string fileName)
     {
-        return activeDownloads.Any(d => d.FileName == fileName);
+        return activeDownloadEntries.Any(entry => entry.FileName == fileName);
     }
 
     public void CancelDownload(string fileName)
     {
-        var downloadToCancel = activeDownloads.FirstOrDefault(d => d.FileName == fileName);
-        if (downloadToCancel != null)
+        var downloadEntryToCancel = activeDownloadEntries.FirstOrDefault(entry => entry.FileName == fileName);
+        if (downloadEntryToCancel != null)
         {
-            GD.Print($"Cancelling download: {fileName}");
-            downloadToCancel.Request.RequestCompleted -= (long result, long responseCode, string[] responseHeaders, byte[] body) => OnDownloadCompleted(downloadToCancel, result, responseCode);
-            OnDownloadCompleted(downloadToCancel, (long)HttpRequest.Result.RequestFailed, 0);
+            downloadEntryToCancel.Request.RequestCompleted -= (long resultCode, long responseCode, string[] responseHeaders, byte[] responseBody) => HandleDownloadCompleted(downloadEntryToCancel, resultCode, responseCode);
+            HandleDownloadCompleted(downloadEntryToCancel, (long)HttpRequest.Result.RequestFailed, 0);
         }
     }
 
-    private void OnDownloadCompleted(Download download, long result, long responseCode)
+    private void HandleDownloadCompleted(ActiveDownloadEntry downloadEntry, long resultCode, long responseCode)
     {
-        bool success = result == (long)HttpRequest.Result.Success && responseCode == 200;
+        bool wasSuccessful = resultCode == (long)HttpRequest.Result.Success && responseCode == 200;
 
-        if (success)
+        if (wasSuccessful)
         {
-            GD.Print($"Download completed successfully: {download.FileName}");
-            download.CompletionCallback?.Invoke(download.DestinationPath);
+            downloadEntry.CompletionCallback?.Invoke(downloadEntry.DestinationPath);
         }
         else
         {
-            GD.PrintErr($"Download failed or was canceled: {download.FileName}, Result: {result}, Response Code: {responseCode}");
-            if (FileAccess.FileExists(download.DestinationPath))
+            GD.PrintErr($"Download failed or was canceled: {downloadEntry.FileName}, Result: {resultCode}, Response Code: {responseCode}");
+            if (FileAccess.FileExists(downloadEntry.DestinationPath))
             {
-                DirAccess.RemoveAbsolute(download.DestinationPath);
+                DirAccess.RemoveAbsolute(downloadEntry.DestinationPath);
             }
         }
 
-        EmitSignal(SignalName.DownloadCompleted, download.FileName, success);
-        
-        activeDownloads.Remove(download);
-        download.Request.QueueFree();
+        EmitSignal(SignalName.DownloadCompleted, downloadEntry.FileName, wasSuccessful);
+
+        activeDownloadEntries.Remove(downloadEntry);
+        downloadEntry.Request.QueueFree();
     }
 }

@@ -1,4 +1,4 @@
-﻿using Godot;
+using Godot;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
@@ -6,91 +6,88 @@ using FileAccess = Godot.FileAccess;
 
 public partial class CacheManager : Node
 {
-    private string SystemsCachePath;
-    private string GamesCachePath;
+    private string systemsCacheFilePath;
+    private string gamesCacheFilePath;
 
     private AppInstance appInstance;
-
 
     public override void _Ready()
     {
         appInstance = GetNode<AppInstance>("/root/AppInstance");
-        appInstance.cacheManager = this; 
-        
-        SetCacheLocations();
+        appInstance.cacheManager = this;
+
+        InitializeCacheFilePaths();
     }
 
-    public void SetCacheLocations()
+    public void InitializeCacheFilePaths()
     {
-        if(OS.HasFeature("editor"))
+        if (OS.HasFeature("editor"))
         {
-            SystemsCachePath = ProjectSettings.GlobalizePath("res://systems.cache");
-            GamesCachePath = ProjectSettings.GlobalizePath("res://games.cache");
+            systemsCacheFilePath = ProjectSettings.GlobalizePath("res://systems.cache");
+            gamesCacheFilePath = ProjectSettings.GlobalizePath("res://games.cache");
         }
-
         else
         {
-            SystemsCachePath = OS.GetExecutablePath().GetBaseDir() + "/systems.cache";
-            GamesCachePath = OS.GetExecutablePath().GetBaseDir() + "/games.cache";
+            systemsCacheFilePath = OS.GetExecutablePath().GetBaseDir() + "/systems.cache";
+            gamesCacheFilePath = OS.GetExecutablePath().GetBaseDir() + "/games.cache";
         }
     }
-    public void SaveCache(List<GameSystem> systems, Dictionary<int, List<Game>> gameCache)
+
+    public void SaveCache(List<GameSystem> gameSystems, Dictionary<int, List<Game>> gameCacheBySystemId)
     {
-        SaveJson(SystemsCachePath, systems);
-        SaveJson(GamesCachePath, gameCache);
-        GD.Print("Saved systems and games to cache.");
+        WriteJsonToFile(systemsCacheFilePath, gameSystems);
+        WriteJsonToFile(gamesCacheFilePath, gameCacheBySystemId);
     }
 
-    public void rebuildGameCache()
+    public void RebuildGameCache()
     {
-        File.Delete(SystemsCachePath);
-        File.Delete(GamesCachePath);
-        
+        File.Delete(systemsCacheFilePath);
+        File.Delete(gamesCacheFilePath);
+
         GetTree().ChangeSceneToFile("res://scenes/login/loading_screen.tscn");
     }
 
     public (List<GameSystem> systems, Dictionary<int, List<Game>> games) LoadCache()
     {
-        var systems = LoadJson<List<GameSystem>>(SystemsCachePath);
-        var games = LoadJson<Dictionary<int, List<Game>>>(GamesCachePath);
+        var cachedSystems = ReadJsonFromFile<List<GameSystem>>(systemsCacheFilePath);
+        var cachedGames = ReadJsonFromFile<Dictionary<int, List<Game>>>(gamesCacheFilePath);
 
-        if (systems != null && games != null)
+        if (cachedSystems != null && cachedGames != null)
         {
-            GD.Print("Loaded systems and games from cache.");
-            return (systems, games);
+            return (cachedSystems, cachedGames);
         }
 
         return (null, null);
     }
 
-    private void SaveJson<T>(string path, T data)
+    private void WriteJsonToFile<T>(string filePath, T dataToSerialize)
     {
-        using var file = FileAccess.Open(path, FileAccess.ModeFlags.Write);
-        if (file == null)
+        using var fileHandle = FileAccess.Open(filePath, FileAccess.ModeFlags.Write);
+        if (fileHandle == null)
         {
-            GD.PrintErr($"Failed to open file for writing: {path}");
+            GD.PrintErr($"Failed to open file for writing: {filePath}");
             return;
         }
-        
-        string jsonString = JsonSerializer.Serialize(data);
-        file.StoreString(jsonString);
+
+        string serializedJsonContent = JsonSerializer.Serialize(dataToSerialize);
+        fileHandle.StoreString(serializedJsonContent);
     }
 
-    private T LoadJson<T>(string path) where T : class
+    private T ReadJsonFromFile<T>(string filePath) where T : class
     {
-        if (!FileAccess.FileExists(path))
+        if (!FileAccess.FileExists(filePath))
         {
             return null;
         }
 
-        using var file = FileAccess.Open(path, FileAccess.ModeFlags.Read);
-        if (file == null)
+        using var fileHandle = FileAccess.Open(filePath, FileAccess.ModeFlags.Read);
+        if (fileHandle == null)
         {
-            GD.PrintErr($"Failed to open file for reading: {path}");
+            GD.PrintErr($"Failed to open file for reading: {filePath}");
             return null;
         }
 
-        string jsonString = file.GetAsText();
-        return JsonSerializer.Deserialize<T>(jsonString);
+        string fileJsonContent = fileHandle.GetAsText();
+        return JsonSerializer.Deserialize<T>(fileJsonContent);
     }
 }
