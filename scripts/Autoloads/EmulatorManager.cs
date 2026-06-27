@@ -171,6 +171,9 @@ public class EmulatorMeta
     [JsonPropertyName("emulator_bios_path")]
     public Dictionary<string, string> EmulatorBiosPath { get; set; }
 
+    [JsonPropertyName("relative_save_path")]
+    public Dictionary<string, JsonElement> RelativeSavePath { get; set; }
+
     [JsonPropertyName("launch_args_with_game")]
     public string LaunchArgsWithGame { get; set; }
 
@@ -254,6 +257,8 @@ public partial class EmulatorManager : Node
 
     private Dictionary<string, string> systemToEmulatorMap = new Dictionary<string, string>();
     private Process activeEmulatorProcess = null;
+    private Game activeGame = null;
+    private DateTime activeSessionStart;
 
     private AppInstance appInstance;
 
@@ -264,6 +269,20 @@ public partial class EmulatorManager : Node
 
         InitializeFilePaths();
         LoadOrGenerateEmulatorMap();
+    }
+
+    public override void _Process(double delta)
+    {
+        if (activeEmulatorProcess != null && activeEmulatorProcess.HasExited)
+        {
+            DateTime sessionEnd = DateTime.UtcNow;
+            if (appInstance.saveSyncManager != null && activeGame != null)
+            {
+                _ = appInstance.saveSyncManager.SyncAfterExit(activeGame, activeSessionStart, sessionEnd);
+            }
+            activeEmulatorProcess = null;
+            activeGame = null;
+        }
     }
 
     private void InitializeFilePaths()
@@ -428,7 +447,7 @@ public partial class EmulatorManager : Node
         return new Dictionary<string, JsonElement>();
     }
 
-    private EmulatorMeta LoadEmulatorMetadataFromDisk(string emulatorName)
+    public EmulatorMeta LoadEmulatorMetadataFromDisk(string emulatorName)
     {
         string metadataFilePath = appInstance.configManager.InstallScriptsPath.PathJoin(emulatorName).PathJoin("meta.json");
         if (!FileAccess.FileExists(metadataFilePath))
@@ -629,7 +648,7 @@ public partial class EmulatorManager : Node
         return Process.Start(processStartInfo);
     }
 
-    public void LaunchEmulatorWithGame(Game game)
+    public async void LaunchEmulatorWithGame(Game game)
     {
         if (game == null)
         {
@@ -697,15 +716,44 @@ public partial class EmulatorManager : Node
             launchArguments = ApplyBiosArgumentsAndCopyFiles(launchArguments, firmwarePath, emulatorInstallDirectory, emulatorMetadata, currentOperatingSystem);
             launchArguments = AppendDynamicSettingsToArguments(launchArguments, mappedEmulatorName, emulatorMetadata);
 
+            if (emulatorMetadata.SettingsFields != null)
+            {
+                foreach (var settingField in emulatorMetadata.SettingsFields)
+                {
+                    if (settingField.Type == "hidden" && !string.IsNullOrEmpty(settingField.ConfigFileRelativePath) && !string.IsNullOrEmpty(settingField.ConfigSection) && !string.IsNullOrEmpty(settingField.ConfigKey))
+                    {
+                        string stringValue = settingField.DefaultValueString;
+                        if (stringValue != null && stringValue.Contains("{game_id}"))
+                        {
+                            stringValue = stringValue.Replace("{game_id}", game.Id.ToString());
+                        }
+
+                        string configFilePath = Path.Combine(emulatorInstallDirectory, settingField.ConfigFileRelativePath);
+                        var updaters = new IConfigurationUpdater[] { new JsonConfigurationUpdater(), new IniConfigurationUpdater() };
+                        foreach (var updater in updaters)
+                        {
+                            if (updater.CanHandle(configFilePath))
+                            {
+                                updater.UpdateValue(configFilePath, settingField.ConfigSection, settingField.ConfigKey, stringValue, stringValue);
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            DateTime sessionStart = DateTime.UtcNow;
+            if (appInstance.saveSyncManager != null)
+            {
+                await appInstance.saveSyncManager.SyncBeforeLaunch(game);
+            }
+
             Process emulatorProcess = BuildAndStartEmulatorProcess(fullExecutablePath, launchArguments, emulatorInstallDirectory);
             if (emulatorProcess != null)
             {
                 activeEmulatorProcess = emulatorProcess;
-                emulatorProcess.EnableRaisingEvents = true;
-                emulatorProcess.Exited += (sender, exitEventArgs) =>
-                {
-                    activeEmulatorProcess = null;
-                };
+                activeGame = game;
+                activeSessionStart = sessionStart;
             }
             else
             {
@@ -750,7 +798,8 @@ public partial class EmulatorManager : Node
             {
                 activeEmulatorProcess.Kill();
             }
-            activeEmulatorProcess = null;
+            // activeEmulatorProcess is intentionally NOT set to null here.
+            // _Process will detect HasExited == true on the next frame and handle save syncing properly.
         }
     }
 

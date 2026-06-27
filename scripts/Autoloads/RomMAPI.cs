@@ -63,7 +63,7 @@ public partial class RomMAPI : Node
             { "grant_type", "password" },
             { "username", username },
             { "password", password },
-            { "scope", "platforms.read roms.read" }
+            { "scope", "platforms.read roms.read assets.read assets.write devices.read devices.write" }
         };
         var encodedFormContent = new FormUrlEncodedContent(tokenRequestBody);
 
@@ -150,7 +150,7 @@ public partial class RomMAPI : Node
         try
         {
             int queryOffset = (pageNumber - 1) * pageSize;
-            string gamesRequestUrl = $"{apiHostUrl}/api/roms?platform_ids={gameSystem.Id}&limit={pageSize}&offset={queryOffset}&include=path_cover_3d,path_cover_large";
+            string gamesRequestUrl = $"{apiHostUrl}/api/roms?platform_ids={gameSystem.Id}&limit={pageSize}&offset={queryOffset}&include=path_cover_3d,path_cover_large,files";
             HttpResponseMessage gamesResponse = await httpClient.GetAsync(gamesRequestUrl);
             string gamesResponseBody = await gamesResponse.Content.ReadAsStringAsync();
 
@@ -302,5 +302,135 @@ public partial class RomMAPI : Node
             GD.PrintErr($"Failed to download asset {assetUrl}: {exception.Message}");
         }
         return false;
+    }
+
+    public async Task<SyncNegotiateResponse> NegotiateSyncAsync(SyncNegotiatePayload payload)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(payload);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await httpClient.PostAsync($"{apiHostUrl}/api/sync/negotiate", content);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                string responseBody = await response.Content.ReadAsStringAsync();
+                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                return JsonSerializer.Deserialize<SyncNegotiateResponse>(responseBody, options);
+            }
+            else
+            {
+                GD.PrintErr($"NegotiateSyncAsync failed: {response.StatusCode}");
+            }
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"NegotiateSyncAsync error: {ex.Message}");
+        }
+        return null;
+    }
+
+    public async Task<bool> CompleteSyncAsync(SyncCompletePayload payload, int sessionId)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(payload);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await httpClient.PostAsync($"{apiHostUrl}/api/sync/sessions/{sessionId}/complete", content);
+            
+            if (response.IsSuccessStatusCode) return true;
+            
+            GD.PrintErr($"CompleteSyncAsync failed: {response.StatusCode}");
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"CompleteSyncAsync error: {ex.Message}");
+        }
+        return false;
+    }
+
+    public async Task<bool> UploadSaveAsync(int romId, string filePath)
+    {
+        try
+        {
+            using var formData = new MultipartFormDataContent();
+            
+            using var fileStream = new System.IO.FileStream(filePath, System.IO.FileMode.Open, System.IO.FileAccess.Read, System.IO.FileShare.ReadWrite);
+            var fileContent = new StreamContent(fileStream);
+            fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/octet-stream");
+            formData.Add(fileContent, "saveFile", System.IO.Path.GetFileName(filePath));
+
+            var response = await httpClient.PostAsync($"{apiHostUrl}/api/saves?rom_id={romId}", formData);
+            if (response.IsSuccessStatusCode) return true;
+
+            string errorBody = await response.Content.ReadAsStringAsync();
+            GD.PrintErr($"UploadSaveAsync failed: {response.StatusCode} - {errorBody}");
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"UploadSaveAsync error: {ex.Message}");
+        }
+        return false;
+    }
+
+    public string GetSaveDownloadUrl(int saveId, string fileName)
+    {
+        return $"{apiHostUrl}/api/saves/{saveId}/content";
+    }
+
+    public async Task<JsonElement> GetSavesAsync(int romId)
+    {
+        try
+        {
+            var response = await httpClient.GetAsync($"{apiHostUrl}/api/saves?rom_id={romId}");
+            if (response.IsSuccessStatusCode)
+            {
+                string responseBody = await response.Content.ReadAsStringAsync();
+                return JsonSerializer.Deserialize<JsonElement>(responseBody);
+            }
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"GetSavesAsync error: {ex.Message}");
+        }
+        return default;
+    }
+
+    public async Task<string> GetOrCreateDeviceAsync()
+    {
+        try
+        {
+            var payload = new Dictionary<string, object>
+            {
+                { "name", "romm-frontend" },
+                { "client", "romm-frontend" },
+                { "platform", OS.GetName().ToLower() },
+                { "sync_mode", "api" },
+                { "allow_existing", true }
+            };
+            var json = JsonSerializer.Serialize(payload);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await httpClient.PostAsync($"{apiHostUrl}/api/devices", content);
+
+            if (response.IsSuccessStatusCode)
+            {
+                string responseBody = await response.Content.ReadAsStringAsync();
+                using var document = JsonDocument.Parse(responseBody);
+                if (document.RootElement.TryGetProperty("device_id", out var idElement))
+                {
+                    return idElement.GetString();
+                }
+            }
+            else
+            {
+                string errorBody = await response.Content.ReadAsStringAsync();
+                GD.PrintErr($"GetOrCreateDeviceAsync failed: {response.StatusCode} - {errorBody}");
+            }
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"GetOrCreateDeviceAsync error: {ex.Message}");
+        }
+        return null;
     }
 }

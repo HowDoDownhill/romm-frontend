@@ -10,8 +10,16 @@
     "linux": "dolphin",
     "macos": "dolphin"
   },
-  "launch_args_with_game": "-b -e \"{rom_path}\" -u ./",
-  "launch_args_without_game": "-u ./",
+  "install_recipe": {
+    "windows": {
+      "type": "direct_url",
+      "url": "https://dl.dolphin-emu.org/releases/2606/dolphin-2606-x64.7z",
+      "extract": true,
+      "extract_folder_regex": "dolphin-*"
+    }
+  },
+  "launch_args_with_game": "-b -e \"{rom_path}\"",
+  "launch_args_without_game": "",
   "settings_fields": [
     {
       "id": "fullscreen",
@@ -35,12 +43,11 @@
       "launch_arg_format": "-C Dolphin.Display.GFXBackend={value}"
     }
   ],
-  "install_recipe": {
-    "windows": {
-      "type": "direct_url",
-      "url": "https://dl.dolphin-emu.org/releases/2603a/dolphin-2603a-x64.7z",
-      "extract": true,
-      "extract_folder_regex": "dolphin-*"
-    }
+  "relative_save_path": {
+    "ngc": [
+      "User/GC/EUR/Card A",
+      "User/GC/JAP/Card A",
+      "User/GC/USA/Card A"
+    ]
   }
 }

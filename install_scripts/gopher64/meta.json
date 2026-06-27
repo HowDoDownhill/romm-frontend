@@ -26,6 +26,9 @@
       "extract": false
     }
   },
+  "relative_save_path": {
+    "n64": "portable_data/data/saves/"
+  },
   "settings_fields": [
     {
       "id": "upscale",

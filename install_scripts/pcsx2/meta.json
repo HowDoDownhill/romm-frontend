@@ -15,6 +15,9 @@
     "linux": "bios",
     "macos": "bios"
   },
+  "relative_save_path": {
+    "ps2": "memcards"
+  },
   "launch_args_with_game": "-batch -fullscreen -portable -bigpicture -- \"{rom_path}\"",
   "launch_args_without_game": "-portable",
   "install_recipe": {
@@ -63,6 +66,15 @@
         "Widescreen (16:9)": "16:9",
         "Stretch": "Stretch"
       }
+    },
+    {
+      "id": "per_game_memcard",
+      "label": "Per-Game Memory Card",
+      "type": "hidden",
+      "default_value_string": "RomM_{game_id}.ps2",
+      "config_file_relative_path": "inis/PCSX2.ini",
+      "config_section": "MemoryCards",
+      "config_key": "Slot1_Filename"
     },
     {
       "id": "vsync",

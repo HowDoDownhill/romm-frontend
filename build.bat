@@ -15,7 +15,6 @@ echo Exporting game to Linux...
 echo Copying install_scripts...
 :: Copy the directory into the build folder
 xcopy "install_scripts" "build\linux\install_scripts" /E /I /Y
-xcopy "downloads" "build\linux\roms" /E /I /Y
 xcopy "tools" "build\linux\tools" /E /I /Y
 
 echo Build complete!

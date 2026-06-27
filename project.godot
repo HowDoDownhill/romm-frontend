@@ -25,6 +25,7 @@ DataBus="*uid://c3ihjck7ojmb6"
 DownloadManager="*uid://cahae8cxkj01b"
 EmulatorManager="*uid://mc0jjiebfh7k"
 AssetManager="*res://scripts/autoloads/AssetManager.cs"
+SaveSyncManager="*res://scripts/autoloads/SaveSyncManager.cs"
 ControllerIcons="*uid://cbgqhfjlifwga"
 
 [display]

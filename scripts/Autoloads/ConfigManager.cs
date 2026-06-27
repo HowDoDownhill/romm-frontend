@@ -13,6 +13,7 @@ public partial class ConfigManager : Node
     public string InstallScriptsPath { get; private set; }
     public string ToolsPath { get; private set; }
     public string AssetsPath { get; private set; }
+    public string SavesPath { get; private set; }
     public string RomMHost { get; private set; }
     public string RomMUsername { get; private set; }
     public string RomMPassword { get; private set; }
@@ -38,7 +39,8 @@ public partial class ConfigManager : Node
         "assets/covers_2d",
         "assets/marquees",
         "assets/covers_fallback",
-        "assets/screenshots"
+        "assets/screenshots",
+        "saves"
     };
 
     public override void _Ready()
@@ -95,6 +97,7 @@ public partial class ConfigManager : Node
         InstallScriptsPath = (string)configurationFile.GetValue("Paths", "InstallScriptsPath", $"{ApplicationRootDirectory}/install_scripts/");
         ToolsPath = (string)configurationFile.GetValue("Paths", "ToolsPath", $"{ApplicationRootDirectory}/tools/");
         AssetsPath = (string)configurationFile.GetValue("Paths", "AssetsPath", $"{ApplicationRootDirectory}/assets/");
+        SavesPath = (string)configurationFile.GetValue("Paths", "SavesPath", $"{ApplicationRootDirectory}/saves/");
         RomMHost = (string)configurationFile.GetValue("RomM", "Host", "");
         RomMUsername = (string)configurationFile.GetValue("RomM", "Username", "");
         RomMPassword = (string)configurationFile.GetValue("RomM", "Password", "");
@@ -117,6 +120,7 @@ public partial class ConfigManager : Node
         InstallScriptsPath = $"{ApplicationRootDirectory}/install_scripts/";
         ToolsPath = $"{ApplicationRootDirectory}/tools/";
         AssetsPath = $"{ApplicationRootDirectory}/assets/";
+        SavesPath = $"{ApplicationRootDirectory}/saves/";
         RomMHost = "";
         RomMUsername = "";
         RomMPassword = "";
@@ -141,6 +145,7 @@ public partial class ConfigManager : Node
         configurationFile.SetValue("Paths", "InstallScriptsPath", InstallScriptsPath);
         configurationFile.SetValue("Paths", "ToolsPath", ToolsPath);
         configurationFile.SetValue("Paths", "AssetsPath", AssetsPath);
+        configurationFile.SetValue("Paths", "SavesPath", SavesPath);
         configurationFile.SetValue("RomM", "Host", RomMHost);
         configurationFile.SetValue("RomM", "Username", RomMUsername);
         configurationFile.SetValue("RomM", "Password", RomMPassword);
