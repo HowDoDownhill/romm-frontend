@@ -291,8 +291,7 @@ public partial class SaveSyncManager : Node
     private string[] GetSavesDirsForGame(Game game)
     {
         string platformSlug = game.System.Slug;
-        string defaultSavesDir = Path.Combine(appInstance.configManager.SavesPath, platformSlug);
-        var savesDirs = new List<string> { defaultSavesDir };
+        var savesDirs = new List<string>();
 
         string mappedEmulatorName = appInstance.emulatorManager.GetMappedEmulator(platformSlug);
         if (!string.IsNullOrEmpty(mappedEmulatorName))
@@ -300,7 +299,8 @@ public partial class SaveSyncManager : Node
             var emulatorMetadata = appInstance.emulatorManager.LoadEmulatorMetadataFromDisk(mappedEmulatorName);
             if (emulatorMetadata != null && emulatorMetadata.RelativeSavePath != null)
             {
-                if (emulatorMetadata.RelativeSavePath.TryGetValue(platformSlug, out JsonElement relativePathElement))
+                if (emulatorMetadata.RelativeSavePath.TryGetValue(platformSlug, out JsonElement relativePathElement) ||
+                    emulatorMetadata.RelativeSavePath.TryGetValue("default", out relativePathElement))
                 {
                     string currentOperatingSystem = OS.GetName().ToLower();
                     if (emulatorMetadata.EmulatorDirName != null && emulatorMetadata.EmulatorDirName.ContainsKey(currentOperatingSystem))
@@ -309,15 +309,15 @@ public partial class SaveSyncManager : Node
                         
                         if (relativePathElement.ValueKind == JsonValueKind.String)
                         {
-                            savesDirs.Clear();
-                            savesDirs.Add(Path.Combine(emulatorInstallDirectory, relativePathElement.GetString()));
+                            string resolvedPath = relativePathElement.GetString().Replace("{system_slug}", platformSlug);
+                            savesDirs.Add(Path.Combine(emulatorInstallDirectory, resolvedPath));
                         }
                         else if (relativePathElement.ValueKind == JsonValueKind.Array)
                         {
-                            savesDirs.Clear();
                             foreach (var pathElement in relativePathElement.EnumerateArray())
                             {
-                                savesDirs.Add(Path.Combine(emulatorInstallDirectory, pathElement.GetString()));
+                                string resolvedPath = pathElement.GetString().Replace("{system_slug}", platformSlug);
+                                savesDirs.Add(Path.Combine(emulatorInstallDirectory, resolvedPath));
                             }
                         }
                     }

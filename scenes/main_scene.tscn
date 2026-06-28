@@ -5,6 +5,8 @@
 [ext_resource type="PackedScene" uid="uid://cew2a8jxcgu6t" path="res://scenes/games_list/game_list_entry.tscn" id="2_rt2n2"]
 [ext_resource type="Script" uid="uid://cwtykxfgbvhv6" path="res://scripts/ui/VerticalCarousel.cs" id="3_gubc5"]
 [ext_resource type="PackedScene" uid="uid://cffanb3xjob1c" path="res://scenes/downloads_list/download_entry.tscn" id="4_pu3yx"]
+[ext_resource type="Script" uid="uid://bgqglerkcylxx" path="res://addons/SmoothScroll/smooth_scroll_container.gd" id="6_c16ls"]
+[ext_resource type="Script" uid="uid://b7h0k2h2qwlqv" path="res://addons/SmoothScroll/scroll_damper/expo_scroll_damper.gd" id="7_18nlu"]
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_pu3yx"]
 
@@ -28,7 +30,13 @@
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_r6p65"]
 
-[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "gameList", "detailsPanelContainer", "gameTitle", "gameDescription", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn")]
+[sub_resource type="Resource" id="Resource_c1pb6"]
+script = ExtResource("7_18nlu")
+
+[sub_resource type="Resource" id="Resource_6wevv"]
+script = ExtResource("7_18nlu")
+
+[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "gameList", "detailsPanelContainer", "gameTitle", "gameDescription", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "LaunchEmulatorPopupOption", "SelectBiosPopupOption", "SettingsPopupOption", "RefreshGamesPopupOption", "QuitPopupOption", "startMenu", "startMenuContainer", "biosSelectorContainer", "biosSelector", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -61,6 +69,18 @@ navHintBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/Dow
 cancelDownloadBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/DownloadsFooter/CancelDownloadContainer/CancelDownloadsButton")
 settingsSelectBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/SettingsFooter/SettingsSelectContainer/SettingsSelectButton")
 settingsBackBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/SettingsFooter/SettingsBackContainer/SettingsBackButton")
+LaunchEmulatorPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/LaunchEmulatorButton")
+SelectBiosPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/SelectBiosButton")
+SettingsPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/SettingsButton")
+RefreshGamesPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/RefreshGamesButton")
+QuitPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/QuitButton")
+startMenu = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu")
+startMenuContainer = NodePath("Background/StartMenu/Panel/StartMenuContainer")
+biosSelectorContainer = NodePath("Background/StartMenu/Panel/BiosSelectorContainer")
+biosSelector = NodePath("Background/StartMenu/Panel/BiosSelectorContainer/SmoothScrollContainer/BiosSelector")
+settingsMenuContainer = NodePath("Background/VBoxContainer/SettingsMenuContainer")
+settingsSectionsTree = NodePath("Background/VBoxContainer/SettingsMenuContainer/HBoxContainer/SettingsSections")
+sectionOptionsContainer = NodePath("Background/VBoxContainer/SettingsMenuContainer/HBoxContainer/Panel/MarginContainer/SectionOptions")
 
 [node name="Background" type="TextureRect" parent="." unique_id=586301297]
 layout_mode = 1
@@ -246,7 +266,23 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 0.3
 
-[node name="SectionOptions" type="VBoxContainer" parent="Background/VBoxContainer/SettingsMenuContainer/HBoxContainer" unique_id=1529244001]
+[node name="Panel" type="Panel" parent="Background/VBoxContainer/SettingsMenuContainer/HBoxContainer" unique_id=1892134041]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MarginContainer" type="MarginContainer" parent="Background/VBoxContainer/SettingsMenuContainer/HBoxContainer/Panel" unique_id=798289251]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="SectionOptions" type="VBoxContainer" parent="Background/VBoxContainer/SettingsMenuContainer/HBoxContainer/Panel/MarginContainer" unique_id=1529244001]
 layout_mode = 2
 size_flags_horizontal = 3
 
@@ -516,3 +552,83 @@ theme_override_constants/icon_max_width = 48
 text = "Back"
 alignment = 0
 expand_icon = true
+
+[node name="StartMenu" type="MarginContainer" parent="Background" unique_id=1160206546]
+visible = false
+custom_minimum_size = Vector2(400, 600)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -300.0
+offset_right = 200.0
+offset_bottom = 300.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="Panel" parent="Background/StartMenu" unique_id=1083749050]
+layout_mode = 2
+
+[node name="StartMenuContainer" type="MarginContainer" parent="Background/StartMenu/Panel" unique_id=93641177]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="StartMenu" type="VBoxContainer" parent="Background/StartMenu/Panel/StartMenuContainer" unique_id=32188184]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="LaunchEmulatorButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=1299222623]
+layout_mode = 2
+text = "Launch Current Emulator"
+
+[node name="SelectBiosButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=1276947446]
+layout_mode = 2
+text = "Select Bios For Emulator"
+
+[node name="SettingsButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=357423038]
+layout_mode = 2
+text = "Settings"
+
+[node name="RefreshGamesButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=325705108]
+layout_mode = 2
+text = "Refresh Games"
+
+[node name="QuitButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=536888331]
+layout_mode = 2
+text = "Quit"
+
+[node name="BiosSelectorContainer" type="MarginContainer" parent="Background/StartMenu/Panel" unique_id=19963209]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="SmoothScrollContainer" type="ScrollContainer" parent="Background/StartMenu/Panel/BiosSelectorContainer" unique_id=797902560]
+layout_mode = 2
+script = ExtResource("6_c16ls")
+wheel_scroll_damper = SubResource("Resource_c1pb6")
+dragging_scroll_damper = SubResource("Resource_6wevv")
+metadata/_custom_type_script = "uid://bgqglerkcylxx"
+
+[node name="BiosSelector" type="VBoxContainer" parent="Background/StartMenu/Panel/BiosSelectorContainer/SmoothScrollContainer" unique_id=1236763628]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+metadata/_smooth_scroll_default_mouse_filter_set = true

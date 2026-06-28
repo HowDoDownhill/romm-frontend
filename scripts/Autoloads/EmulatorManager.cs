@@ -157,6 +157,176 @@ public class JsonConfigurationUpdater : IConfigurationUpdater
     }
 }
 
+public class BmlConfigurationUpdater : IConfigurationUpdater
+{
+    class BmlLine
+    {
+        public string Text;
+        public int Indent;
+        public string Key;
+        public bool IsParsed;
+    }
+
+    public bool CanHandle(string filePath)
+    {
+        return filePath.EndsWith(".bml", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public void UpdateValue(string configurationFilePath, string targetSection, string targetKey, string stringValue, object rawValue)
+    {
+        string[] lines = System.IO.File.Exists(configurationFilePath) ? System.IO.File.ReadAllLines(configurationFilePath) : new string[0];
+        
+        var parsedLines = new System.Collections.Generic.List<BmlLine>();
+        foreach (var line in lines)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                parsedLines.Add(new BmlLine { Text = line, IsParsed = false });
+                continue;
+            }
+            
+            int indent = 0;
+            while (indent < line.Length && line[indent] == ' ') indent++;
+            
+            string content = line.Substring(indent);
+            if (content.StartsWith("//"))
+            {
+                parsedLines.Add(new BmlLine { Text = line, IsParsed = false });
+                continue;
+            }
+            
+            int colonIndex = content.IndexOf(':');
+            string key = colonIndex >= 0 ? content.Substring(0, colonIndex).TrimEnd() : content.TrimEnd();
+            
+            parsedLines.Add(new BmlLine { Text = line, Indent = indent, Key = key, IsParsed = true });
+        }
+
+        string[] sectionPath = string.IsNullOrEmpty(targetSection) ? new string[0] : targetSection.Split('/');
+        
+        int currentLineIndex = 0;
+        int currentIndent = 0;
+        int parentIndent = -1;
+
+        // Traverse sections
+        for (int i = 0; i < sectionPath.Length; i++)
+        {
+            string expectedSection = sectionPath[i];
+            bool found = false;
+            
+            for (int j = currentLineIndex; j < parsedLines.Count; j++)
+            {
+                var pl = parsedLines[j];
+                if (!pl.IsParsed) continue;
+                
+                if (pl.Indent <= parentIndent)
+                {
+                    break;
+                }
+                
+                if (pl.Indent == currentIndent && pl.Key == expectedSection)
+                {
+                    found = true;
+                    currentLineIndex = j + 1;
+                    parentIndent = currentIndent;
+                    
+                    int childIndent = currentIndent + 2;
+                    for (int next = currentLineIndex; next < parsedLines.Count; next++)
+                    {
+                        if (parsedLines[next].IsParsed)
+                        {
+                            if (parsedLines[next].Indent > currentIndent)
+                            {
+                                childIndent = parsedLines[next].Indent;
+                            }
+                            break;
+                        }
+                    }
+                    currentIndent = childIndent;
+                    break;
+                }
+            }
+            
+            if (!found)
+            {
+                for (int k = i; k < sectionPath.Length; k++)
+                {
+                    int insertAt = FindInsertPosition(parsedLines, currentLineIndex, parentIndent);
+                    parsedLines.Insert(insertAt, new BmlLine 
+                    { 
+                        Text = new string(' ', currentIndent) + sectionPath[k], 
+                        Indent = currentIndent, 
+                        Key = sectionPath[k], 
+                        IsParsed = true 
+                    });
+                    currentLineIndex = insertAt + 1;
+                    parentIndent = currentIndent;
+                    currentIndent += 2;
+                }
+                break;
+            }
+        }
+        
+        bool keyFound = false;
+        for (int j = currentLineIndex; j < parsedLines.Count; j++)
+        {
+            var pl = parsedLines[j];
+            if (!pl.IsParsed) continue;
+            
+            if (pl.Indent <= parentIndent)
+            {
+                break;
+            }
+            
+            if (pl.Indent == currentIndent && pl.Key == targetKey)
+            {
+                pl.Text = new string(' ', currentIndent) + targetKey + ": " + stringValue;
+                keyFound = true;
+                break;
+            }
+        }
+        
+        if (!keyFound)
+        {
+            int insertAt = FindInsertPosition(parsedLines, currentLineIndex, parentIndent);
+            parsedLines.Insert(insertAt, new BmlLine 
+            { 
+                Text = new string(' ', currentIndent) + targetKey + ": " + stringValue, 
+                Indent = currentIndent, 
+                Key = targetKey, 
+                IsParsed = true 
+            });
+        }
+        
+        var outputLines = new System.Collections.Generic.List<string>();
+        foreach(var pl in parsedLines)
+        {
+            outputLines.Add(pl.Text);
+        }
+        
+        string directory = Path.GetDirectoryName(configurationFilePath);
+        if (!string.IsNullOrEmpty(directory) && !System.IO.Directory.Exists(directory))
+        {
+            System.IO.Directory.CreateDirectory(directory);
+        }
+        
+        System.IO.File.WriteAllLines(configurationFilePath, outputLines);
+    }
+
+    private int FindInsertPosition(System.Collections.Generic.List<BmlLine> parsedLines, int startIndex, int parentIndent)
+    {
+        int insertAt = startIndex;
+        for (int j = startIndex; j < parsedLines.Count; j++)
+        {
+            if (parsedLines[j].IsParsed && parsedLines[j].Indent <= parentIndent)
+            {
+                break;
+            }
+            insertAt = j + 1;
+        }
+        return insertAt;
+    }
+}
+
 public class EmulatorMeta
 {
     [JsonPropertyName("name")]
@@ -414,7 +584,8 @@ public partial class EmulatorManager : Node
                     var updaters = new IConfigurationUpdater[]
                     {
                         new JsonConfigurationUpdater(),
-                        new IniConfigurationUpdater()
+                        new IniConfigurationUpdater(),
+                        new BmlConfigurationUpdater()
                     };
 
                     foreach (var updater in updaters)
@@ -729,7 +900,7 @@ public partial class EmulatorManager : Node
                         }
 
                         string configFilePath = Path.Combine(emulatorInstallDirectory, settingField.ConfigFileRelativePath);
-                        var updaters = new IConfigurationUpdater[] { new JsonConfigurationUpdater(), new IniConfigurationUpdater() };
+                        var updaters = new IConfigurationUpdater[] { new JsonConfigurationUpdater(), new IniConfigurationUpdater(), new BmlConfigurationUpdater() };
                         foreach (var updater in updaters)
                         {
                             if (updater.CanHandle(configFilePath))

@@ -1,0 +1,42 @@
+{
+  "name": "ares",
+  "executable_name": {
+    "windows": "ares.exe",
+    "macos": "ares.app/Contents/MacOS/ares"
+  },
+  "emulator_dir_name": {
+    "windows": "ares",
+    "macos": "ares"
+  },
+  "relative_save_path": {
+    "default": "Saves"
+  },
+  "install_recipe": {
+    "windows": {
+      "type": "github_release",
+      "repo": "ares-emulator/ares",
+      "asset_regex": ".*windows-x64\\.zip$",
+      "extract": true,
+      "extract_folder_regex": "ares-*"
+    },
+    "macos": {
+      "type": "github_release",
+      "repo": "ares-emulator/ares",
+      "asset_regex": ".*macos-universal\\.zip$",
+      "extract": true,
+      "extract_folder_regex": "ares-*"
+    }
+  },
+  "launch_args_with_game": "\"{rom_path}\"",
+  "launch_args_without_game": "",
+  "settings_fields": [
+    {
+      "id": "fullscreen",
+      "label": "Start in Fullscreen",
+      "type": "boolean",
+      "default_value_bool": true,
+      "launch_arg_true": "--fullscreen",
+      "launch_arg_false": ""
+    }
+  ]
+}

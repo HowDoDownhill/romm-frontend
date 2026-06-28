@@ -72,10 +72,17 @@ public partial class MainScene : Control
     private ImageTexture _placeholderTexture;
     private VBoxContainer _mainVBoxContainer;
     
+    // Start Menu
+    [Export] private Control startMenu;
+    [Export] private Control startMenuContainer;
+    [Export] private Control biosSelectorContainer;
+    [Export] private VBoxContainer biosSelector;
+    private Control startMenuRoot;
+
     // Settings Menu
-    private MarginContainer settingsMenuContainer;
-    private Tree settingsSectionsTree;
-    private VBoxContainer sectionOptionsContainer;
+    [Export] private MarginContainer settingsMenuContainer;
+    [Export] private Tree settingsSectionsTree;
+    [Export] private VBoxContainer sectionOptionsContainer;
     
     public override void _Ready()
     {
@@ -89,20 +96,149 @@ public partial class MainScene : Control
         appInstance.emulatorManager.EmulatorInstallationCompleted += OnEmulatorInstallationCompleted;
         appInstance.assetManager.AssetDownloaded += OnAssetDownloaded;
         
+        // Setup Start Menu
+        if (startMenuContainer != null)
+        {
+            startMenuRoot = startMenuContainer.GetParent()?.GetParent() as Control;
+            if (startMenuRoot != null) startMenuRoot.Visible = false;
+
+            if (LaunchEmulatorPopupOption is Button launchBtn) launchBtn.Pressed += OnLaunchEmulatorPressed;
+            if (SelectBiosPopupOption is Button biosBtn) biosBtn.Pressed += OnSelectBiosMenuPressed;
+            if (SettingsPopupOption is Button settingsBtn) settingsBtn.Pressed += OnSettingsMenuPressed;
+            if (RefreshGamesPopupOption is Button refreshBtn) refreshBtn.Pressed += OnRefreshGamesPressed;
+            if (QuitPopupOption is Button quitBtn) quitBtn.Pressed += OnQuitPressed;
+        }
+
+        // Setup Settings
+        if (settingsMenuContainer != null)
+        {
+            settingsMenuContainer.Visible = false;
+            settingsSectionsTree?.AddThemeStyleboxOverride("focus", new StyleBoxEmpty());
+            SetupSettingsTree();
+        }
+
         GetCache();
         SelectSystemByIndex(0);
         SetupGameList();
         SetupDownloadsList();
         SetupFooterUI();
-        // Setup Settings
-        settingsMenuContainer = GetNodeOrNull<MarginContainer>("Background/VBoxContainer/SettingsMenuContainer");
+        
+    }
+
+    private void ToggleSettingsMenu()
+    {
         if (settingsMenuContainer != null)
         {
-            settingsSectionsTree = settingsMenuContainer.GetNodeOrNull<Tree>("HBoxContainer/SettingsSections");
-            sectionOptionsContainer = settingsMenuContainer.GetNodeOrNull<VBoxContainer>("HBoxContainer/SectionOptions");
-            settingsMenuContainer.Visible = false;
-            SetupSettingsTree();
+            var gamesListContainer = gameList?.GetParent()?.GetParent<Control>();
+            if (settingsMenuContainer.Visible)
+            {
+                settingsMenuContainer.Visible = false;
+                if (settingsFooter != null) settingsFooter.Visible = false;
+                if (gamesListContainer != null) gamesListContainer.Visible = true;
+                if (gameListFooter != null) gameListFooter.Visible = (downloadsListContainer == null || !downloadsListContainer.Visible);
+                if (downloadsFooter != null) downloadsFooter.Visible = (downloadsListContainer != null && downloadsListContainer.Visible);
+                gameList?.GrabFocus();
+            }
+            else
+            {
+                settingsMenuContainer.Visible = true;
+                if (settingsFooter != null) settingsFooter.Visible = true;
+                if (gamesListContainer != null) gamesListContainer.Visible = false;
+                if (gameListFooter != null) gameListFooter.Visible = false;
+                if (downloadsFooter != null) downloadsFooter.Visible = false;
+                settingsSectionsTree?.GrabFocus();
+            }
+            UpdateHeaderLabel();
         }
+    }
+
+    private void OnLaunchEmulatorPressed()
+    {
+        if (gameSystems == null || currentGameSystemIndex < 0 || currentGameSystemIndex >= gameSystems.Count) return;
+        var system = gameSystems[currentGameSystemIndex];
+        string mappedEmulator = appInstance.emulatorManager.GetMappedEmulator(system.Slug);
+        if (!string.IsNullOrEmpty(mappedEmulator))
+        {
+            appInstance.emulatorManager.LaunchEmulatorWithoutGame(mappedEmulator, system);
+        }
+        if (startMenuRoot != null) startMenuRoot.Visible = false;
+        gameList?.GrabFocus();
+    }
+
+    private void OnSelectBiosMenuPressed()
+    {
+        if (startMenuContainer != null) startMenuContainer.Visible = false;
+        if (biosSelectorContainer != null) biosSelectorContainer.Visible = true;
+        PopulateBiosSelector();
+    }
+
+    private void PopulateBiosSelector()
+    {
+        if (biosSelector == null) return;
+
+        foreach (Node child in biosSelector.GetChildren())
+        {
+            biosSelector.RemoveChild(child);
+            child.QueueFree();
+        }
+
+        if (gameSystems == null || currentGameSystemIndex < 0 || currentGameSystemIndex >= gameSystems.Count) return;
+        var system = gameSystems[currentGameSystemIndex];
+
+        var firmwareDir = appInstance.configManager.BiosPath.PathJoin(system.Slug);
+        var localFiles = new string[0];
+        if (Godot.FileAccess.FileExists(firmwareDir) || Godot.DirAccess.DirExistsAbsolute(firmwareDir))
+        {
+            if (Godot.DirAccess.DirExistsAbsolute(firmwareDir))
+            {
+                localFiles = Godot.DirAccess.GetFilesAt(firmwareDir);
+            }
+        }
+
+        if (localFiles.Length > 0)
+        {
+            foreach (var fileName in localFiles)
+            {
+                Button btn = new Button();
+                btn.Text = fileName;
+                btn.Alignment = HorizontalAlignment.Left;
+                btn.Pressed += () => 
+                {
+                    system.PrefferedFirmware = firmwareDir.PathJoin(fileName);
+                    if (biosSelectorContainer != null) biosSelectorContainer.Visible = false;
+                    if (startMenuContainer != null) startMenuContainer.Visible = true;
+                    (SelectBiosPopupOption as Control)?.GrabFocus();
+                };
+                biosSelector.AddChild(btn);
+            }
+        }
+        else
+        {
+            Label lbl = new Label();
+            lbl.Text = "No bios/firmware found.";
+            biosSelector.AddChild(lbl);
+        }
+
+        if (biosSelector.GetChildCount() > 0 && biosSelector.GetChild(0) is Control firstChild)
+        {
+            firstChild.GrabFocus();
+        }
+    }
+
+    private void OnSettingsMenuPressed()
+    {
+        if (startMenuRoot != null) startMenuRoot.Visible = false;
+        ToggleSettingsMenu();
+    }
+
+    private void OnRefreshGamesPressed()
+    {
+        appInstance.cacheManager?.RebuildGameCache();
+    }
+
+    private void OnQuitPressed()
+    {
+        GetTree().Quit();
     }
 
     private void OnAssetDownloaded(int gameId, string assetType)
@@ -147,30 +283,78 @@ public partial class MainScene : Control
 
         if (@event.IsActionPressed("ToggleSettings"))
         {
-            if (settingsMenuContainer != null)
+            if (settingsMenuContainer != null && settingsMenuContainer.Visible)
             {
-                var gamesListContainer = gameList?.GetParent()?.GetParent<Control>();
-                if (settingsMenuContainer.Visible)
+                ToggleSettingsMenu();
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
+            if (startMenuRoot != null)
+            {
+                if (startMenuRoot.Visible)
                 {
-                    settingsMenuContainer.Visible = false;
-                    if (settingsFooter != null) settingsFooter.Visible = false;
-                    if (gamesListContainer != null) gamesListContainer.Visible = true;
-                    if (gameListFooter != null) gameListFooter.Visible = (downloadsListContainer == null || !downloadsListContainer.Visible);
-                    if (downloadsFooter != null) downloadsFooter.Visible = (downloadsListContainer != null && downloadsListContainer.Visible);
+                    startMenuRoot.Visible = false;
                     gameList?.GrabFocus();
+                }
+                else if (downloadsListContainer == null || !downloadsListContainer.Visible)
+                {
+                    startMenuRoot.Visible = true;
+                    if (startMenuContainer != null) startMenuContainer.Visible = true;
+                    if (biosSelectorContainer != null) biosSelectorContainer.Visible = false;
+                    
+                    if (LaunchEmulatorPopupOption is Control launchBtn)
+                    {
+                        launchBtn.GrabFocus();
+                    }
+                }
+            }
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (startMenuRoot != null && startMenuRoot.Visible)
+        {
+            if (@event.IsActionPressed("ui_cancel") || @event.IsActionPressed("Back"))
+            {
+                if (biosSelectorContainer != null && biosSelectorContainer.Visible)
+                {
+                    biosSelectorContainer.Visible = false;
+                    if (startMenuContainer != null) startMenuContainer.Visible = true;
+                    (SelectBiosPopupOption as Control)?.GrabFocus();
                 }
                 else
                 {
-                    settingsMenuContainer.Visible = true;
-                    if (settingsFooter != null) settingsFooter.Visible = true;
-                    if (gamesListContainer != null) gamesListContainer.Visible = false;
-                    if (gameListFooter != null) gameListFooter.Visible = false;
-                    if (downloadsFooter != null) downloadsFooter.Visible = false;
-                    settingsSectionsTree?.GrabFocus();
+                    startMenuRoot.Visible = false;
+                    gameList?.GrabFocus();
                 }
-                UpdateHeaderLabel();
+                GetViewport().SetInputAsHandled();
+                return;
             }
-            GetViewport().SetInputAsHandled();
+            else if (@event.IsActionPressed("ui_up", true) || @event.IsActionPressed("MoveUp"))
+            {
+                CycleFocusInContainer(biosSelectorContainer != null && biosSelectorContainer.Visible ? biosSelectorContainer : startMenu, -1);
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+            else if (@event.IsActionPressed("ui_down", true) || @event.IsActionPressed("MoveDown"))
+            {
+                CycleFocusInContainer(biosSelectorContainer != null && biosSelectorContainer.Visible ? biosSelectorContainer : startMenu, 1);
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+            else if (@event.IsActionPressed("ui_accept") || @event.IsActionPressed("Select"))
+            {
+                var focusOwner = GetViewport().GuiGetFocusOwner();
+                if (focusOwner is BaseButton btn)
+                {
+                    btn.EmitSignal(BaseButton.SignalName.Pressed);
+                    GetViewport().SetInputAsHandled();
+                }
+                return;
+            }
+            
+            // Block other custom input processing while start menu is open
             return;
         }
 
@@ -188,14 +372,7 @@ public partial class MainScene : Control
                 }
                 else
                 {
-                    var gamesListContainer = gameList?.GetParent()?.GetParent<Control>();
-                    settingsMenuContainer.Visible = false;
-                    if (settingsFooter != null) settingsFooter.Visible = false;
-                    if (gamesListContainer != null) gamesListContainer.Visible = true;
-                    if (gameListFooter != null) gameListFooter.Visible = (downloadsListContainer == null || !downloadsListContainer.Visible);
-                    if (downloadsFooter != null) downloadsFooter.Visible = (downloadsListContainer != null && downloadsListContainer.Visible);
-                    UpdateHeaderLabel();
-                    gameList?.GrabFocus();
+                    ToggleSettingsMenu();
                 }
                 GetViewport().SetInputAsHandled();
                 return;
@@ -379,7 +556,23 @@ public partial class MainScene : Control
     
     public void GetCache()
     {
-        gameSystems = appInstance.dataBus.systems;
+        if (appInstance.configManager.ShowAllSystems)
+        {
+            gameSystems = appInstance.dataBus.systems;
+        }
+        else
+        {
+            gameSystems = appInstance.dataBus.systems.Where(sys => 
+            {
+                string mappedEmulator = appInstance.emulatorManager.GetMappedEmulator(sys.Slug);
+                return !string.IsNullOrEmpty(mappedEmulator) && appInstance.emulatorManager.LoadEmulatorMetadataFromDisk(mappedEmulator) != null;
+            }).ToList();
+
+            if (gameSystems.Count == 0)
+            {
+                gameSystems = appInstance.dataBus.systems;
+            }
+        }
         games = appInstance.dataBus.gameCache;
         
     }
@@ -1224,6 +1417,47 @@ public partial class MainScene : Control
         }
     }
 
+    private void CycleFocusInContainer(Control container, int direction)
+    {
+        if (container == null) return;
+        
+        List<Control> focusableChildren = new List<Control>();
+        GatherFocusableControls(container, focusableChildren);
+        
+        if (focusableChildren.Count == 0) return;
+        
+        var focusOwner = GetViewport().GuiGetFocusOwner();
+        int currentIndex = focusOwner != null ? focusableChildren.IndexOf(focusOwner) : -1;
+        
+        if (currentIndex == -1)
+        {
+            focusableChildren[0].GrabFocus();
+            return;
+        }
+        
+        int nextIndex = currentIndex + direction;
+        if (nextIndex < 0) nextIndex = focusableChildren.Count - 1;
+        else if (nextIndex >= focusableChildren.Count) nextIndex = 0;
+        
+        focusableChildren[nextIndex].GrabFocus();
+    }
+    
+    private void GatherFocusableControls(Node parent, List<Control> list)
+    {
+        foreach (Node child in parent.GetChildren())
+        {
+            if (child is Control c)
+            {
+                if (!c.Visible) continue;
+                if (c.FocusMode != Control.FocusModeEnum.None)
+                {
+                    list.Add(c);
+                }
+            }
+            GatherFocusableControls(child, list);
+        }
+    }
+
     private void GenerateGameListSettingsForm()
     {
         if (sectionOptionsContainer == null) return;
@@ -1249,9 +1483,12 @@ public partial class MainScene : Control
         CheckButton checkbox = new CheckButton();
         checkbox.ButtonPressed = appInstance.configManager.HideGamesWithoutBoxArt;
         
+        CheckButton showAllCheckbox = new CheckButton();
+        showAllCheckbox.ButtonPressed = appInstance.configManager.ShowAllSystems;
+
         checkbox.Toggled += (bool toggledOn) => 
         {
-            appInstance.configManager.SaveGameListSettings(toggledOn);
+            appInstance.configManager.SaveGameListSettings(toggledOn, showAllCheckbox.ButtonPressed);
             if (gameSystems != null && currentGameSystemIndex >= 0 && currentGameSystemIndex < gameSystems.Count)
             {
                 OnSystemSelected(gameSystems[currentGameSystemIndex]);
@@ -1259,6 +1496,21 @@ public partial class MainScene : Control
         };
         fieldBox.AddChild(checkbox);
         vbox.AddChild(fieldBox);
+
+        HBoxContainer fieldBox2 = new HBoxContainer();
+        Label label2 = new Label();
+        label2.Text = "Show all systems";
+        label2.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        fieldBox2.AddChild(label2);
+        
+        showAllCheckbox.Toggled += (bool toggledOn) => 
+        {
+            appInstance.configManager.SaveGameListSettings(checkbox.ButtonPressed, toggledOn);
+            GetCache();
+            SelectSystemByIndex(0);
+        };
+        fieldBox2.AddChild(showAllCheckbox);
+        vbox.AddChild(fieldBox2);
     }
 
     private void GenerateInputSettingsForm()

@@ -24,6 +24,9 @@
       "repo": "snes9xgit/snes9x",
       "asset_regex": ".*linux\\.zip$",
       "extract": true
-    }
+    },
+	"relative_save_path": {
+		"default": "saves"
+	}
   }
 }

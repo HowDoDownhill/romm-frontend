@@ -13,13 +13,13 @@ public partial class ConfigManager : Node
     public string InstallScriptsPath { get; private set; }
     public string ToolsPath { get; private set; }
     public string AssetsPath { get; private set; }
-    public string SavesPath { get; private set; }
     public string RomMHost { get; private set; }
     public string RomMUsername { get; private set; }
     public string RomMPassword { get; private set; }
     public string RomMApiKey { get; private set; }
     public bool RomMValidLoginLastUsed { get; private set; }
     public bool HideGamesWithoutBoxArt { get; private set; }
+    public bool ShowAllSystems { get; private set; }
 
     public int EmulatorCloseHotkeyCount { get; private set; }
     public Godot.Collections.Array EmulatorCloseHotkeys { get; private set; }
@@ -39,8 +39,7 @@ public partial class ConfigManager : Node
         "assets/covers_2d",
         "assets/marquees",
         "assets/covers_fallback",
-        "assets/screenshots",
-        "saves"
+        "assets/screenshots"
     };
 
     public override void _Ready()
@@ -97,13 +96,13 @@ public partial class ConfigManager : Node
         InstallScriptsPath = (string)configurationFile.GetValue("Paths", "InstallScriptsPath", $"{ApplicationRootDirectory}/install_scripts/");
         ToolsPath = (string)configurationFile.GetValue("Paths", "ToolsPath", $"{ApplicationRootDirectory}/tools/");
         AssetsPath = (string)configurationFile.GetValue("Paths", "AssetsPath", $"{ApplicationRootDirectory}/assets/");
-        SavesPath = (string)configurationFile.GetValue("Paths", "SavesPath", $"{ApplicationRootDirectory}/saves/");
         RomMHost = (string)configurationFile.GetValue("RomM", "Host", "");
         RomMUsername = (string)configurationFile.GetValue("RomM", "Username", "");
         RomMPassword = (string)configurationFile.GetValue("RomM", "Password", "");
         RomMApiKey = (string)configurationFile.GetValue("RomM", "ApiKey", "");
         RomMValidLoginLastUsed = (bool)configurationFile.GetValue("RomM", "ValidLoginLastUsed", "");
         HideGamesWithoutBoxArt = (bool)configurationFile.GetValue("UI", "HideGamesWithoutBoxArt", false);
+        ShowAllSystems = (bool)configurationFile.GetValue("UI", "ShowAllSystems", false);
 
         EmulatorCloseHotkeyCount = (int)configurationFile.GetValue("Input", "EmulatorCloseHotkeyCount", 4);
         var defaultHotkeyButtons = new Godot.Collections.Array { (int)JoyButton.LeftShoulder, (int)JoyButton.RightShoulder, (int)JoyButton.Back, (int)JoyButton.Start };
@@ -120,13 +119,13 @@ public partial class ConfigManager : Node
         InstallScriptsPath = $"{ApplicationRootDirectory}/install_scripts/";
         ToolsPath = $"{ApplicationRootDirectory}/tools/";
         AssetsPath = $"{ApplicationRootDirectory}/assets/";
-        SavesPath = $"{ApplicationRootDirectory}/saves/";
         RomMHost = "";
         RomMUsername = "";
         RomMPassword = "";
         RomMApiKey = "";
         RomMValidLoginLastUsed = false;
         HideGamesWithoutBoxArt = false;
+        ShowAllSystems = false;
 
         EmulatorCloseHotkeyCount = 4;
         EmulatorCloseHotkeys = new Godot.Collections.Array { (int)JoyButton.LeftShoulder, (int)JoyButton.RightShoulder, (int)JoyButton.Back, (int)JoyButton.Start };
@@ -145,13 +144,13 @@ public partial class ConfigManager : Node
         configurationFile.SetValue("Paths", "InstallScriptsPath", InstallScriptsPath);
         configurationFile.SetValue("Paths", "ToolsPath", ToolsPath);
         configurationFile.SetValue("Paths", "AssetsPath", AssetsPath);
-        configurationFile.SetValue("Paths", "SavesPath", SavesPath);
         configurationFile.SetValue("RomM", "Host", RomMHost);
         configurationFile.SetValue("RomM", "Username", RomMUsername);
         configurationFile.SetValue("RomM", "Password", RomMPassword);
         configurationFile.SetValue("RomM", "ApiKey", RomMApiKey);
         configurationFile.SetValue("RomM", "ValidLoginLastUsed", RomMValidLoginLastUsed);
         configurationFile.SetValue("UI", "HideGamesWithoutBoxArt", HideGamesWithoutBoxArt);
+        configurationFile.SetValue("UI", "ShowAllSystems", ShowAllSystems);
         configurationFile.SetValue("Input", "EmulatorCloseHotkeyCount", EmulatorCloseHotkeyCount);
         configurationFile.SetValue("Input", "EmulatorCloseHotkeys", EmulatorCloseHotkeys);
     }
@@ -179,9 +178,10 @@ public partial class ConfigManager : Node
         SaveConfig();
     }
 
-    public void SaveGameListSettings(bool shouldHideGamesWithoutBoxArt)
+    public void SaveGameListSettings(bool shouldHideGamesWithoutBoxArt, bool showAllSystems)
     {
         HideGamesWithoutBoxArt = shouldHideGamesWithoutBoxArt;
+        ShowAllSystems = showAllSystems;
         SaveConfig();
     }
 

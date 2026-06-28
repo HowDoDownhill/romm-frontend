@@ -1,18 +1,20 @@
 @echo off
+set GODOT_BIN="E:\Godot\Godot_v4.6.3-stable_mono_win64\Godot_v4.6.3-stable_mono_win64.exe"
+
 echo Exporting app to Windows...
 :: Run Godot in headless mode to export the project
-"E:\Godot\Godot_v4.6.3-stable_mono_win64\Godot_v4.6.3-stable_mono_win64.exe" --headless --export-release "Windows Desktop" "build\windows\romm-frontend.exe"
+%GODOT_BIN% --headless --export-release "Windows Desktop" "build\windows\romm-frontend.exe"
 
-echo Copying install_scripts...
+echo Copying install_scripts and tools to Windows build...
 :: Copy the directory into the build folder
 xcopy "install_scripts" "build\windows\install_scripts" /E /I /Y
 xcopy "tools" "build\windows\tools" /E /I /Y
 
 echo Exporting game to Linux...
 :: Run Godot in headless mode to export the project
-"E:\Godot\Godot_v4.6.3-stable_mono_win64\Godot_v4.6.3-stable_mono_win64.exe" --headless --export-release "Linux Desktop" "build\linux\romm-frontend.x86_64"
+%GODOT_BIN% --headless --export-release "Linux Desktop" "build\linux\romm-frontend.x86_64"
 
-echo Copying install_scripts...
+echo Copying install_scripts and tools to Linux build...
 :: Copy the directory into the build folder
 xcopy "install_scripts" "build\linux\install_scripts" /E /I /Y
 xcopy "tools" "build\linux\tools" /E /I /Y
