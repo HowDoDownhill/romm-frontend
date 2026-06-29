@@ -1,14 +1,14 @@
-# RomM Frontend User Guide
+# Frontend User Guide
 
-Welcome to the **RomM Frontend User Guide**! This guide covers the basics of getting started, including how to log in, map systems to emulators, and define custom emulators and their settings.
+Welcome to the **Frontend User Guide**! This guide covers the basics of getting started, including how to log in, map systems to emulators, and define custom emulators and their settings.
 
 ---
 
 ## 1. Login to the Frontend
 
-Logging into the RomM Frontend requires connecting the application to your RomM backend instance. 
+Logging into the Frontend requires connecting the application to your RomM backend instance. 
 
-1. Launch the **RomM Frontend** application.
+1. Launch the **Frontend**.
 2. On the Login Screen, fill in the following details:
    - **RomM Host**: The URL/IP of your RomM backend server.
    - **RomM Username & Password**: Your standard RomM credentials.
