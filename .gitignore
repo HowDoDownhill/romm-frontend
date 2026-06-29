@@ -24,6 +24,11 @@ mono_crash.*.json
 test_*.png
 test_*.png.import
 
+.agents/
+build_errors.txt
+
+releases/
+
 /build/
 /bios/
 /roms/
