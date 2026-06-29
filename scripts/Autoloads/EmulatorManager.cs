@@ -471,7 +471,7 @@ public partial class EmulatorManager : Node
         try
         {
             string mapJsonContent = FileAccess.GetFileAsString(emulatorMapFilePath);
-            systemToEmulatorMap = JsonSerializer.Deserialize<Dictionary<string, string>>(mapJsonContent);
+            systemToEmulatorMap = JsonSerializer.Deserialize<Dictionary<string, string>>(mapJsonContent, RommJsonContext.Default.Options);
         }
         catch (Exception exception)
         {
@@ -512,7 +512,7 @@ public partial class EmulatorManager : Node
                         try
                         {
                             var metadataJsonContent = FileAccess.GetFileAsString(metadataFilePath);
-                            var emulatorMetadata = JsonSerializer.Deserialize<EmulatorMeta>(metadataJsonContent);
+                            var emulatorMetadata = JsonSerializer.Deserialize<EmulatorMeta>(metadataJsonContent, RommJsonContext.Default.Options);
                             if (emulatorMetadata != null)
                             {
                                 availableEmulators[directoryEntryName] = emulatorMetadata;
@@ -611,7 +611,7 @@ public partial class EmulatorManager : Node
             try
             {
                 string settingsJsonContent = System.IO.File.ReadAllText(userSettingsFilePath);
-                return JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(settingsJsonContent) ?? new Dictionary<string, JsonElement>();
+                return JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(settingsJsonContent, RommJsonContext.Default.Options) ?? new Dictionary<string, JsonElement>();
             }
             catch {}
         }
@@ -629,7 +629,7 @@ public partial class EmulatorManager : Node
         try
         {
             var metadataJsonContent = FileAccess.GetFileAsString(metadataFilePath);
-            return JsonSerializer.Deserialize<EmulatorMeta>(metadataJsonContent);
+            return JsonSerializer.Deserialize<EmulatorMeta>(metadataJsonContent, RommJsonContext.Default.Options);
         }
         catch (Exception exception)
         {
@@ -1056,7 +1056,7 @@ public partial class EmulatorManager : Node
 
         try
         {
-            string serializedMapJson = JsonSerializer.Serialize(defaultPlatformToEmulatorMap, new JsonSerializerOptions { WriteIndented = true });
+            string serializedMapJson = JsonSerializer.Serialize(defaultPlatformToEmulatorMap, RommJsonContext.Default.Options);
             using var emulatorMapFile = FileAccess.Open(emulatorMapFilePath, FileAccess.ModeFlags.Write);
             emulatorMapFile.StoreString(serializedMapJson);
         }
@@ -1067,7 +1067,7 @@ public partial class EmulatorManager : Node
 
         try
         {
-            string serializedExecutableJson = JsonSerializer.Serialize(executableMapFilePath, new JsonSerializerOptions { WriteIndented = true });
+            string serializedExecutableJson = JsonSerializer.Serialize(executableMapFilePath, RommJsonContext.Default.Options);
             using var executableMapFile = FileAccess.Open(executableMapFilePath, FileAccess.ModeFlags.Write);
             executableMapFile.StoreString(serializedExecutableJson);
         }
@@ -1077,3 +1077,4 @@ public partial class EmulatorManager : Node
         }
     }
 }
+

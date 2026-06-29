@@ -24,6 +24,10 @@ public partial class VerticalCarousel : Control
     [Signal]
     public delegate void ItemFocusedEventHandler(long index);
 
+    [Signal]
+    public delegate void JumpSectionRequestedEventHandler(int direction);
+
+
     public override void _Ready()
     {
         FocusMode = FocusModeEnum.All;
@@ -50,6 +54,16 @@ public partial class VerticalCarousel : Control
         else if (@event.IsActionPressed("ui_accept"))
         {
             EmitSignal(SignalName.ItemSelected, SelectedIndex);
+            AcceptEvent();
+        }
+        else if (@event.IsActionPressed("ui_right", true))
+        {
+            EmitSignal(SignalName.JumpSectionRequested, 1);
+            AcceptEvent();
+        }
+        else if (@event.IsActionPressed("ui_left", true))
+        {
+            EmitSignal(SignalName.JumpSectionRequested, -1);
             AcceptEvent();
         }
     }

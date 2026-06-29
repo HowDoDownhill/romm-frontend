@@ -149,3 +149,27 @@ public class User
     public string Username { get; set; }
     public string Token { get; set; }
 }
+
+public class GithubReleaseAsset
+{
+    [JsonPropertyName("name")]
+    public string Name { get; set; }
+    
+    [JsonPropertyName("browser_download_url")]
+    public string BrowserDownloadUrl { get; set; }
+}
+
+public class GithubReleaseInfo
+{
+    [JsonPropertyName("tag_name")]
+    public string TagName { get; set; }
+
+    [JsonPropertyName("name")]
+    public string Name { get; set; }
+
+    [JsonPropertyName("body")]
+    public string Body { get; set; }
+
+    [JsonPropertyName("assets")]
+    public List<GithubReleaseAsset> Assets { get; set; }
+}

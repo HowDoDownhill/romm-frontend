@@ -25,9 +25,9 @@
       "repo": "mgba-emu/mgba",
       "asset_regex": ".*AppImage$",
       "extract": false
-    },
-	"relative_save_path": {
-		"default": "saves"
-	}
+    }
+  },
+  "relative_save_path": {
+	"default": "saves"
   }
 }

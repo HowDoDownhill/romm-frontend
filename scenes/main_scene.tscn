@@ -36,7 +36,7 @@ script = ExtResource("7_18nlu")
 [sub_resource type="Resource" id="Resource_6wevv"]
 script = ExtResource("7_18nlu")
 
-[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "gameList", "detailsPanelContainer", "gameTitle", "gameDescription", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "LaunchEmulatorPopupOption", "SelectBiosPopupOption", "SettingsPopupOption", "RefreshGamesPopupOption", "QuitPopupOption", "startMenu", "startMenuContainer", "biosSelectorContainer", "biosSelector", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
+[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "gameList", "detailsPanelContainer", "gameTitle", "gameDescription", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "LaunchEmulatorPopupOption", "SelectBiosPopupOption", "SettingsPopupOption", "RefreshGamesPopupOption", "RefreshCurrentSystemGamesPopupOption", "QuitPopupOption", "downloadProgressPopup", "downloadProgressLabel", "downloadProgressBar", "changelogPopup", "changelogRichTextLabel", "startMenu", "startMenuContainer", "biosSelectorContainer", "biosSelector", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -72,12 +72,18 @@ settingsBackBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Pane
 LaunchEmulatorPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/LaunchEmulatorButton")
 SelectBiosPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/SelectBiosButton")
 SettingsPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/SettingsButton")
-RefreshGamesPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/RefreshGamesButton")
+RefreshGamesPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/RefreshAllGamesButton")
+RefreshCurrentSystemGamesPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/RefreshCurrentSystemsGamesButton")
 QuitPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/QuitButton")
+downloadProgressPopup = NodePath("Background/DownloadProgressPopup")
+downloadProgressLabel = NodePath("Background/DownloadProgressPopup/Panel/VBoxContainer/LabelContianer/Label")
+downloadProgressBar = NodePath("Background/DownloadProgressPopup/Panel/VBoxContainer/ProgressContainer/ProgressBar")
+changelogPopup = NodePath("Background/ChangelogContainer")
+changelogRichTextLabel = NodePath("Background/ChangelogContainer/Panel/MarginContainer/RichTextLabel")
 startMenu = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu")
 startMenuContainer = NodePath("Background/StartMenu/Panel/StartMenuContainer")
 biosSelectorContainer = NodePath("Background/StartMenu/Panel/BiosSelectorContainer")
-biosSelector = NodePath("Background/StartMenu/Panel/BiosSelectorContainer/SmoothScrollContainer/BiosSelector")
+biosSelector = NodePath("Background/StartMenu/Panel/BiosSelectorContainer/SmoothScrollContainer/MarginContainer/BiosSelector")
 settingsMenuContainer = NodePath("Background/VBoxContainer/SettingsMenuContainer")
 settingsSectionsTree = NodePath("Background/VBoxContainer/SettingsMenuContainer/HBoxContainer/SettingsSections")
 sectionOptionsContainer = NodePath("Background/VBoxContainer/SettingsMenuContainer/HBoxContainer/Panel/MarginContainer/SectionOptions")
@@ -600,9 +606,14 @@ text = "Select Bios For Emulator"
 layout_mode = 2
 text = "Settings"
 
-[node name="RefreshGamesButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=325705108]
+[node name="RefreshAllGamesButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=325705108]
 layout_mode = 2
-text = "Refresh Games"
+text = "Refresh All Games"
+
+[node name="RefreshCurrentSystemsGamesButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=1065288368]
+layout_mode = 2
+text = "Refresh Current System
+"
 
 [node name="QuitButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=536888331]
 layout_mode = 2
@@ -622,13 +633,114 @@ theme_override_constants/margin_bottom = 5
 
 [node name="SmoothScrollContainer" type="ScrollContainer" parent="Background/StartMenu/Panel/BiosSelectorContainer" unique_id=797902560]
 layout_mode = 2
+follow_focus = true
 script = ExtResource("6_c16ls")
 wheel_scroll_damper = SubResource("Resource_c1pb6")
 dragging_scroll_damper = SubResource("Resource_6wevv")
 metadata/_custom_type_script = "uid://bgqglerkcylxx"
 
-[node name="BiosSelector" type="VBoxContainer" parent="Background/StartMenu/Panel/BiosSelectorContainer/SmoothScrollContainer" unique_id=1236763628]
+[node name="MarginContainer" type="MarginContainer" parent="Background/StartMenu/Panel/BiosSelectorContainer/SmoothScrollContainer" unique_id=1487848439]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+metadata/_smooth_scroll_default_mouse_filter_set = true
+
+[node name="BiosSelector" type="VBoxContainer" parent="Background/StartMenu/Panel/BiosSelectorContainer/SmoothScrollContainer/MarginContainer" unique_id=1236763628]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 metadata/_smooth_scroll_default_mouse_filter_set = true
+
+[node name="DownloadProgressPopup" type="MarginContainer" parent="Background" unique_id=695295220]
+visible = false
+custom_minimum_size = Vector2(500, 100)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="Panel" type="Panel" parent="Background/DownloadProgressPopup" unique_id=428372210]
+layout_mode = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Background/DownloadProgressPopup/Panel" unique_id=949079431]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 0
+
+[node name="LabelContianer" type="MarginContainer" parent="Background/DownloadProgressPopup/Panel/VBoxContainer" unique_id=1846967498]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="Label" type="Label" parent="Background/DownloadProgressPopup/Panel/VBoxContainer/LabelContianer" unique_id=1314148376]
+layout_mode = 2
+size_flags_vertical = 3
+text = "Test"
+vertical_alignment = 1
+
+[node name="ProgressContainer" type="MarginContainer" parent="Background/DownloadProgressPopup/Panel/VBoxContainer" unique_id=1516397779]
+layout_mode = 2
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="ProgressBar" type="ProgressBar" parent="Background/DownloadProgressPopup/Panel/VBoxContainer/ProgressContainer" unique_id=1179132155]
+layout_mode = 2
+size_flags_vertical = 8
+
+[node name="ChangelogContainer" type="MarginContainer" parent="Background" unique_id=664785356]
+visible = false
+custom_minimum_size = Vector2(600, 800)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="Panel" parent="Background/ChangelogContainer" unique_id=1450288382]
+layout_mode = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="Background/ChangelogContainer/Panel" unique_id=846107793]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="RichTextLabel" type="RichTextLabel" parent="Background/ChangelogContainer/Panel/MarginContainer" unique_id=1651234799]
+layout_mode = 2

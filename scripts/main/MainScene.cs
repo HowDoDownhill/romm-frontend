@@ -63,9 +63,16 @@ public partial class MainScene : Control
     [Export] public Node SelectBiosPopupOption;
     [Export] public Node SettingsPopupOption;
     [Export] public Node RefreshGamesPopupOption;
+    [Export] public Node RefreshCurrentSystemGamesPopupOption;
     [Export] public Node QuitPopupOption;
 
-
+    [ExportGroup("Update & Refresh UI")]
+    [Export] private Control downloadProgressPopup;
+    [Export] private Label downloadProgressLabel;
+    [Export] private ProgressBar downloadProgressBar;
+    
+    [Export] private Control changelogPopup;
+    [Export] private RichTextLabel changelogRichTextLabel;
 
     //Global access to other systems
     private AppInstance appInstance;
@@ -106,6 +113,7 @@ public partial class MainScene : Control
             if (SelectBiosPopupOption is Button biosBtn) biosBtn.Pressed += OnSelectBiosMenuPressed;
             if (SettingsPopupOption is Button settingsBtn) settingsBtn.Pressed += OnSettingsMenuPressed;
             if (RefreshGamesPopupOption is Button refreshBtn) refreshBtn.Pressed += OnRefreshGamesPressed;
+            if (RefreshCurrentSystemGamesPopupOption is Button refreshSysBtn) refreshSysBtn.Pressed += OnRefreshCurrentSystemGamesPressed;
             if (QuitPopupOption is Button quitBtn) quitBtn.Pressed += OnQuitPressed;
         }
 
@@ -123,6 +131,57 @@ public partial class MainScene : Control
         SetupDownloadsList();
         SetupFooterUI();
         
+        InitUpdater();
+    }
+
+    private AppUpdater _appUpdater;
+    private string _pendingUpdateVersion;
+
+    private void InitUpdater()
+    {
+        _appUpdater = GetNodeOrNull<AppUpdater>("/root/AppUpdater");
+        if (_appUpdater != null)
+        {
+            _appUpdater.UpdateAvailable += OnUpdateAvailable;
+            _appUpdater.UpdateDownloadProgress += OnUpdateDownloadProgress;
+            _appUpdater.UpdateDownloadCompleted += OnUpdateDownloadCompleted;
+
+            _ = _appUpdater.CheckForUpdatesAsync();
+        }
+    }
+
+    private void OnUpdateAvailable(string version, string releaseNotes)
+    {
+        _pendingUpdateVersion = version;
+        if (changelogPopup != null && changelogRichTextLabel != null)
+        {
+            changelogRichTextLabel.Text = $"[b]A new version ({version}) of Romm Frontend is available.[/b]\n\nRelease Notes:\n{releaseNotes}\n\nPress (A)/Enter to download and install, or (B)/Escape to cancel.";
+            changelogPopup.Visible = true;
+        }
+    }
+
+    private void OnUpdateDownloadProgress(float progress)
+    {
+        if (downloadProgressBar != null)
+        {
+            downloadProgressBar.Value = progress * 100.0f;
+        }
+    }
+
+    private async void OnUpdateDownloadCompleted(bool success)
+    {
+        if (success)
+        {
+            if (downloadProgressLabel != null) downloadProgressLabel.Text = "Download complete. Restarting to apply update...";
+            await ToSignal(GetTree().CreateTimer(3.0f), "timeout");
+            _appUpdater.ApplyUpdateAndRestart();
+        }
+        else
+        {
+            if (downloadProgressLabel != null) downloadProgressLabel.Text = "Failed to download update. Please try again later.";
+            await ToSignal(GetTree().CreateTimer(3.0f), "timeout");
+            if (downloadProgressPopup != null) downloadProgressPopup.Visible = false;
+        }
     }
 
     private void ToggleSettingsMenu()
@@ -236,6 +295,67 @@ public partial class MainScene : Control
         appInstance.cacheManager?.RebuildGameCache();
     }
 
+    private async void OnRefreshCurrentSystemGamesPressed()
+    {
+        if (gameSystems == null || currentGameSystemIndex < 0 || currentGameSystemIndex >= gameSystems.Count) return;
+
+        if (startMenuRoot != null) startMenuRoot.Visible = false;
+        
+        if (downloadProgressPopup != null) 
+        {
+            downloadProgressPopup.Visible = true;
+            if (downloadProgressLabel != null) downloadProgressLabel.Text = "Refreshing games...";
+            if (downloadProgressBar != null) downloadProgressBar.Value = 0;
+        }
+        
+        GameSystem currentSystem = gameSystems[currentGameSystemIndex];
+        List<Game> allGamesForSystem = new List<Game>();
+        int currentPage = 1;
+        const int chunkSize = 100;
+        bool hasMoreGames = true;
+
+        while (hasMoreGames)
+        {
+            var response = await appInstance.rommApi.GetGamesAsync(currentSystem, currentPage, chunkSize);
+            
+            if (response?.Games != null && response.Games.Any())
+            {
+                foreach (var game in response.Games)
+                {
+                    game.System = currentSystem;
+                }
+                allGamesForSystem.AddRange(response.Games);
+                if (downloadProgressLabel != null) downloadProgressLabel.Text = $"Found {allGamesForSystem.Count} games...";
+
+                if (response.Games.Count < chunkSize)
+                {
+                    hasMoreGames = false;
+                }
+                else
+                {
+                    currentPage++;
+                }
+            }
+            else
+            {
+                hasMoreGames = false;
+            }
+        }
+        
+        appInstance.dataBus.gameCache[currentSystem.Id] = allGamesForSystem;
+        appInstance.cacheManager?.SaveCache(appInstance.dataBus.systems, appInstance.dataBus.gameCache);
+        
+        games = appInstance.dataBus.gameCache;
+        ApplyFiltersAndRefresh();
+        
+        if (downloadProgressBar != null) downloadProgressBar.Value = 100;
+        if (downloadProgressLabel != null) downloadProgressLabel.Text = "Refresh complete!";
+        
+        await ToSignal(GetTree().CreateTimer(1.5f), "timeout");
+        if (downloadProgressPopup != null) downloadProgressPopup.Visible = false;
+        gameList?.GrabFocus();
+    }
+
     private void OnQuitPressed()
     {
         GetTree().Quit();
@@ -251,6 +371,27 @@ public partial class MainScene : Control
     
     public override void _Input(InputEvent @event)
     {
+        if (changelogPopup != null && changelogPopup.Visible)
+        {
+            GetViewport().SetInputAsHandled();
+            if (@event.IsActionPressed("ui_accept"))
+            {
+                changelogPopup.Visible = false;
+                if (!string.IsNullOrEmpty(_pendingUpdateVersion))
+                {
+                    if (downloadProgressPopup != null) downloadProgressPopup.Visible = true;
+                    if (downloadProgressLabel != null) downloadProgressLabel.Text = "Downloading...";
+                    if (downloadProgressBar != null) downloadProgressBar.Value = 0;
+                    _ = _appUpdater.DownloadUpdateAsync(_pendingUpdateVersion);
+                }
+            }
+            else if (@event.IsActionPressed("ui_cancel") || @event.IsActionPressed("Back"))
+            {
+                changelogPopup.Visible = false;
+            }
+            return;
+        }
+
         if (appInstance.emulatorManager != null && appInstance.emulatorManager.IsEmulatorRunning)
         {
             GetViewport().SetInputAsHandled();
@@ -583,6 +724,7 @@ public partial class MainScene : Control
         {
             gameList.Connect("ItemSelected", Callable.From<long>(OnGameSelected));
             gameList.Connect("ItemFocused", Callable.From<long>(OnGameSelected));
+            gameList.Connect("JumpSectionRequested", Callable.From<int>(OnJumpSectionRequested));
         }
     }
     
@@ -1178,6 +1320,86 @@ public partial class MainScene : Control
         else
         {
             DownloadGame(currentlySelectedGame);
+        }
+    }
+
+    private void OnJumpSectionRequested(int direction)
+    {
+        if (currentlyShownGames == null || currentlyShownGames.Count == 0 || gameList == null) return;
+        
+        int currentIndex = (int)gameList.Get("SelectedIndex");
+        if (currentIndex < 0 || currentIndex >= currentlyShownGames.Count) return;
+
+        char GetSectionChar(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return '#';
+            
+            string sortName = name.TrimStart();
+            string[] articles = { "The ", "A ", "An " };
+            foreach (string article in articles)
+            {
+                if (sortName.StartsWith(article, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    sortName = sortName.Substring(article.Length).TrimStart();
+                    break;
+                }
+            }
+            
+            if (string.IsNullOrEmpty(sortName)) return '#';
+            char first = char.ToUpper(sortName[0]);
+            return char.IsLetter(first) ? first : '#';
+        }
+        
+        char currentLetter = GetSectionChar(currentlyShownGames[currentIndex].Name);
+        int targetIndex = currentIndex;
+        
+        if (direction > 0) // next section
+        {
+            for (int i = currentIndex + 1; i < currentlyShownGames.Count; i++)
+            {
+                char letter = GetSectionChar(currentlyShownGames[i].Name);
+                if (letter != currentLetter)
+                {
+                    targetIndex = i;
+                    break;
+                }
+            }
+        }
+        else // previous section
+        {
+            char targetLetter = '\0';
+            for (int i = currentIndex - 1; i >= 0; i--)
+            {
+                char letter = GetSectionChar(currentlyShownGames[i].Name);
+                if (letter != currentLetter)
+                {
+                    targetLetter = letter;
+                    break;
+                }
+            }
+            
+            if (targetLetter != '\0')
+            {
+                for (int i = 0; i <= currentIndex; i++)
+                {
+                    if (GetSectionChar(currentlyShownGames[i].Name) == targetLetter)
+                    {
+                        targetIndex = i;
+                        break;
+                    }
+                }
+            }
+            else 
+            {
+                targetIndex = 0;
+            }
+        }
+
+        if (targetIndex != currentIndex)
+        {
+            gameList.Set("SelectedIndex", targetIndex);
+            gameList.Call("UpdateLayout", true);
+            OnGameSelected(targetIndex);
         }
     }
     

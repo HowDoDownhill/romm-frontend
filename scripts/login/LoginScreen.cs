@@ -33,11 +33,6 @@ public partial class LoginScreen : Control
         rommUserInput.Text = appInstance.configManager.RomMUsername;
         rommPasswordInput.Text = appInstance.configManager.RomMPassword;
         rommApiKeyInput.Text = appInstance.configManager.RomMApiKey;
-        
-        GD.Print(appInstance.configManager.RomMHost);
-        GD.Print(appInstance.configManager.RomMUsername);
-        GD.Print(appInstance.configManager.RomMPassword);
-        GD.Print(appInstance.configManager.RomMApiKey);
     }
 
     private async void AttemptAutoLogin()

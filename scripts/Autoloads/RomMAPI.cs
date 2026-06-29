@@ -74,7 +74,7 @@ public partial class RomMAPI : Node
             if (tokenResponse.IsSuccessStatusCode)
             {
                 string tokenResponseBody = await tokenResponse.Content.ReadAsStringAsync();
-                var deserializedTokenResponse = JsonSerializer.Deserialize<Dictionary<string, string>>(tokenResponseBody);
+                var deserializedTokenResponse = JsonSerializer.Deserialize(tokenResponseBody, RommJsonContext.Default.DictionaryStringString);
 
                 if (deserializedTokenResponse != null && deserializedTokenResponse.ContainsKey("access_token"))
                 {
@@ -117,8 +117,7 @@ public partial class RomMAPI : Node
             if (platformsResponse.IsSuccessStatusCode)
             {
                 string platformsResponseBody = await platformsResponse.Content.ReadAsStringAsync();
-                var deserializationOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                List<GameSystem> allGameSystems = JsonSerializer.Deserialize<List<GameSystem>>(platformsResponseBody, deserializationOptions);
+                List<GameSystem> allGameSystems = JsonSerializer.Deserialize(platformsResponseBody, RommJsonContext.Default.ListGameSystem);
 
                 if (allGameSystems != null)
                 {
@@ -150,14 +149,54 @@ public partial class RomMAPI : Node
         try
         {
             int queryOffset = (pageNumber - 1) * pageSize;
-            string gamesRequestUrl = $"{apiHostUrl}/api/roms?platform_ids={gameSystem.Id}&limit={pageSize}&offset={queryOffset}&include=path_cover_3d,path_cover_large,files";
+            string gamesRequestUrl = $"{apiHostUrl}/api/roms?platform_ids={gameSystem.Id}&limit={pageSize}&offset={queryOffset}&include=path_cover_3d,path_cover_large&with_files=true";
             HttpResponseMessage gamesResponse = await httpClient.GetAsync(gamesRequestUrl);
             string gamesResponseBody = await gamesResponse.Content.ReadAsStringAsync();
 
             if (gamesResponse.IsSuccessStatusCode)
             {
-                var deserializationOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                return JsonSerializer.Deserialize<GameResponse>(gamesResponseBody, deserializationOptions);
+                var response = JsonSerializer.Deserialize(gamesResponseBody, RommJsonContext.Default.GameResponse);
+                
+                // ULTIMATE AOT FALLBACK: If Godot's IL Linker still somehow strips the List<RomFile> 
+                // despite the Source Generator, we manually parse the files array from the raw JSON tree.
+                try
+                {
+                    using var doc = JsonDocument.Parse(gamesResponseBody);
+                    if (doc.RootElement.TryGetProperty("items", out var itemsElement) && itemsElement.ValueKind == JsonValueKind.Array)
+                    {
+                        int i = 0;
+                        foreach (var itemElement in itemsElement.EnumerateArray())
+                        {
+                            if (i >= response.Games.Count) break;
+
+                            if (itemElement.TryGetProperty("files", out var filesElement) && filesElement.ValueKind == JsonValueKind.Array)
+                            {
+                                var filesList = new List<RomFile>();
+                                foreach (var fileElement in filesElement.EnumerateArray())
+                                {
+                                    var romFile = new RomFile();
+                                    if (fileElement.TryGetProperty("id", out var idElem) && idElem.ValueKind == JsonValueKind.Number) 
+                                        romFile.Id = idElem.GetInt32();
+                                    if (fileElement.TryGetProperty("file_name", out var fnElem) && fnElem.ValueKind == JsonValueKind.String) 
+                                        romFile.FileName = fnElem.GetString();
+                                    if (fileElement.TryGetProperty("full_path", out var fpElem) && fpElem.ValueKind == JsonValueKind.String) 
+                                        romFile.FullPath = fpElem.GetString();
+                                        
+                                    filesList.Add(romFile);
+                                }
+                                // Overwrite the files with our manually parsed list
+                                response.Games[i].Files = filesList;
+                            }
+                            i++;
+                        }
+                    }
+                }
+                catch (Exception fallbackEx)
+                {
+                    GD.PrintErr($"Fallback manual JSON parsing failed: {fallbackEx.Message}");
+                }
+
+                return response;
             }
             else
             {
@@ -210,8 +249,7 @@ public partial class RomMAPI : Node
             if (firmwareResponse.IsSuccessStatusCode)
             {
                 string firmwareResponseBody = await firmwareResponse.Content.ReadAsStringAsync();
-                var deserializationOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                List<Firmware> firmwareList = JsonSerializer.Deserialize<List<Firmware>>(firmwareResponseBody, deserializationOptions);
+                List<Firmware> firmwareList = JsonSerializer.Deserialize(firmwareResponseBody, RommJsonContext.Default.ListFirmware);
 
                 return firmwareList ?? new List<Firmware>();
             }
@@ -247,9 +285,7 @@ public partial class RomMAPI : Node
             if (firmwareResponse.IsSuccessStatusCode)
             {
                 string firmwareResponseBody = await firmwareResponse.Content.ReadAsStringAsync();
-                var deserializationOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-
-                return JsonSerializer.Deserialize<Firmware>(firmwareResponseBody, deserializationOptions);
+                return JsonSerializer.Deserialize(firmwareResponseBody, RommJsonContext.Default.Firmware);
             }
             else
             {
@@ -292,7 +328,7 @@ public partial class RomMAPI : Node
                 await assetResponse.Content.CopyToAsync(destinationFileStream);
                 return true;
             }
-            else
+            else if (assetResponse.StatusCode != System.Net.HttpStatusCode.NotFound)
             {
                 GD.PrintErr($"Failed to download asset {assetUrl}. Status: {assetResponse.StatusCode} {assetResponse.ReasonPhrase}");
             }
@@ -308,15 +344,14 @@ public partial class RomMAPI : Node
     {
         try
         {
-            var json = JsonSerializer.Serialize(payload);
+            var json = JsonSerializer.Serialize(payload, RommJsonContext.Default.SyncNegotiatePayload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var response = await httpClient.PostAsync($"{apiHostUrl}/api/sync/negotiate", content);
             
             if (response.IsSuccessStatusCode)
             {
                 string responseBody = await response.Content.ReadAsStringAsync();
-                var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-                return JsonSerializer.Deserialize<SyncNegotiateResponse>(responseBody, options);
+                return JsonSerializer.Deserialize(responseBody, RommJsonContext.Default.SyncNegotiateResponse);
             }
             else
             {
@@ -334,7 +369,7 @@ public partial class RomMAPI : Node
     {
         try
         {
-            var json = JsonSerializer.Serialize(payload);
+            var json = JsonSerializer.Serialize(payload, RommJsonContext.Default.SyncCompletePayload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var response = await httpClient.PostAsync($"{apiHostUrl}/api/sync/sessions/{sessionId}/complete", content);
             
@@ -386,7 +421,7 @@ public partial class RomMAPI : Node
             if (response.IsSuccessStatusCode)
             {
                 string responseBody = await response.Content.ReadAsStringAsync();
-                return JsonSerializer.Deserialize<JsonElement>(responseBody);
+                return JsonSerializer.Deserialize(responseBody, RommJsonContext.Default.JsonElement);
             }
         }
         catch (Exception ex)
@@ -400,15 +435,15 @@ public partial class RomMAPI : Node
     {
         try
         {
-            var payload = new Dictionary<string, object>
+            var payload = new DevicePayload
             {
-                { "name", "romm-frontend" },
-                { "client", "romm-frontend" },
-                { "platform", OS.GetName().ToLower() },
-                { "sync_mode", "api" },
-                { "allow_existing", true }
+                Name = "romm-frontend",
+                Client = "romm-frontend",
+                Platform = OS.GetName().ToLower(),
+                SyncMode = "api",
+                AllowExisting = true
             };
-            var json = JsonSerializer.Serialize(payload);
+            var json = JsonSerializer.Serialize(payload, RommJsonContext.Default.DevicePayload);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var response = await httpClient.PostAsync($"{apiHostUrl}/api/devices", content);
 
@@ -434,3 +469,5 @@ public partial class RomMAPI : Node
         return null;
     }
 }
+
+

@@ -2,6 +2,7 @@ using Godot;
 using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
+using System.Linq;
 using FileAccess = Godot.FileAccess;
 
 public partial class CacheManager : Node
@@ -35,8 +36,8 @@ public partial class CacheManager : Node
 
     public void SaveCache(List<GameSystem> gameSystems, Dictionary<int, List<Game>> gameCacheBySystemId)
     {
-        WriteJsonToFile(systemsCacheFilePath, gameSystems);
-        WriteJsonToFile(gamesCacheFilePath, gameCacheBySystemId);
+        WriteJsonToFile(systemsCacheFilePath, gameSystems, RommJsonContext.Default.ListGameSystem);
+        WriteJsonToFile(gamesCacheFilePath, gameCacheBySystemId, RommJsonContext.Default.DictionaryInt32ListGame);
     }
 
     public void RebuildGameCache()
@@ -49,18 +50,49 @@ public partial class CacheManager : Node
 
     public (List<GameSystem> systems, Dictionary<int, List<Game>> games) LoadCache()
     {
-        var cachedSystems = ReadJsonFromFile<List<GameSystem>>(systemsCacheFilePath);
-        var cachedGames = ReadJsonFromFile<Dictionary<int, List<Game>>>(gamesCacheFilePath);
+        var cachedSystems = ReadJsonFromFile(systemsCacheFilePath, RommJsonContext.Default.ListGameSystem);
+        var cachedGames = ReadJsonFromFile(gamesCacheFilePath, RommJsonContext.Default.DictionaryInt32ListGame);
 
         if (cachedSystems != null && cachedGames != null)
         {
-            return (cachedSystems, cachedGames);
+            // Validate that the cache isn't from a previous broken export
+            // The broken export could have serialized Files as null OR as an empty list for EVERY game.
+            bool isCacheValid = true;
+            bool foundAnyGameWithFiles = false;
+
+            foreach (var gamesList in cachedGames.Values)
+            {
+                foreach(var game in gamesList)
+                {
+                    if (game.Files != null && game.Files.Count > 0)
+                    {
+                        foundAnyGameWithFiles = true;
+                        break;
+                    }
+                }
+                if (foundAnyGameWithFiles) break;
+            }
+
+            // If we have games, but literally zero files across the entire cache, it's a broken cache from the old export.
+            if (cachedGames.Values.Any(list => list.Count > 0) && !foundAnyGameWithFiles)
+            {
+                isCacheValid = false;
+            }
+
+            if (isCacheValid)
+            {
+                return (cachedSystems, cachedGames);
+            }
+            else 
+            {
+                GD.Print("Cache invalid (missing Files). Rebuilding cache...");
+            }
         }
 
         return (null, null);
     }
 
-    private void WriteJsonToFile<T>(string filePath, T dataToSerialize)
+    private void WriteJsonToFile<T>(string filePath, T dataToSerialize, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo)
     {
         using var fileHandle = FileAccess.Open(filePath, FileAccess.ModeFlags.Write);
         if (fileHandle == null)
@@ -69,11 +101,11 @@ public partial class CacheManager : Node
             return;
         }
 
-        string serializedJsonContent = JsonSerializer.Serialize(dataToSerialize);
+        string serializedJsonContent = JsonSerializer.Serialize(dataToSerialize, typeInfo);
         fileHandle.StoreString(serializedJsonContent);
     }
 
-    private T ReadJsonFromFile<T>(string filePath) where T : class
+    private T ReadJsonFromFile<T>(string filePath, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo) where T : class
     {
         if (!FileAccess.FileExists(filePath))
         {
@@ -88,6 +120,6 @@ public partial class CacheManager : Node
         }
 
         string fileJsonContent = fileHandle.GetAsText();
-        return JsonSerializer.Deserialize<T>(fileJsonContent);
+        return JsonSerializer.Deserialize(fileJsonContent, typeInfo);
     }
 }

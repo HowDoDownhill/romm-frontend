@@ -26,6 +26,7 @@ DownloadManager="*uid://cahae8cxkj01b"
 EmulatorManager="*uid://mc0jjiebfh7k"
 AssetManager="*res://scripts/autoloads/AssetManager.cs"
 SaveSyncManager="*res://scripts/autoloads/SaveSyncManager.cs"
+AppUpdater="*res://scripts/autoloads/AppUpdater.cs"
 ControllerIcons="*uid://cbgqhfjlifwga"
 
 [display]

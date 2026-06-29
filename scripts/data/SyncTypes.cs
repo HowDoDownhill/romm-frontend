@@ -26,6 +26,24 @@ public class ClientSaveState
     public long FileSizeBytes { get; set; }
 }
 
+public class DevicePayload
+{
+    [JsonPropertyName("name")]
+    public string Name { get; set; }
+
+    [JsonPropertyName("client")]
+    public string Client { get; set; }
+
+    [JsonPropertyName("platform")]
+    public string Platform { get; set; }
+
+    [JsonPropertyName("sync_mode")]
+    public string SyncMode { get; set; }
+
+    [JsonPropertyName("allow_existing")]
+    public bool AllowExisting { get; set; }
+}
+
 public class SyncNegotiatePayload
 {
     [JsonPropertyName("device_id")]

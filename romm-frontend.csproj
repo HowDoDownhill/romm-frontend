@@ -5,6 +5,10 @@
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <RootNamespace>rommfrontend</RootNamespace>
     <PublishTrimmed>false</PublishTrimmed>
+    <IsTrimmable>false</IsTrimmable>
+    <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
+    <SuppressTrimAnalysisWarnings>true</SuppressTrimAnalysisWarnings>
+    <PublishAot>false</PublishAot>
   </PropertyGroup>
   <ItemGroup>
     <Content Include="assets\platforms\1292-advanced-programmable-video-system.ico" />
