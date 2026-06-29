@@ -19,6 +19,10 @@ export_credentials.cfg
 data_*/
 mono_crash.*.json
 .idea/
+*.sln.DotSettings.user
+*.csproj.old
+test_*.png
+test_*.png.import
 
 /build/
 /bios/
