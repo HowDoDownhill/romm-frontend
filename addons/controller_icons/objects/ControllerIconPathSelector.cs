@@ -65,9 +65,12 @@ public partial class ControllerIconPathSelector : PanelContainer
 		// then this signal may get called even before _Ready() is called
 		// Therefore we need to check that stuff has been setup first.
 		// Ideally: Don't touch the tab container.
-		if( nTabContainer == null || EditorInterface == null ) return;
+		if( nTabContainer == null || EditorInterface == null )
+        {
+            return;
+        }
 
-		if( nTabContainer.GetCurrentTabControl() == nInputAction )
+        if ( nTabContainer.GetCurrentTabControl() == nInputAction )
 		{
 			if( !InputActionPopulated )
 			{

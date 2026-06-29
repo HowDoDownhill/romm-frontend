@@ -74,8 +74,10 @@ public partial class ControllerIconEditorInspector : EditorInspectorPlugin
 		AddCustomControl(preview.get_root());
 
 		if( obj is ControllerIconTexture icon )
-			preview.Texture = icon;
-	}
+        {
+            preview.Texture = icon;
+        }
+    }
 
 	public override bool _ParseProperty( GodotObject obj, Variant.Type type, string name, PropertyHint hint_type, string hint_string, PropertyUsageFlags usage_flags, bool wide )
 	{

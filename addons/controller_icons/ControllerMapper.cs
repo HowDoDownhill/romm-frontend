@@ -41,42 +41,74 @@ public partial class ControllerMapper : RefCounted
 
 		// If the requested joypad is not on the connected joypad list, try using the last known connected joypad
 		if( !available.Contains( device ) )
-			device = ControllerIcons.CI.LastController;
+        {
+            device = ControllerIcons.CI.LastController;
+        }
 
-		// If that fails too, then use whatever joypad we have connected right now
-		if( !available.Contains( device ) )
-			device = available.First();
+        // If that fails too, then use whatever joypad we have connected right now
+        if ( !available.Contains( device ) )
+        {
+            device = available.First();
+        }
 
-		string controllerName = Input.GetJoyName(device);
+        string controllerName = Input.GetJoyName(device);
 		if( controllerName.Contains("Luna Controller") )
-			return ControllerSettings.Devices.LUNA;
-		else if( controllerName.Contains("PS3 Controller") )
-			return ControllerSettings.Devices.PS3;
-		else if( controllerName.Contains("PS4 Controller") || controllerName.Contains("DUALSHOCK 4") )
-			return ControllerSettings.Devices.PS4;
-		else if( controllerName.Contains("PS5 Controller") || controllerName.Contains("DualSense") )
-			return ControllerSettings.Devices.PS5;
-		else if( controllerName.Contains("Stadia Controller") )
-			return ControllerSettings.Devices.STADIA;
-		else if( controllerName.Contains("Steam Controller") )
-			return ControllerSettings.Devices.STEAM;
-		else if( controllerName.Contains("Switch Controller") || controllerName.Contains("Switch Pro Controller") )
-			return ControllerSettings.Devices.SWITCH;
-		else if( controllerName.Contains("Joy-Con") )
-			return ControllerSettings.Devices.JOYCON;
-		else if( controllerName.Contains("Xbox 360 Controller") )
-			return ControllerSettings.Devices.XBOX360;
-		else if( controllerName.Contains("Xbox One") || controllerName.Contains("X-Box One") || controllerName.Contains("Xbox Wireless Controller") )
-			return ControllerSettings.Devices.XBOXONE;
-		else if( controllerName.Contains("Xbox Series") )
-			return ControllerSettings.Devices.XBOXSERIES;
-		else if( controllerName.Contains("Steam Deck") || controllerName.Contains("Steam Virtual Gamepad") )
-			return ControllerSettings.Devices.STEAM_DECK;
-		else if( controllerName.Contains("OUYA Controller") )
-			return ControllerSettings.Devices.OUYA;
-		else
-			return fallback;
-	}
+        {
+            return ControllerSettings.Devices.LUNA;
+        }
+        else if( controllerName.Contains("PS3 Controller") )
+        {
+            return ControllerSettings.Devices.PS3;
+        }
+        else if( controllerName.Contains("PS4 Controller") || controllerName.Contains("DUALSHOCK 4") )
+        {
+            return ControllerSettings.Devices.PS4;
+        }
+        else if( controllerName.Contains("PS5 Controller") || controllerName.Contains("DualSense") )
+        {
+            return ControllerSettings.Devices.PS5;
+        }
+        else if( controllerName.Contains("Stadia Controller") )
+        {
+            return ControllerSettings.Devices.STADIA;
+        }
+        else if( controllerName.Contains("Steam Controller") )
+        {
+            return ControllerSettings.Devices.STEAM;
+        }
+        else if( controllerName.Contains("Switch Controller") || controllerName.Contains("Switch Pro Controller") )
+        {
+            return ControllerSettings.Devices.SWITCH;
+        }
+        else if( controllerName.Contains("Joy-Con") )
+        {
+            return ControllerSettings.Devices.JOYCON;
+        }
+        else if( controllerName.Contains("Xbox 360 Controller") )
+        {
+            return ControllerSettings.Devices.XBOX360;
+        }
+        else if( controllerName.Contains("Xbox One") || controllerName.Contains("X-Box One") || controllerName.Contains("Xbox Wireless Controller") )
+        {
+            return ControllerSettings.Devices.XBOXONE;
+        }
+        else if( controllerName.Contains("Xbox Series") )
+        {
+            return ControllerSettings.Devices.XBOXSERIES;
+        }
+        else if( controllerName.Contains("Steam Deck") || controllerName.Contains("Steam Virtual Gamepad") )
+        {
+            return ControllerSettings.Devices.STEAM_DECK;
+        }
+        else if( controllerName.Contains("OUYA Controller") )
+        {
+            return ControllerSettings.Devices.OUYA;
+        }
+        else
+        {
+            return fallback;
+        }
+    }
 
 
 	public string ConvertJoypadToLuna( string path )

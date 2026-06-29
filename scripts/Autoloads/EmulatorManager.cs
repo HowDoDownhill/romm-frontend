@@ -13,6 +13,7 @@ using DirAccess = Godot.DirAccess;
 public interface IConfigurationUpdater
 {
     bool CanHandle(string filePath);
+
     void UpdateValue(string filePath, string section, string key, string stringValue, object rawValue);
 }
 
@@ -53,27 +54,33 @@ public class IniConfigurationUpdater : IConfigurationUpdater
                 isInsideTargetSection = (currentSection == targetSection);
                 updatedConfigurationLines.Add(currentLine);
             }
+
             else if (isInsideTargetSection && !hasUpdatedTargetKey)
             {
                 int equalsIndex = currentLine.IndexOf('=');
+
                 if (equalsIndex != -1)
                 {
                     string keyName = currentLine.Substring(0, equalsIndex).Trim();
+
                     if (keyName == targetKey)
                     {
                         updatedConfigurationLines.Add($"{keyName} = {stringValue}");
                         hasUpdatedTargetKey = true;
                     }
+
                     else
                     {
                         updatedConfigurationLines.Add(currentLine);
                     }
                 }
+
                 else
                 {
                     updatedConfigurationLines.Add(currentLine);
                 }
             }
+
             else
             {
                 updatedConfigurationLines.Add(currentLine);
@@ -85,6 +92,7 @@ public class IniConfigurationUpdater : IConfigurationUpdater
             updatedConfigurationLines.Add($"{targetKey} = {stringValue}");
             hasUpdatedTargetKey = true;
         }
+
         else if (!hasUpdatedTargetKey)
         {
             updatedConfigurationLines.Add("");
@@ -106,12 +114,14 @@ public class JsonConfigurationUpdater : IConfigurationUpdater
     public void UpdateValue(string configurationFilePath, string targetSection, string targetKey, string stringValue, object rawValue)
     {
         string directory = Path.GetDirectoryName(configurationFilePath);
+
         if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
         {
             Directory.CreateDirectory(directory);
         }
 
         JsonNode jsonNode = null;
+
         if (System.IO.File.Exists(configurationFilePath))
         {
             try
@@ -119,6 +129,7 @@ public class JsonConfigurationUpdater : IConfigurationUpdater
                 string json = System.IO.File.ReadAllText(configurationFilePath);
                 jsonNode = JsonNode.Parse(json);
             }
+
             catch { }
         }
 
@@ -128,6 +139,7 @@ public class JsonConfigurationUpdater : IConfigurationUpdater
         }
 
         var jsonObject = jsonNode.AsObject();
+
         if (!jsonObject.ContainsKey(targetSection))
         {
             jsonObject[targetSection] = new JsonObject();
@@ -135,19 +147,47 @@ public class JsonConfigurationUpdater : IConfigurationUpdater
 
         var sectionObject = jsonObject[targetSection].AsObject();
 
-        if (rawValue is bool boolVal) sectionObject[targetKey] = boolVal;
+        if (rawValue is bool boolVal)
+        {
+            sectionObject[targetKey] = boolVal;
+        }
+
         else if (rawValue is string strVal)
         {
-            if (int.TryParse(strVal, out int intVal)) sectionObject[targetKey] = intVal;
-            else sectionObject[targetKey] = strVal;
+            if (int.TryParse(strVal, out int intVal))
+            {
+                sectionObject[targetKey] = intVal;
+            }
+
+            else
+            {
+                sectionObject[targetKey] = strVal;
+            }
         }
+
         else if (rawValue is JsonElement elem)
         {
-            if (elem.ValueKind == JsonValueKind.True) sectionObject[targetKey] = true;
-            else if (elem.ValueKind == JsonValueKind.False) sectionObject[targetKey] = false;
-            else if (elem.ValueKind == JsonValueKind.String) sectionObject[targetKey] = elem.GetString();
-            else if (elem.ValueKind == JsonValueKind.Number) sectionObject[targetKey] = elem.GetDouble();
+            if (elem.ValueKind == JsonValueKind.True)
+            {
+                sectionObject[targetKey] = true;
+            }
+
+            else if (elem.ValueKind == JsonValueKind.False)
+            {
+                sectionObject[targetKey] = false;
+            }
+
+            else if (elem.ValueKind == JsonValueKind.String)
+            {
+                sectionObject[targetKey] = elem.GetString();
+            }
+
+            else if (elem.ValueKind == JsonValueKind.Number)
+            {
+                sectionObject[targetKey] = elem.GetDouble();
+            }
         }
+
         else if (rawValue is JsonArray jsonArray)
         {
             sectionObject[targetKey] = jsonArray;
@@ -177,6 +217,7 @@ public class BmlConfigurationUpdater : IConfigurationUpdater
         string[] lines = System.IO.File.Exists(configurationFilePath) ? System.IO.File.ReadAllLines(configurationFilePath) : new string[0];
         
         var parsedLines = new System.Collections.Generic.List<BmlLine>();
+
         foreach (var line in lines)
         {
             if (string.IsNullOrWhiteSpace(line))
@@ -186,9 +227,14 @@ public class BmlConfigurationUpdater : IConfigurationUpdater
             }
             
             int indent = 0;
-            while (indent < line.Length && line[indent] == ' ') indent++;
-            
+
+            while (indent < line.Length && line[indent] == ' ')
+            {
+                indent++;
+            }
+
             string content = line.Substring(indent);
+
             if (content.StartsWith("//"))
             {
                 parsedLines.Add(new BmlLine { Text = line, IsParsed = false });
@@ -207,7 +253,6 @@ public class BmlConfigurationUpdater : IConfigurationUpdater
         int currentIndent = 0;
         int parentIndent = -1;
 
-        // Traverse sections
         for (int i = 0; i < sectionPath.Length; i++)
         {
             string expectedSection = sectionPath[i];
@@ -216,8 +261,12 @@ public class BmlConfigurationUpdater : IConfigurationUpdater
             for (int j = currentLineIndex; j < parsedLines.Count; j++)
             {
                 var pl = parsedLines[j];
-                if (!pl.IsParsed) continue;
-                
+
+                if (!pl.IsParsed)
+                {
+                    continue;
+                }
+
                 if (pl.Indent <= parentIndent)
                 {
                     break;
@@ -230,6 +279,7 @@ public class BmlConfigurationUpdater : IConfigurationUpdater
                     parentIndent = currentIndent;
                     
                     int childIndent = currentIndent + 2;
+
                     for (int next = currentLineIndex; next < parsedLines.Count; next++)
                     {
                         if (parsedLines[next].IsParsed)
@@ -238,9 +288,11 @@ public class BmlConfigurationUpdater : IConfigurationUpdater
                             {
                                 childIndent = parsedLines[next].Indent;
                             }
+
                             break;
                         }
                     }
+
                     currentIndent = childIndent;
                     break;
                 }
@@ -262,16 +314,22 @@ public class BmlConfigurationUpdater : IConfigurationUpdater
                     parentIndent = currentIndent;
                     currentIndent += 2;
                 }
+
                 break;
             }
         }
         
         bool keyFound = false;
+
         for (int j = currentLineIndex; j < parsedLines.Count; j++)
         {
             var pl = parsedLines[j];
-            if (!pl.IsParsed) continue;
-            
+
+            if (!pl.IsParsed)
+            {
+                continue;
+            }
+
             if (pl.Indent <= parentIndent)
             {
                 break;
@@ -298,12 +356,14 @@ public class BmlConfigurationUpdater : IConfigurationUpdater
         }
         
         var outputLines = new System.Collections.Generic.List<string>();
+
         foreach(var pl in parsedLines)
         {
             outputLines.Add(pl.Text);
         }
         
         string directory = Path.GetDirectoryName(configurationFilePath);
+
         if (!string.IsNullOrEmpty(directory) && !System.IO.Directory.Exists(directory))
         {
             System.IO.Directory.CreateDirectory(directory);
@@ -315,14 +375,17 @@ public class BmlConfigurationUpdater : IConfigurationUpdater
     private int FindInsertPosition(System.Collections.Generic.List<BmlLine> parsedLines, int startIndex, int parentIndent)
     {
         int insertAt = startIndex;
+
         for (int j = startIndex; j < parsedLines.Count; j++)
         {
             if (parsedLines[j].IsParsed && parsedLines[j].Indent <= parentIndent)
             {
                 break;
             }
+
             insertAt = j + 1;
         }
+
         return insertAt;
     }
 }
@@ -446,10 +509,12 @@ public partial class EmulatorManager : Node
         if (activeEmulatorProcess != null && activeEmulatorProcess.HasExited)
         {
             DateTime sessionEnd = DateTime.UtcNow;
+
             if (appInstance.saveSyncManager != null && activeGame != null)
             {
                 _ = appInstance.saveSyncManager.SyncAfterExit(activeGame, activeSessionStart, sessionEnd);
             }
+
             activeEmulatorProcess = null;
             activeGame = null;
         }
@@ -473,6 +538,7 @@ public partial class EmulatorManager : Node
             string mapJsonContent = FileAccess.GetFileAsString(emulatorMapFilePath);
             systemToEmulatorMap = JsonSerializer.Deserialize<Dictionary<string, string>>(mapJsonContent, RommJsonContext.Default.Options);
         }
+
         catch (Exception exception)
         {
             GD.PrintErr($"Failed to load emulator map: {exception.Message}");
@@ -481,7 +547,10 @@ public partial class EmulatorManager : Node
 
     public string GetMappedEmulator(string systemSlug)
     {
-        if (string.IsNullOrEmpty(systemSlug)) return null;
+        if (string.IsNullOrEmpty(systemSlug))
+        {
+            return null;
+        }
 
         if (systemToEmulatorMap.ContainsKey(systemSlug))
         {
@@ -495,51 +564,65 @@ public partial class EmulatorManager : Node
     {
         Dictionary<string, EmulatorMeta> availableEmulators = new Dictionary<string, EmulatorMeta>();
         string installScriptsDirectoryPath = appInstance.configManager.InstallScriptsPath;
-        if (!DirAccess.DirExistsAbsolute(installScriptsDirectoryPath)) return availableEmulators;
+
+        if (!DirAccess.DirExistsAbsolute(installScriptsDirectoryPath))
+        {
+            return availableEmulators;
+        }
 
         using var installScriptsDirectory = DirAccess.Open(installScriptsDirectoryPath);
+
         if (installScriptsDirectory != null)
         {
             installScriptsDirectory.ListDirBegin();
             string directoryEntryName = installScriptsDirectory.GetNext();
+
             while (directoryEntryName != "")
             {
                 if (installScriptsDirectory.CurrentIsDir() && directoryEntryName != "." && directoryEntryName != "..")
                 {
                     string metadataFilePath = installScriptsDirectoryPath.PathJoin(directoryEntryName).PathJoin("meta.json");
+
                     if (FileAccess.FileExists(metadataFilePath))
                     {
                         try
                         {
                             var metadataJsonContent = FileAccess.GetFileAsString(metadataFilePath);
                             var emulatorMetadata = JsonSerializer.Deserialize<EmulatorMeta>(metadataJsonContent, RommJsonContext.Default.Options);
+
                             if (emulatorMetadata != null)
                             {
                                 availableEmulators[directoryEntryName] = emulatorMetadata;
                             }
                         }
+
                         catch (Exception exception)
                         {
                             GD.PrintErr($"Failed to parse meta.json for {directoryEntryName}: {exception.Message}");
                         }
                     }
                 }
+
                 directoryEntryName = installScriptsDirectory.GetNext();
             }
         }
+
         return availableEmulators;
     }
 
     public void SaveEmulatorSetting(string emulatorSlug, string settingId, object settingValue)
     {
         string emulatorDirectoryPath = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorSlug);
+
         if (!System.IO.Directory.Exists(emulatorDirectoryPath))
         {
             System.IO.Directory.CreateDirectory(emulatorDirectoryPath);
         }
+
         string userSettingsFilePath = Path.Combine(emulatorDirectoryPath, "user_settings.json");
 
         Dictionary<string, object> userSettings = new Dictionary<string, object>();
+
         if (System.IO.File.Exists(userSettingsFilePath))
         {
             try
@@ -547,6 +630,7 @@ public partial class EmulatorManager : Node
                 string existingSettingsJson = System.IO.File.ReadAllText(userSettingsFilePath);
                 userSettings = JsonSerializer.Deserialize<Dictionary<string, object>>(existingSettingsJson) ?? new Dictionary<string, object>();
             }
+
             catch {}
         }
 
@@ -554,37 +638,56 @@ public partial class EmulatorManager : Node
         System.IO.File.WriteAllText(userSettingsFilePath, JsonSerializer.Serialize(userSettings, new JsonSerializerOptions { WriteIndented = true }));
 
         EmulatorMeta emulatorMetadata = LoadEmulatorMetadataFromDisk(emulatorSlug);
+
         if (emulatorMetadata != null && emulatorMetadata.SettingsFields != null)
         {
             EmulatorSettingField targetSettingField = emulatorMetadata.SettingsFields.Find(field => field.Id == settingId);
+
             if (targetSettingField != null && !string.IsNullOrEmpty(targetSettingField.ConfigFileRelativePath) && !string.IsNullOrEmpty(targetSettingField.ConfigSection) && !string.IsNullOrEmpty(targetSettingField.ConfigKey))
             {
                 string currentOperatingSystem = OS.GetName().ToLower();
+
                 if (emulatorMetadata.EmulatorDirName != null && emulatorMetadata.EmulatorDirName.ContainsKey(currentOperatingSystem))
                 {
                     string targetEmulatorInstallDirectory = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorMetadata.EmulatorDirName[currentOperatingSystem]);
                     string configurationFilePath = Path.Combine(targetEmulatorInstallDirectory, targetSettingField.ConfigFileRelativePath);
 
                     string stringValue = "";
+
                     if (settingValue is bool booleanValue)
                     {
                         stringValue = booleanValue ? "true" : "false";
                     }
+
                     else if (settingValue is string rawStringValue)
                     {
                         stringValue = rawStringValue;
                     }
+
                     else if (settingValue is JsonElement jsonElement)
                     {
-                        if (jsonElement.ValueKind == JsonValueKind.True) stringValue = "true";
-                        else if (jsonElement.ValueKind == JsonValueKind.False) stringValue = "false";
-                        else if (jsonElement.ValueKind == JsonValueKind.String) stringValue = jsonElement.GetString();
+                        if (jsonElement.ValueKind == JsonValueKind.True)
+                        {
+                            stringValue = "true";
+                        }
+
+                        else if (jsonElement.ValueKind == JsonValueKind.False)
+                        {
+                            stringValue = "false";
+                        }
+
+                        else if (jsonElement.ValueKind == JsonValueKind.String)
+                        {
+                            stringValue = jsonElement.GetString();
+                        }
                     }
                     
                     var updaters = new IConfigurationUpdater[]
                     {
                         new JsonConfigurationUpdater(),
+
                         new IniConfigurationUpdater(),
+
                         new BmlConfigurationUpdater()
                     };
 
@@ -606,6 +709,7 @@ public partial class EmulatorManager : Node
     public Dictionary<string, JsonElement> LoadEmulatorSettings(string emulatorSlug)
     {
         string userSettingsFilePath = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorSlug, "user_settings.json");
+
         if (System.IO.File.Exists(userSettingsFilePath))
         {
             try
@@ -613,14 +717,17 @@ public partial class EmulatorManager : Node
                 string settingsJsonContent = System.IO.File.ReadAllText(userSettingsFilePath);
                 return JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(settingsJsonContent, RommJsonContext.Default.Options) ?? new Dictionary<string, JsonElement>();
             }
+
             catch {}
         }
+
         return new Dictionary<string, JsonElement>();
     }
 
     public EmulatorMeta LoadEmulatorMetadataFromDisk(string emulatorName)
     {
         string metadataFilePath = appInstance.configManager.InstallScriptsPath.PathJoin(emulatorName).PathJoin("meta.json");
+
         if (!FileAccess.FileExists(metadataFilePath))
         {
             return null;
@@ -631,6 +738,7 @@ public partial class EmulatorManager : Node
             var metadataJsonContent = FileAccess.GetFileAsString(metadataFilePath);
             return JsonSerializer.Deserialize<EmulatorMeta>(metadataJsonContent, RommJsonContext.Default.Options);
         }
+
         catch (Exception exception)
         {
             GD.PrintErr($"Failed to load emulator metadata for {emulatorName}: {exception.Message}");
@@ -640,10 +748,17 @@ public partial class EmulatorManager : Node
 
     public bool IsEmulatorInstalled(string emulatorName)
     {
-        if (string.IsNullOrEmpty(emulatorName)) return false;
+        if (string.IsNullOrEmpty(emulatorName))
+        {
+            return false;
+        }
 
         var emulatorMetadata = LoadEmulatorMetadataFromDisk(emulatorName);
-        if (emulatorMetadata == null) return false;
+
+        if (emulatorMetadata == null)
+        {
+            return false;
+        }
 
         string currentOperatingSystem = OS.GetName().ToLower();
 
@@ -663,6 +778,7 @@ public partial class EmulatorManager : Node
     public async Task InstallEmulator(string emulatorName)
     {
         var emulatorMetadata = LoadEmulatorMetadataFromDisk(emulatorName);
+
         if (emulatorMetadata == null)
         {
             GD.PrintErr($"Emulator recipe not found for: {emulatorName}");
@@ -680,6 +796,7 @@ public partial class EmulatorManager : Node
             {
                 GD.Print($"Successfully installed {emulatorName}.");
             }
+
             else
             {
                 GD.PrintErr($"Failed to install {emulatorName}.");
@@ -687,6 +804,7 @@ public partial class EmulatorManager : Node
 
             EmitSignal(SignalName.EmulatorInstallationCompleted, emulatorName, installationSucceeded);
         }
+
         catch (Exception exception)
         {
             GD.PrintErr($"Exception during install: {exception.Message}");
@@ -696,7 +814,10 @@ public partial class EmulatorManager : Node
 
     private string ResolveFirmwarePath(GameSystem gameSystem)
     {
-        if (gameSystem == null) return null;
+        if (gameSystem == null)
+        {
+            return null;
+        }
 
         if (!string.IsNullOrEmpty(gameSystem.PrefferedFirmware))
         {
@@ -704,9 +825,11 @@ public partial class EmulatorManager : Node
         }
 
         string biosDirectoryPath = appInstance.configManager.BiosPath.PathJoin(gameSystem.Slug);
+
         if (DirAccess.DirExistsAbsolute(biosDirectoryPath))
         {
             var biosFiles = DirAccess.GetFilesAt(biosDirectoryPath);
+
             if (biosFiles.Length > 0)
             {
                 return Path.GetFullPath(biosDirectoryPath.PathJoin(biosFiles[0]));
@@ -718,7 +841,10 @@ public partial class EmulatorManager : Node
 
     private void CopyBiosFilesToEmulatorDirectory(string biosSourceDirectoryPath, string emulatorBiosDirectoryPath)
     {
-        if (!DirAccess.DirExistsAbsolute(biosSourceDirectoryPath)) return;
+        if (!DirAccess.DirExistsAbsolute(biosSourceDirectoryPath))
+        {
+            return;
+        }
 
         if (!DirAccess.DirExistsAbsolute(emulatorBiosDirectoryPath))
         {
@@ -726,10 +852,12 @@ public partial class EmulatorManager : Node
         }
 
         var biosFileNames = DirAccess.GetFilesAt(biosSourceDirectoryPath);
+
         foreach (var biosFileName in biosFileNames)
         {
             string sourceFilePath = Path.Combine(biosSourceDirectoryPath, biosFileName);
             string destinationFilePath = Path.Combine(emulatorBiosDirectoryPath, biosFileName);
+
             if (!Godot.FileAccess.FileExists(destinationFilePath))
             {
                 System.IO.File.Copy(sourceFilePath, destinationFilePath, true);
@@ -746,30 +874,55 @@ public partial class EmulatorManager : Node
 
     private string AppendDynamicSettingsToArguments(string launchArguments, string emulatorName, EmulatorMeta emulatorMetadata)
     {
-        if (emulatorMetadata.SettingsFields == null) return launchArguments;
+        if (emulatorMetadata.SettingsFields == null)
+        {
+            return launchArguments;
+        }
 
         var savedUserSettings = LoadEmulatorSettings(emulatorName);
+
         foreach (var settingField in emulatorMetadata.SettingsFields)
         {
-            if (string.IsNullOrEmpty(settingField.Id)) continue;
+            if (string.IsNullOrEmpty(settingField.Id))
+            {
+                continue;
+            }
 
             bool hasUserOverride = savedUserSettings.TryGetValue(settingField.Id, out JsonElement settingElement);
 
             if (settingField.Type == "boolean")
             {
                 bool booleanSettingValue = settingField.DefaultValueBool;
-                if (hasUserOverride && settingElement.ValueKind == JsonValueKind.True) booleanSettingValue = true;
-                if (hasUserOverride && settingElement.ValueKind == JsonValueKind.False) booleanSettingValue = false;
+
+                if (hasUserOverride && settingElement.ValueKind == JsonValueKind.True)
+                {
+                    booleanSettingValue = true;
+                }
+
+                if (hasUserOverride && settingElement.ValueKind == JsonValueKind.False)
+                {
+                    booleanSettingValue = false;
+                }
 
                 if (booleanSettingValue && !string.IsNullOrEmpty(settingField.LaunchArgTrue))
+                {
                     launchArguments += " " + settingField.LaunchArgTrue;
+                }
+
                 else if (!booleanSettingValue && !string.IsNullOrEmpty(settingField.LaunchArgFalse))
+                {
                     launchArguments += " " + settingField.LaunchArgFalse;
+                }
             }
+
             else if (settingField.Type == "dropdown" || settingField.Type == "string")
             {
                 string stringSettingValue = settingField.DefaultValueString;
-                if (hasUserOverride && settingElement.ValueKind == JsonValueKind.String) stringSettingValue = settingElement.GetString();
+
+                if (hasUserOverride && settingElement.ValueKind == JsonValueKind.String)
+                {
+                    stringSettingValue = settingElement.GetString();
+                }
 
                 if (!string.IsNullOrEmpty(stringSettingValue) && !string.IsNullOrEmpty(settingField.LaunchArgFormat))
                 {
@@ -797,6 +950,7 @@ public partial class EmulatorManager : Node
                 CopyBiosFilesToEmulatorDirectory(biosSourceDirectoryPath, emulatorBiosDirectoryPath);
             }
         }
+
         else
         {
             launchArguments = StripBiosPathPlaceholderFromArguments(launchArguments);
@@ -834,6 +988,7 @@ public partial class EmulatorManager : Node
         }
 
         string mappedEmulatorName = GetMappedEmulator(game.System.Slug);
+
         if (string.IsNullOrEmpty(mappedEmulatorName))
         {
             GD.PrintErr($"No emulator mapped for system: {game.System.Name} ({game.System.Slug})");
@@ -841,6 +996,7 @@ public partial class EmulatorManager : Node
         }
 
         var emulatorMetadata = LoadEmulatorMetadataFromDisk(mappedEmulatorName);
+
         if (emulatorMetadata == null)
         {
             GD.PrintErr($"Meta file not found for emulator: {mappedEmulatorName}");
@@ -856,6 +1012,8 @@ public partial class EmulatorManager : Node
                 GD.PrintErr("EmulatorDirName is missing or does not contain key for the current OS.");
                 return;
             }
+
+
             if (emulatorMetadata.ExecutableName == null || !emulatorMetadata.ExecutableName.ContainsKey(currentOperatingSystem))
             {
                 GD.PrintErr("ExecutableName is missing or does not contain key for the current OS.");
@@ -871,10 +1029,12 @@ public partial class EmulatorManager : Node
                 GD.PrintErr("Game has no files.");
                 return;
             }
+
             string romFileName = game.Files[0].FileName;
             string fullRomPath = Path.GetFullPath(Path.Combine(appInstance.configManager.RomsPath, game.System.Slug, romFileName));
 
             string launchArguments = emulatorMetadata.LaunchArgsWithGame;
+
             if (string.IsNullOrEmpty(launchArguments))
             {
                 GD.PrintErr("LaunchArgsWithGame is not defined in meta.json.");
@@ -894,6 +1054,7 @@ public partial class EmulatorManager : Node
                     if (settingField.Type == "hidden" && !string.IsNullOrEmpty(settingField.ConfigFileRelativePath) && !string.IsNullOrEmpty(settingField.ConfigSection) && !string.IsNullOrEmpty(settingField.ConfigKey))
                     {
                         string stringValue = settingField.DefaultValueString;
+
                         if (stringValue != null && stringValue.Contains("{game_id}"))
                         {
                             stringValue = stringValue.Replace("{game_id}", game.Id.ToString());
@@ -901,6 +1062,7 @@ public partial class EmulatorManager : Node
 
                         string configFilePath = Path.Combine(emulatorInstallDirectory, settingField.ConfigFileRelativePath);
                         var updaters = new IConfigurationUpdater[] { new JsonConfigurationUpdater(), new IniConfigurationUpdater(), new BmlConfigurationUpdater() };
+
                         foreach (var updater in updaters)
                         {
                             if (updater.CanHandle(configFilePath))
@@ -914,23 +1076,27 @@ public partial class EmulatorManager : Node
             }
 
             DateTime sessionStart = DateTime.UtcNow;
+
             if (appInstance.saveSyncManager != null)
             {
                 await appInstance.saveSyncManager.SyncBeforeLaunch(game);
             }
 
             Process emulatorProcess = BuildAndStartEmulatorProcess(fullExecutablePath, launchArguments, emulatorInstallDirectory);
+
             if (emulatorProcess != null)
             {
                 activeEmulatorProcess = emulatorProcess;
                 activeGame = game;
                 activeSessionStart = sessionStart;
             }
+
             else
             {
                 GD.PrintErr("Failed to start emulator process. Process.Start returned null.");
             }
         }
+
         catch (Exception exception)
         {
             GD.PrintErr($"An exception occurred while launching the emulator: {exception.Message}");
@@ -941,10 +1107,12 @@ public partial class EmulatorManager : Node
     public string GetEmulatorLaunchArgs(string emulatorName)
     {
         var availableEmulators = GetAllAvailableEmulators();
+
         if (availableEmulators.TryGetValue(emulatorName, out EmulatorMeta emulatorMetadata))
         {
             return emulatorMetadata.LaunchArgsWithoutGame;
         }
+
         return "";
     }
 
@@ -956,6 +1124,7 @@ public partial class EmulatorManager : Node
             {
                 return true;
             }
+
             return false;
         }
     }
@@ -965,12 +1134,13 @@ public partial class EmulatorManager : Node
         if (activeEmulatorProcess != null && !activeEmulatorProcess.HasExited)
         {
             activeEmulatorProcess.CloseMainWindow();
+
             if (!activeEmulatorProcess.WaitForExit(5000))
             {
                 activeEmulatorProcess.Kill();
             }
-            // activeEmulatorProcess is intentionally NOT set to null here.
-            // _Process will detect HasExited == true on the next frame and handle save syncing properly.
+
+
         }
     }
 
@@ -983,6 +1153,7 @@ public partial class EmulatorManager : Node
         }
 
         var emulatorMetadata = LoadEmulatorMetadataFromDisk(emulatorName);
+
         if (emulatorMetadata == null)
         {
             GD.PrintErr($"Meta file not found for emulator: {emulatorName}");
@@ -1015,6 +1186,7 @@ public partial class EmulatorManager : Node
             launchArguments = AppendDynamicSettingsToArguments(launchArguments, emulatorName, emulatorMetadata);
 
             Process emulatorProcess = BuildAndStartEmulatorProcess(fullExecutablePath, launchArguments, emulatorInstallDirectory);
+
             if (emulatorProcess != null)
             {
                 emulatorProcess.EnableRaisingEvents = true;
@@ -1024,6 +1196,7 @@ public partial class EmulatorManager : Node
                 };
             }
         }
+
         catch (Exception exception)
         {
             GD.PrintErr($"Failed to launch emulator: {exception.Message}");
@@ -1060,6 +1233,7 @@ public partial class EmulatorManager : Node
             using var emulatorMapFile = FileAccess.Open(emulatorMapFilePath, FileAccess.ModeFlags.Write);
             emulatorMapFile.StoreString(serializedMapJson);
         }
+
         catch (Exception exception)
         {
             GD.PrintErr($"Failed to generate default emulator map: {exception.Message}");
@@ -1071,6 +1245,7 @@ public partial class EmulatorManager : Node
             using var executableMapFile = FileAccess.Open(executableMapFilePath, FileAccess.ModeFlags.Write);
             executableMapFile.StoreString(serializedExecutableJson);
         }
+
         catch (Exception exception)
         {
             GD.PrintErr($"Failed to generate default executable map: {exception.Message}");

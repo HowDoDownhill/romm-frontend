@@ -1,3 +1,15 @@
+RomM Frontend - Version 1.0.3 Changelog
+
+💄 Quality of Life Improvements
+Carousel Focus Border: Added a clear focus border around the currently selected game in the carousel to easily identify your active selection.
+Cleaner Header Interface: The platform header text is now exclusively displayed on the Downloads and Settings pages, providing a cleaner, unobstructed view while browsing your games list.
+
+🐛 Bug Fixes
+Carousel Centering: Fixed an issue where the game list would not properly center the active game upon switching systems until the carousel was manually moved.
+Update Popup Logic: Resolved a bug where the update changelog popup would display on startup even when you were already on the latest version.
+
+---
+
 RomM Frontend - Version 1.0.2 Changelog
 
 ✨ New Features

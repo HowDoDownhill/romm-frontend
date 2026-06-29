@@ -5,12 +5,12 @@ public partial class DownloadEntryUI : MarginContainer
     [Signal]
     public delegate void EntrySelectedEventHandler(string fileName);
 
-    [Export] private Label _nameLabel;
-    [Export] private Label _statusLabel;
-    [Export] private ProgressBar _progressBar;
-    [Export] private PanelContainer _backgroundPanel;
+    [Export] private Label nameLabel;
+    [Export] private Label statusLabel;
+    [Export] private ProgressBar progressBar;
+    [Export] private PanelContainer backgroundPanel;
     
-    private StyleBoxFlat _backgroundStyle;
+    private StyleBoxFlat backgroundStyle;
 
     public string FileName { get; private set; }
 
@@ -18,13 +18,12 @@ public partial class DownloadEntryUI : MarginContainer
     {
         FocusMode = FocusModeEnum.All;
         
-        if (_backgroundPanel != null)
+        if (backgroundPanel != null)
         {
-            _backgroundStyle = new StyleBoxFlat();
-            _backgroundPanel.AddThemeStyleboxOverride("panel", _backgroundStyle);
+            backgroundStyle = new StyleBoxFlat();
+            backgroundPanel.AddThemeStyleboxOverride("panel", backgroundStyle);
         }
 
-        // Ensure child controls pass mouse events up to this node for selection
         SetChildrenMousePass(this);
 
         GuiInput += OnGuiInput;
@@ -42,6 +41,7 @@ public partial class DownloadEntryUI : MarginContainer
             {
                 control.MouseFilter = MouseFilterEnum.Pass;
             }
+
             SetChildrenMousePass(child);
         }
     }
@@ -68,18 +68,19 @@ public partial class DownloadEntryUI : MarginContainer
     public void SetFileName(string fileName)
     {
         FileName = fileName;
-        if (_nameLabel != null)
+
+        if (nameLabel != null)
         {
-            _nameLabel.Text = fileName.GetBaseName();
+            nameLabel.Text = fileName.GetBaseName();
         }
     }
 
     public void UpdateProgress(long current, long total)
     {
-        if (_progressBar != null)
+        if (progressBar != null)
         {
             double percentage = total > 0 ? (double)current / total * 100 : 0;
-            _progressBar.Value = percentage;
+            progressBar.Value = percentage;
         }
         
         SetStatus("Downloading...");
@@ -87,25 +88,25 @@ public partial class DownloadEntryUI : MarginContainer
 
     public void SetStatus(string status)
     {
-        if (_statusLabel != null)
+        if (statusLabel != null)
         {
-            _statusLabel.Text = status;
+            statusLabel.Text = status;
         }
     }
 
     public void Highlight()
     {
-        if (_backgroundStyle != null)
+        if (backgroundStyle != null)
         {
-            _backgroundStyle.BgColor = new Color(0.3f, 0.3f, 0.4f);
+            backgroundStyle.BgColor = new Color(0.3f, 0.3f, 0.4f);
         }
     }
 
     public void Unhighlight()
     {
-        if (_backgroundStyle != null)
+        if (backgroundStyle != null)
         {
-            _backgroundStyle.BgColor = new Color(0.1f, 0.1f, 0.15f, 0.5f);
+            backgroundStyle.BgColor = new Color(0.1f, 0.1f, 0.15f, 0.5f);
         }
     }
 }

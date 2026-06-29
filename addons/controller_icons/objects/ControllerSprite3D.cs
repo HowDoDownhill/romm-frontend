@@ -50,8 +50,10 @@ public partial class ControllerSprite3D : Sprite3D
 			_show_only = value;
 
 			if( IsControllerIconsPluginReady() )
-				OnInputTypeChanged((int)CI.LastInputType, CI.LastController);
-		}
+            {
+                OnInputTypeChanged((int)CI.LastInputType, CI.LastController);
+            }
+        }
 	}
 	private EShowMode _show_only = EShowMode.ANY;
 
@@ -68,8 +70,10 @@ public partial class ControllerSprite3D : Sprite3D
 			_force_type = value;
 
 			if( IsControllerIconsPluginReady() )
-				OnInputTypeChanged((int)CI.LastInputType, CI.LastController);
-		}
+            {
+                OnInputTypeChanged((int)CI.LastInputType, CI.LastController);
+            }
+        }
 	}
 	private EInputType _force_type = EInputType.NONE;
 
@@ -110,8 +114,10 @@ public partial class ControllerSprite3D : Sprite3D
 			this.path = path;
 		}
 		else
-			Visible = false;
-	}
+        {
+            Visible = false;
+        }
+    }
 
 	private string GetTTSString()
 	{

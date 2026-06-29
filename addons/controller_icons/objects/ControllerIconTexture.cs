@@ -198,10 +198,14 @@ public partial class ControllerIconTexture : Texture2D
 	public string GetTTSString()
 	{
 		if( force_type != EInputType.NONE )
-			return CI.ParsePathToTTS(path, force_type - 1);
-		else
-			return CI.ParsePathToTTS(path);
-	}
+        {
+            return CI.ParsePathToTTS(path, force_type - 1);
+        }
+        else
+        {
+            return CI.ParsePathToTTS(path);
+        }
+    }
 
 	private bool CanBeShown()
 	{
@@ -228,13 +232,17 @@ public partial class ControllerIconTexture : Texture2D
 			foreach( Texture2D tex in value ) 
 			{
 				if( tex != null && tex.IsConnected(SignalName.Changed, Callable.From( ReloadResource )) )
-					tex.Changed -= ReloadResource;
-			}
+                {
+                    tex.Changed -= ReloadResource;
+                }
+            }
 
 			if( LabelSettings != null && LabelSettings.IsConnected(SignalName.Changed, Callable.From(OnLabelSettingsChanged)) )
-				LabelSettings.Changed -= OnLabelSettingsChanged;
+            {
+                LabelSettings.Changed -= OnLabelSettingsChanged;
+            }
 
-			_Textures = value;
+            _Textures = value;
 			LabelSettings = null;
 			if( _Textures != null && _Textures.Count > 1 )
 			{
@@ -259,8 +267,10 @@ public partial class ControllerIconTexture : Texture2D
 			foreach( Texture2D tex in value)
 			{
 				if( tex != null )
-					tex.Changed += ReloadResource;
-			}
+                {
+                    tex.Changed += ReloadResource;
+                }
+            }
 		}
 	}
 	private List<Texture2D> _Textures = new();
@@ -328,8 +338,10 @@ public partial class ControllerIconTexture : Texture2D
 			int target_device = force_device != EForceDevice.ANY ? (int)force_device : CI.LastController;
 			Texture2D tex = CI.ParsePath(path, input_type, target_device, force_controller_icon_style);
 			if( tex != null )
-				textures.Add(tex);
-		}
+            {
+                textures.Add(tex);
+            }
+        }
 
 		Textures = textures;
 		ReloadResource();		
@@ -432,9 +444,12 @@ public partial class ControllerIconTexture : Texture2D
 		{
 			Texture2D tex = Textures[i];
 
-			if( tex == null ) continue;
+			if( tex == null )
+            {
+                continue;
+            }
 
-			if( i != 0 )
+            if ( i != 0 )
 			{
 				// Draw text char '+'
 				Vector2 font_position = new Vector2(
@@ -461,9 +476,12 @@ public partial class ControllerIconTexture : Texture2D
 		{
 			Texture2D tex = Textures[i];
 
-			if( tex == null) continue;
+			if( tex == null)
+            {
+                continue;
+            }
 
-			if( i != 0 )
+            if ( i != 0 )
 			{
 				// Draw text char '+'
 				Vector2 fontPosition = new Vector2(
@@ -490,9 +508,12 @@ public partial class ControllerIconTexture : Texture2D
 		{
 			Texture2D tex = Textures[i];
 
-			if( tex == null) continue;
+			if( tex == null)
+            {
+                continue;
+            }
 
-			if( i != 0 )
+            if ( i != 0 )
 			{
 				// Draw text char '+'
 				Vector2 fontPosition = new(
@@ -528,8 +549,10 @@ public partial class ControllerIconTexture : Texture2D
 		{
 			Font.DrawString(toCanvasItem, fontPosition + LabelSettings.ShadowOffset, text, HorizontalAlignment.Left, -1, LabelSettings.FontSize, LabelSettings.ShadowColor);
 			if( LabelSettings.ShadowSize > 0 )
-				Font.DrawStringOutline(toCanvasItem, fontPosition + LabelSettings.ShadowOffset, text, HorizontalAlignment.Left, -1, LabelSettings.FontSize, LabelSettings.ShadowSize, LabelSettings.ShadowColor);
-		}
+            {
+                Font.DrawStringOutline(toCanvasItem, fontPosition + LabelSettings.ShadowOffset, text, HorizontalAlignment.Left, -1, LabelSettings.FontSize, LabelSettings.ShadowSize, LabelSettings.ShadowColor);
+            }
+        }
 		if( LabelSettings.OutlineColor.A > 0 && LabelSettings.OutlineSize > 0 )
 		{
 			Font.DrawStringOutline(toCanvasItem, fontPosition, text, HorizontalAlignment.Left, -1, LabelSettings.FontSize, LabelSettings.OutlineSize, LabelSettings.OutlineColor);
@@ -543,9 +566,11 @@ public partial class ControllerIconTexture : Texture2D
 	private async void StitchTexture()
 	{
 		if( Textures.Count == 0 )
-			return;
+        {
+            return;
+        }
 
-		IsStitchingTexture = true;
+        IsStitchingTexture = true;
 
 		Image fontImage = null;
 		if( Textures.Count > 1 )
@@ -585,9 +610,12 @@ public partial class ControllerIconTexture : Texture2D
 		Image img = new();
 		for (int i = 0; i < Textures.Count; ++i )
 		{
-			if( Textures[i] == null ) continue;
+			if( Textures[i] == null )
+            {
+                continue;
+            }
 
-			if( i != 0 )
+            if ( i != 0 )
 			{
 				// Draw text char '+'
 				Rect2I region = fontImage.GetUsedRect();
@@ -630,14 +658,17 @@ public partial class ControllerIconTexture : Texture2D
 		if( Dirty )
 		{
 			if( !IsStitchingTexture )
-				// FIXME: Function may await, but because this is an internal engine call, we can't do anything about it.
-				// This results in a one-frame white texture being displayed, which is not ideal. Investigate later.
-				StitchTexture();
-				
-			if( IsStitchingTexture )
-				return new Rid(null);
+            {
+                // FIXME: Function may await, but because this is an internal engine call, we can't do anything about it.
+                // This results in a one-frame white texture being displayed, which is not ideal. Investigate later.
+                StitchTexture();
+            }
 
-			else
+            if ( IsStitchingTexture )
+            {
+                return new Rid(null);
+            }
+            else
 			{
 				return new Rid(null);
 			}

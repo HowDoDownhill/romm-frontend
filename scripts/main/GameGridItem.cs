@@ -1,21 +1,21 @@
-﻿using Godot;
+using Godot;
 
 public partial class GameGridItem : Control
 {
     [Export]
-    private TextureRect _cover;
+    private TextureRect cover;
     [Export]
-    private Label _title;
+    private Label title;
 
-    private Game _game;
-    private StyleBoxFlat _focusStyle;
+    private Game game;
+    private StyleBoxFlat focusStyle;
 
     [Signal]
     public delegate void ItemSelectedEventHandler(GameGridItem item);
 
     public override void _Ready()
     {
-        _focusStyle = new StyleBoxFlat
+        focusStyle = new StyleBoxFlat
         {
             BgColor = new Color(0, 0, 0, 0), // Transparent background
             BorderWidthTop = 2,
@@ -32,7 +32,7 @@ public partial class GameGridItem : Control
 
     private void OnFocusEntered()
     {
-        AddThemeStyleboxOverride("panel", _focusStyle);
+        AddThemeStyleboxOverride("panel", focusStyle);
     }
 
     private void OnFocusExited()
@@ -42,23 +42,24 @@ public partial class GameGridItem : Control
 
     public void SetGame(Game game)
     {
-        _game = game;
-        if (_title != null)
+        this.game = game;
+
+        if (title != null)
         {
-            _title.Text = game.Name;
+            title.Text = game.Name;
         }
     }
 
     public Game GetGame()
     {
-        return _game;
+        return game;
     }
 
     public void SetCoverTexture(Texture2D texture)
     {
-        if (_cover != null)
+        if (cover != null)
         {
-            _cover.Texture = texture;
+            cover.Texture = texture;
         }
     }
 
@@ -70,6 +71,7 @@ public partial class GameGridItem : Control
         {
             isSelected = true;
         }
+
         else if (@event.IsActionPressed("ui_accept"))
         {
             isSelected = true;
@@ -81,3 +83,4 @@ public partial class GameGridItem : Control
         }
     }
 }
+

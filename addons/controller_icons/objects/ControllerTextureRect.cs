@@ -49,8 +49,10 @@ public partial class ControllerTextureRect : TextureRect
 			_show_only = value;
 			
 			if( IsControllerIconsPluginReady() )
-				OnInputTypeChanged((int)CI.LastInputType, CI.LastController);
-		}
+            {
+                OnInputTypeChanged((int)CI.LastInputType, CI.LastController);
+            }
+        }
 	}
 	private EShowMode _show_only = EShowMode.ANY;
 
@@ -67,8 +69,10 @@ public partial class ControllerTextureRect : TextureRect
 			_force_type = value;
 
 			if( IsControllerIconsPluginReady() )
-				OnInputTypeChanged((int)CI.LastInputType, CI.LastController);
-		}
+            {
+                OnInputTypeChanged((int)CI.LastInputType, CI.LastController);
+            }
+        }
 	}
 	private EInputType _force_type = EInputType.NONE;
 
@@ -86,16 +90,22 @@ public partial class ControllerTextureRect : TextureRect
 			if( IsInsideTree() )
 			{
 				if( _max_width < 0 )
-					ExpandMode = ExpandModeEnum.KeepSize;
-				else
+                {
+                    ExpandMode = ExpandModeEnum.KeepSize;
+                }
+                else
 				{
 					ExpandMode = ExpandModeEnum.IgnoreSize;
 					CustomMinimumSize = new Vector2( _max_width, CustomMinimumSize.Y );
 					if( Texture != null )
-						CustomMinimumSize = new Vector2( CustomMinimumSize.X, Texture.GetHeight() * _max_width / Texture.GetWidth() );
-					else
-						CustomMinimumSize = new Vector2( CustomMinimumSize.X, CustomMinimumSize.X );
-				}
+                    {
+                        CustomMinimumSize = new Vector2( CustomMinimumSize.X, Texture.GetHeight() * _max_width / Texture.GetWidth() );
+                    }
+                    else
+                    {
+                        CustomMinimumSize = new Vector2( CustomMinimumSize.X, CustomMinimumSize.X );
+                    }
+                }
 
 
 			}
@@ -141,8 +151,10 @@ public partial class ControllerTextureRect : TextureRect
 			this.path = path;
 		}
 		else
-			Visible = false;
-	}
+        {
+            Visible = false;
+        }
+    }
 
 	private string GetTTSString()
 	{

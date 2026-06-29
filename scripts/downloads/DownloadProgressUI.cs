@@ -4,7 +4,7 @@ using System.Collections.Generic;
 public partial class DownloadProgressUI : Panel
 {
     [Export] private VBoxContainer downloadsVBox;
-    [Export] private PackedScene _downloadEntryScene;
+    [Export] private PackedScene downloadEntryScene;
     [Export] private Button cancelDownloadButton;
     
     private Dictionary<string, DownloadEntryUI> downloadEntries = new Dictionary<string, DownloadEntryUI>();
@@ -15,23 +15,36 @@ public partial class DownloadProgressUI : Panel
     public void CycleSelection(int direction)
     {
         var children = downloadsVBox.GetChildren();
-        if (children.Count == 0) return;
 
-        var entries = new List<DownloadEntryUI>();
-        foreach (var child in children)
+        if (children.Count == 0)
         {
-            if (child is DownloadEntryUI entry) entries.Add(entry);
+            return;
         }
 
-        if (entries.Count == 0) return;
+        var entries = new List<DownloadEntryUI>();
+
+        foreach (var child in children)
+        {
+            if (child is DownloadEntryUI entry)
+            {
+                entries.Add(entry);
+            }
+        }
+
+        if (entries.Count == 0)
+        {
+            return;
+        }
 
         DownloadEntryUI current = null;
+
         if (!string.IsNullOrEmpty(currentlySelectedFile) && downloadEntries.TryGetValue(currentlySelectedFile, out var e))
         {
             current = e;
         }
 
         int index = -1;
+
         if (current != null)
         {
             index = entries.IndexOf(current);
@@ -44,8 +57,16 @@ public partial class DownloadProgressUI : Panel
         }
 
         index += direction;
-        if (index < 0) index = entries.Count - 1;
-        if (index >= entries.Count) index = 0;
+
+        if (index < 0)
+        {
+            index = entries.Count - 1;
+        }
+
+        if (index >= entries.Count)
+        {
+            index = 0;
+        }
 
         entries[index].GrabFocus();
     }
@@ -72,13 +93,13 @@ public partial class DownloadProgressUI : Panel
     {
         if (!downloadEntries.ContainsKey(fileName))
         {
-            if (_downloadEntryScene == null)
+            if (downloadEntryScene == null)
             {
                 GD.PrintErr("DownloadProgressUI: DownloadEntryScene is not assigned!");
                 return;
             }
 
-            var entryUi = _downloadEntryScene.Instantiate<DownloadEntryUI>();
+            var entryUi = downloadEntryScene.Instantiate<DownloadEntryUI>();
             downloadsVBox.AddChild(entryUi);
             entryUi.SetFileName(fileName);
             entryUi.EntrySelected += OnEntrySelected;

@@ -85,8 +85,10 @@ public partial class InputActionSelector : SelectorPanel
 		private void QueryVisibility()
 		{
 			if( IsInstanceValid(nTreeItem) )
-				nTreeItem.Visible = ShowDefault && Filtered;
-		}
+            {
+                nTreeItem.Visible = ShowDefault && Filtered;
+            }
+        }
 	}
 
 	public void Populate( EditorInterface editor_interface )
@@ -133,9 +135,11 @@ public partial class InputActionSelector : SelectorPanel
 	{
 		TreeItem item = nTree.GetSelected();
 		if( IsInstanceValid(item) )
-			return item.GetText(0);
+        {
+            return item.GetText(0);
+        }
 
-		return "";
+        return "";
 	}
 
 	private void SetDefaultActionsVisibility( bool display )

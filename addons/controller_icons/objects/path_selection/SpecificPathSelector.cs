@@ -36,9 +36,11 @@ public partial class SpecificPathSelector : SelectorPanel
 	public void HookupSignals()
 	{
 		if( IsSignalsConnected )
-			return;
+        {
+            return;
+        }
 
-		foreach( Dictionary<string, ControllerIcons_Icon> category in ButtonNodes.Values )
+        foreach ( Dictionary<string, ControllerIcons_Icon> category in ButtonNodes.Values )
 		{
 			foreach( ControllerIcons_Icon icon in category.Values )
 			{
@@ -52,9 +54,11 @@ public partial class SpecificPathSelector : SelectorPanel
 	public void CleanupSignals()
 	{ 
 		if( !IsSignalsConnected )
-			return;
+        {
+            return;
+        }
 
-		foreach( Dictionary<string, ControllerIcons_Icon> category in ButtonNodes.Values )
+        foreach ( Dictionary<string, ControllerIcons_Icon> category in ButtonNodes.Values )
 		{
 			foreach( ControllerIcons_Icon icon in category.Values )
 			{
@@ -145,8 +149,10 @@ public partial class SpecificPathSelector : SelectorPanel
 				#endif					
 				}
 				else
-					PathSelector._LastPressedTimestamp = Time.GetTicksMsec() + 1000;
-			}
+                {
+                    PathSelector._LastPressedTimestamp = Time.GetTicksMsec() + 1000;
+                }
+            }
 			else
 			{
 				PathSelector._LastPressedIcon = this;
@@ -192,10 +198,12 @@ public partial class SpecificPathSelector : SelectorPanel
 		foreach( string basePath in basePaths )
 		{
 			if( basePath.Length == 0 || !basePath.StartsWith("res://") )
-				continue;
+            {
+                continue;
+            }
 
-			// Files first
-			HandleFiles("", basePath);
+            // Files first
+            HandleFiles("", basePath);
 
 			// Directories next
 			foreach( string dir in DirAccess.GetDirectoriesAt(basePath) )
@@ -215,8 +223,10 @@ public partial class SpecificPathSelector : SelectorPanel
 		foreach( string file in DirAccess.GetFilesAt(basePaths) )
 		{
 			if( file.GetExtension() == CI.BaseExtension )
-				CreateIcon(category, basePaths.PathJoin(file));
-		}
+            {
+                CreateIcon(category, basePaths.PathJoin(file));
+            }
+        }
 	}
 
 	private void CreateIcon( string category, string path )
@@ -231,9 +241,12 @@ public partial class SpecificPathSelector : SelectorPanel
 		}
 
 		string filename = path.GetFile();
-		if( ButtonNodes[mapCategory].ContainsKey(filename) ) return;
+		if( ButtonNodes[mapCategory].ContainsKey(filename) )
+        {
+            return;
+        }
 
-		string icon_path = (category.Length == 0 ? "" : category ) + "/" + path.GetFile().GetBaseName();
+        string icon_path = (category.Length == 0 ? "" : category ) + "/" + path.GetFile().GetBaseName();
 		ControllerIcons_Icon icon = new( mapCategory, icon_path);
 
 		ButtonNodes[mapCategory][filename] = icon;
@@ -245,9 +258,11 @@ public partial class SpecificPathSelector : SelectorPanel
 	public string GetIconPath()
 	{
 		if (ControllerIcons_Icon.group.GetPressedButton() is Button button)
-			return (button.Icon as ControllerIconTexture).path;
+        {
+            return (button.Icon as ControllerIconTexture).path;
+        }
 
-		return "";
+        return "";
 	}
 
 	public override void GrabFocus()
@@ -258,16 +273,22 @@ public partial class SpecificPathSelector : SelectorPanel
 	private void OnBaseAssetNamesItemSelected()
 	{
 		TreeItem selected = BaseAssetNames.GetSelected();
-		if( selected == null ) return;
+		if( selected == null )
+        {
+            return;
+        }
 
-		string category = selected.GetText(0);
-		if( !ButtonNodes.ContainsKey(category) ) return;
+        string category = selected.GetText(0);
+		if( !ButtonNodes.ContainsKey(category) )
+        {
+            return;
+        }
 
-		// UPGRADE: In Godot 4.2, for-loop variables can be
-		// statically typed:
-		// for key:string in button_nodes.keys():
-		// 	for icon:ControllerIcon_Icon in button_nodes[key].values():
-		foreach( string key in ButtonNodes.Keys )
+        // UPGRADE: In Godot 4.2, for-loop variables can be
+        // statically typed:
+        // for key:string in button_nodes.keys():
+        // 	for icon:ControllerIcon_Icon in button_nodes[key].values():
+        foreach ( string key in ButtonNodes.Keys )
 		{
 			foreach( ControllerIcons_Icon icon in ButtonNodes[key].Values )
 			{
@@ -310,8 +331,11 @@ public partial class SpecificPathSelector : SelectorPanel
 			{
 				asset_name.SetSelectable(0, selectable);
 				if( !selectable )
-					asset_name.Deselect(0);
-				asset_name.SetCustomColor(0, selectable ? ColorTextEnabled : ColorTextDisabled);
+                {
+                    asset_name.Deselect(0);
+                }
+
+                asset_name.SetCustomColor(0, selectable ? ColorTextEnabled : ColorTextDisabled);
 			}
 
 			asset_name = asset_name.GetNextInTree();

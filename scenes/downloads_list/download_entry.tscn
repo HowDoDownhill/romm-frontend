@@ -4,7 +4,7 @@
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_ua2w2"]
 
-[node name="DownloadEntry" type="MarginContainer" unique_id=2135865801 node_paths=PackedStringArray("_nameLabel", "_statusLabel", "_progressBar", "_backgroundPanel")]
+[node name="DownloadEntry" type="MarginContainer" unique_id=2135865801 node_paths=PackedStringArray("nameLabel", "statusLabel", "progressBar", "backgroundPanel")]
 layout_mode = 2
 size_flags_horizontal = 3
 focus_mode = 2
@@ -13,10 +13,10 @@ theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 script = ExtResource("1_ua2w2")
-_nameLabel = NodePath("Panel/VBoxContainer/Name")
-_statusLabel = NodePath("Panel/VBoxContainer/Status")
-_progressBar = NodePath("Panel/VBoxContainer/ProgressBar")
-_backgroundPanel = NodePath("Panel")
+nameLabel = NodePath("Panel/VBoxContainer/Name")
+statusLabel = NodePath("Panel/VBoxContainer/Status")
+progressBar = NodePath("Panel/VBoxContainer/ProgressBar")
+backgroundPanel = NodePath("Panel")
 
 [node name="Panel" type="PanelContainer" parent="." unique_id=513956903]
 layout_mode = 2
@@ -36,3 +36,4 @@ layout_mode = 2
 
 [node name="ProgressBar" type="ProgressBar" parent="Panel/VBoxContainer" unique_id=67073736]
 layout_mode = 2
+

@@ -36,7 +36,7 @@ script = ExtResource("7_18nlu")
 [sub_resource type="Resource" id="Resource_6wevv"]
 script = ExtResource("7_18nlu")
 
-[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "gameList", "detailsPanelContainer", "gameTitle", "gameDescription", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "LaunchEmulatorPopupOption", "SelectBiosPopupOption", "SettingsPopupOption", "RefreshGamesPopupOption", "RefreshCurrentSystemGamesPopupOption", "QuitPopupOption", "downloadProgressPopup", "downloadProgressLabel", "downloadProgressBar", "changelogPopup", "changelogRichTextLabel", "startMenu", "startMenuContainer", "biosSelectorContainer", "biosSelector", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
+[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "gameList", "detailsPanelContainer", "gameTitle", "gameDescription", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "LaunchEmulatorPopupOption", "SelectBiosPopupOption", "SettingsPopupOption", "RefreshGamesPopupOption", "RefreshCurrentSystemGamesPopupOption", "QuitPopupOption", "downloadProgressPopup", "downloadProgressLabel", "downloadProgressBar", "changelogPopup", "changelogRichTextLabel", "backgroundRect", "mainVBoxContainer", "startMenu", "startMenuContainer", "biosSelectorContainer", "biosSelector", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -80,6 +80,8 @@ downloadProgressLabel = NodePath("Background/DownloadProgressPopup/Panel/VBoxCon
 downloadProgressBar = NodePath("Background/DownloadProgressPopup/Panel/VBoxContainer/ProgressContainer/ProgressBar")
 changelogPopup = NodePath("Background/ChangelogContainer")
 changelogRichTextLabel = NodePath("Background/ChangelogContainer/Panel/MarginContainer/RichTextLabel")
+backgroundRect = NodePath("Background")
+mainVBoxContainer = NodePath("Background/VBoxContainer")
 startMenu = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu")
 startMenuContainer = NodePath("Background/StartMenu/Panel/StartMenuContainer")
 biosSelectorContainer = NodePath("Background/StartMenu/Panel/BiosSelectorContainer")
@@ -139,10 +141,10 @@ layout_mode = 2
 expand_mode = 3
 
 [node name="PlatformLabel" type="Label" parent="Background/VBoxContainer/MarginContainer/Panel/MarginContainer/HBoxContainer" unique_id=2094541351]
-visible = false
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 1
+theme_override_font_sizes/font_size = 48
 text = "Platform Label"
 vertical_alignment = 1
 
@@ -166,11 +168,9 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 focus_mode = 2
 script = ExtResource("3_gubc5")
-DepthOffset = 400.0
-XOffset = -300.0
-MinimumOpacity = -0.5
-PreloadItemsHalfCount = 5
-WindowWidthRatio = 0.2
+depthOffset = 400.0
+xOffset = -400.0
+minimumScale = 0.2
 
 [node name="Panel" type="Panel" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer" unique_id=1330960290]
 layout_mode = 2
@@ -244,7 +244,7 @@ theme_override_constants/margin_bottom = 5
 [node name="DownloadsPage" parent="Background/VBoxContainer/DownloadsPageContainer" unique_id=141579046 node_paths=PackedStringArray("downloadsVBox") instance=ExtResource("2_6l7je")]
 layout_mode = 2
 downloadsVBox = NodePath("VBoxContainer2")
-_downloadEntryScene = ExtResource("4_pu3yx")
+downloadEntryScene = ExtResource("4_pu3yx")
 
 [node name="VBoxContainer2" type="VBoxContainer" parent="Background/VBoxContainer/DownloadsPageContainer/DownloadsPage" unique_id=1354520381]
 layout_mode = 1

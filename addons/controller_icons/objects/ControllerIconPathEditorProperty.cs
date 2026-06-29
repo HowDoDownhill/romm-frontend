@@ -76,8 +76,10 @@ public partial class ControllerIconPathEditorProperty : EditorProperty
 	{
 		string new_text = (string)GetEditedObject().Get(GetEditedProperty());
 		if( line_edit.Text != new_text )
-			line_edit.Text = new_text;
-	}
+        {
+            line_edit.Text = new_text;
+        }
+    }
 
 }
 #endif

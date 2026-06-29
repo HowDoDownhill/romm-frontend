@@ -3,20 +3,20 @@ using System;
 
 public partial class VerticalCarousel : Control
 {
-    [Export] public float ItemSpacing = 160.0f;
-    [Export] public float DepthOffset = 80.0f; // Horizontal shift for 3D wheel curve
-    [Export] public float XOffset = 0.0f; // Global horizontal adjustment
-    [Export] public float MinimumScale = 0.5f;
-    [Export] public float MinimumOpacity = 0.3f;
-    [Export] public float AnimationDuration = 0.25f;
-    [Export] public int VisibleItemsHalfCount = 4;
-    [Export] public int PreloadItemsHalfCount = 2;
-    [Export] public bool ScaleItemsToWindow = true;
-    [Export] public float WindowWidthRatio = 0.25f;
+    [Export] public float itemSpacing = 160.0f;
+    [Export] public float depthOffset = 80.0f; // Horizontal shift for 3D wheel curve
+    [Export] public float xOffset = 0.0f; // Global horizontal adjustment
+    [Export] public float minimumScale = 0.5f;
+    [Export] public float minimumOpacity = 0.3f;
+    [Export] public float animationDuration = 0.25f;
+    [Export] public int visibleItemsHalfCount = 4;
+    [Export] public int preloadItemsHalfCount = 2;
+    [Export] public bool scaleItemsToWindow = true;
+    [Export] public float windowWidthRatio = 0.25f;
 
     public int SelectedIndex = 0;
-    private Tween _tween;
-    public bool IsAnimating => _tween != null && _tween.IsValid() && _tween.IsRunning();
+    private Tween tween;
+    public bool IsAnimating => tween != null && tween.IsValid() && tween.IsRunning();
 
     [Signal]
     public delegate void ItemSelectedEventHandler(long index);
@@ -37,7 +37,11 @@ public partial class VerticalCarousel : Control
     public override void _GuiInput(InputEvent @event)
     {
         int childCount = GetChildCount();
-        if (childCount == 0) return;
+
+        if (childCount == 0)
+        {
+            return;
+        }
 
         if (@event.IsActionPressed("ui_down", true))
         {
@@ -45,22 +49,26 @@ public partial class VerticalCarousel : Control
             UpdateLayout(true);
             AcceptEvent();
         }
+
         else if (@event.IsActionPressed("ui_up", true))
         {
             SelectedIndex = (SelectedIndex - 1 + childCount) % childCount;
             UpdateLayout(true);
             AcceptEvent();
         }
+
         else if (@event.IsActionPressed("ui_accept"))
         {
             EmitSignal(SignalName.ItemSelected, SelectedIndex);
             AcceptEvent();
         }
+
         else if (@event.IsActionPressed("ui_right", true))
         {
             EmitSignal(SignalName.JumpSectionRequested, 1);
             AcceptEvent();
         }
+
         else if (@event.IsActionPressed("ui_left", true))
         {
             EmitSignal(SignalName.JumpSectionRequested, -1);
@@ -74,96 +82,111 @@ public partial class VerticalCarousel : Control
         {
             SelectedIndex = GetChildCount() - 1;
         }
+
         UpdateLayout(false);
     }
 
     public void UpdateLayout(bool animated = true)
     {
         int childCount = GetChildCount();
-        if (childCount == 0) return;
 
-        if (_tween != null && _tween.IsValid())
+        if (childCount == 0)
         {
-            _tween.Kill();
+            return;
+        }
+
+        if (tween != null && tween.IsValid())
+        {
+            tween.Kill();
         }
 
         if (animated)
         {
-            _tween = CreateTween().SetParallel(true).SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
+            tween = CreateTween().SetParallel(true).SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
         }
 
         Vector2 center = Size / 2.0f;
         float viewportWidth = GetViewportRect().Size.X;
-        float targetWidth = viewportWidth * WindowWidthRatio;
+        float targetWidth = viewportWidth * windowWidthRatio;
 
         for (int i = 0; i < childCount; i++)
         {
             Control child = GetChild<Control>(i);
             
-            if (ScaleItemsToWindow)
+            if (scaleItemsToWindow)
             {
                 child.CustomMinimumSize = new Vector2(targetWidth, 0);
+
                 if (child is TextureRect texRect && texRect.Texture != null && texRect.Texture.GetSize().X > 0)
                 {
                     float aspect = texRect.Texture.GetSize().Y / texRect.Texture.GetSize().X;
                     child.Size = new Vector2(targetWidth, targetWidth * aspect);
                 }
+
                 else
                 {
                     child.Size = new Vector2(targetWidth, child.Size.Y);
                 }
             }
 
-            // Center the pivot for scaling
             child.PivotOffset = child.Size / 2.0f;
             
             int diff = i - SelectedIndex;
             
             int halfCount = childCount / 2;
-            if (diff > halfCount) diff -= childCount;
-            else if (diff < -halfCount) diff += childCount;
 
-            // Handle edge case for even numbers so we don't snap wildly from top to bottom
+            if (diff > halfCount)
+            {
+                diff -= childCount;
+            }
+
+            else if (diff < -halfCount)
+            {
+                diff += childCount;
+            }
+
             if (childCount % 2 == 0 && diff == halfCount)
             {
-                // If it's exactly the halfway point on an even count, we can keep it at halfCount or let it be -halfCount.
-                // It's usually invisible anyway because VisibleItemsHalfCount should hide it.
+
+
             }
 
             float absDiff = Mathf.Abs(diff);
-            float t = Mathf.Clamp(absDiff / VisibleItemsHalfCount, 0.0f, 1.0f);
+            float t = Mathf.Clamp(absDiff / visibleItemsHalfCount, 0.0f, 1.0f);
             
-            float targetY = center.Y + (diff * ItemSpacing) - (child.Size.Y / 2.0f);
-            float targetX = center.X - (child.Size.X / 2.0f) - (t * t * DepthOffset) + XOffset;
+            float targetY = center.Y + (diff * itemSpacing) - (child.Size.Y / 2.0f);
+            float targetX = center.X - (child.Size.X / 2.0f) - (t * t * depthOffset) + xOffset;
             
             Vector2 targetPos = new Vector2(targetX, targetY);
             
-            float targetScaleVal = Mathf.Lerp(1.0f, MinimumScale, t);
+            float targetScaleVal = Mathf.Lerp(1.0f, minimumScale, t);
             Vector2 targetScale = new Vector2(targetScaleVal, targetScaleVal);
             
             Color targetColor = child.Modulate;
-            targetColor.A = Mathf.Lerp(1.0f, MinimumOpacity, t);
+            targetColor.A = Mathf.Lerp(1.0f, minimumOpacity, t);
 
-            // Ensure ZIndex remains positive so items don't render behind the root background
-            child.ZIndex = VisibleItemsHalfCount - Mathf.RoundToInt(absDiff);
+            child.ZIndex = visibleItemsHalfCount - Mathf.RoundToInt(absDiff);
 
-            if (absDiff > VisibleItemsHalfCount + PreloadItemsHalfCount)
+            if (absDiff > visibleItemsHalfCount + preloadItemsHalfCount)
             {
-                // Hide off-screen items to save rendering, but place them roughly where they should be if they fade in
+
                 child.Visible = false;
                 child.Position = targetPos;
                 child.Scale = targetScale;
                 child.Modulate = targetColor;
             }
+
             else
             {
                 child.Visible = true;
+
                 if (animated)
                 {
-                    _tween.TweenProperty(child, "position", targetPos, AnimationDuration);
-                    _tween.TweenProperty(child, "scale", targetScale, AnimationDuration);
-                    _tween.TweenProperty(child, "modulate", targetColor, AnimationDuration);
+                    tween.TweenProperty(child, "position", targetPos, animationDuration);
+                    tween.TweenProperty(child, "scale", targetScale, animationDuration);
+                    tween.TweenProperty(child, "modulate", targetColor, animationDuration);
                 }
+
                 else
                 {
                     child.Position = targetPos;

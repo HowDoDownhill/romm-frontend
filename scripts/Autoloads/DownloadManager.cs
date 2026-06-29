@@ -47,6 +47,7 @@ public partial class DownloadManager : Node
         httpRequest.UseThreads = true;
 
         string[] finalRequestHeaders = requestHeaders ?? new string[0];
+
         if (!finalRequestHeaders.Any(header => header.StartsWith("User-Agent")))
         {
             var headerList = finalRequestHeaders.ToList();
@@ -55,6 +56,7 @@ public partial class DownloadManager : Node
         }
 
         var requestError = httpRequest.Request(downloadUrl, finalRequestHeaders);
+
         if (requestError != Error.Ok)
         {
             GD.PrintErr($"HttpRequest failed to start for {downloadUrl}. Error: {requestError}");
@@ -89,6 +91,7 @@ public partial class DownloadManager : Node
     public void CancelDownload(string fileName)
     {
         var downloadEntryToCancel = activeDownloadEntries.FirstOrDefault(entry => entry.FileName == fileName);
+
         if (downloadEntryToCancel != null)
         {
             downloadEntryToCancel.Request.RequestCompleted -= (long resultCode, long responseCode, string[] responseHeaders, byte[] responseBody) => HandleDownloadCompleted(downloadEntryToCancel, resultCode, responseCode);
@@ -104,9 +107,11 @@ public partial class DownloadManager : Node
         {
             downloadEntry.CompletionCallback?.Invoke(downloadEntry.DestinationPath);
         }
+
         else
         {
             GD.PrintErr($"Download failed or was canceled: {downloadEntry.FileName}, Result: {resultCode}, Response Code: {responseCode}");
+
             if (FileAccess.FileExists(downloadEntry.DestinationPath))
             {
                 DirAccess.RemoveAbsolute(downloadEntry.DestinationPath);

@@ -49,7 +49,11 @@ public partial class LoginScreen : Control
 
     private async void OnLoginButtonPressed()
     {
-        if (errorLabel != null) errorLabel.Text = "Authenticating...";
+        if (errorLabel != null)
+        {
+            errorLabel.Text = "Authenticating...";
+        }
+
         loginButton.Disabled = true;
 
         (bool isSuccess, string errorMessage) result = (false, "An unknown error occurred.");
@@ -69,13 +73,20 @@ public partial class LoginScreen : Control
 
         if (result.isSuccess)
         {
-            if (errorLabel != null) errorLabel.Text = "Success!";
+            if (errorLabel != null)
+            {
+                errorLabel.Text = "Success!";
+            }
+
             GetTree().ChangeSceneToFile("res://scenes/login/loading_screen.tscn");
         }
         
         else
         {
-            if (errorLabel != null) errorLabel.Text = result.errorMessage;
+            if (errorLabel != null)
+            {
+                errorLabel.Text = result.errorMessage;
+            }
         }
 
         loginButton.Disabled = false;

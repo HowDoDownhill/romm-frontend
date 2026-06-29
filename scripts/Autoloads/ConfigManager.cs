@@ -59,10 +59,12 @@ public partial class ConfigManager : Node
             ApplicationRootDirectory = ProjectSettings.GlobalizePath("res://");
             ApplicationRootDirectory = ApplicationRootDirectory.Remove(ApplicationRootDirectory.Length - 1);
         }
+
         else
         {
             ApplicationRootDirectory = OS.GetExecutablePath().GetBaseDir();
         }
+
         configurationFilePath = ApplicationRootDirectory + "/config.cfg";
         configurationFile = new ConfigFile();
     }
@@ -72,6 +74,7 @@ public partial class ConfigManager : Node
         foreach (string subdirectoryRelativePath in requiredSubdirectories)
         {
             string fullDirectoryPath = ApplicationRootDirectory + "/" + subdirectoryRelativePath + "/";
+
             if (!DirAccess.DirExistsAbsolute(fullDirectoryPath))
             {
                 DirAccess.MakeDirAbsolute(fullDirectoryPath);
@@ -201,19 +204,24 @@ public partial class ConfigManager : Node
                 InputMap.EraseAction($"CloseKey{actionIndex}");
             }
         }
+
+
         for (int hotkeyIndex = 0; hotkeyIndex < EmulatorCloseHotkeyCount; hotkeyIndex++)
         {
             string inputActionName = $"CloseKey{hotkeyIndex + 1}";
             InputMap.AddAction(inputActionName);
             var joypadButtonEvent = new InputEventJoypadButton();
+
             if (hotkeyIndex < EmulatorCloseHotkeys.Count)
             {
                 joypadButtonEvent.ButtonIndex = (JoyButton)EmulatorCloseHotkeys[hotkeyIndex].AsInt32();
             }
+
             else
             {
                 joypadButtonEvent.ButtonIndex = JoyButton.Invalid;
             }
+
             InputMap.ActionAddEvent(inputActionName, joypadButtonEvent);
         }
     }

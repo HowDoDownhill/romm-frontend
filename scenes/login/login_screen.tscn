@@ -128,3 +128,4 @@ text = "Login"
 [node name="Error Label" type="Label" parent="TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer" unique_id=1647000609]
 layout_mode = 2
 horizontal_alignment = 1
+

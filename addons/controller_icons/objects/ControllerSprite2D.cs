@@ -30,8 +30,10 @@ public partial class ControllerSprite2D : Sprite2D
 		{
 			_path = value;
 			if( IsInsideTree() && IsControllerIconsPluginReady() )
-				Texture = CI.ParsePath(path, force_type);			
-		} 
+            {
+                Texture = CI.ParsePath(path, force_type);
+            }
+        } 
 	}
 	private string _path = "";
 
@@ -47,8 +49,10 @@ public partial class ControllerSprite2D : Sprite2D
 			_show_only = value;
 
 			if( IsControllerIconsPluginReady() )
-				OnInputTypeChanged((int)CI.LastInputType, CI.LastController);
-		}
+            {
+                OnInputTypeChanged((int)CI.LastInputType, CI.LastController);
+            }
+        }
 	}
 	private EShowMode _show_only = EShowMode.ANY;
 
@@ -65,8 +69,10 @@ public partial class ControllerSprite2D : Sprite2D
 			_force_type = value;
 			
 			if( IsControllerIconsPluginReady() )
-				OnInputTypeChanged((int)CI.LastInputType, CI.LastController);
-		}
+            {
+                OnInputTypeChanged((int)CI.LastInputType, CI.LastController);
+            }
+        }
 	}
 	private EInputType _force_type = EInputType.NONE;
 
@@ -107,8 +113,10 @@ public partial class ControllerSprite2D : Sprite2D
 			this.path = path;
 		}
 		else
-			Visible = false;
-	}
+        {
+            Visible = false;
+        }
+    }
 
 	private string GetTTSString()
 	{

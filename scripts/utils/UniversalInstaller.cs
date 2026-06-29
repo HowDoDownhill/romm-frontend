@@ -30,16 +30,21 @@ public static class UniversalInstaller
         string emulatorTargetDirectory = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorMetadata.EmulatorDirName[currentOperatingSystem]);
 
         string resolvedDownloadUrl = await ResolveDownloadUrl(installRecipe);
+
         if (string.IsNullOrEmpty(resolvedDownloadUrl))
         {
             GD.PrintErr("No valid download URL found.");
             return false;
         }
 
-        string temporaryArchiveFilePath = Path.Combine(appInstance.configManager.DownloadsPath, $"{emulatorName}_download.archive");
+        string temporaryArchiveFilePath = Path.Combine(appInstance.configManager.DownloadsPath, $"{emulatorName}download.archive");
 
         bool downloadSucceeded = await DownloadFileAsync(resolvedDownloadUrl, temporaryArchiveFilePath);
-        if (!downloadSucceeded) return false;
+
+        if (!downloadSucceeded)
+        {
+            return false;
+        }
 
         if (installRecipe.Extract)
         {
@@ -53,7 +58,11 @@ public static class UniversalInstaller
             }
 
             bool extractionSucceeded = await ExtractArchiveAsync(appInstance, temporaryArchiveFilePath, extractionDestinationPath);
-            if (!extractionSucceeded) return false;
+
+            if (!extractionSucceeded)
+            {
+                return false;
+            }
 
             if (!string.IsNullOrEmpty(installRecipe.ExtractFolderRegex))
             {
@@ -67,12 +76,14 @@ public static class UniversalInstaller
                     {
                         Directory.Delete(emulatorTargetDirectory, true);
                     }
+
                     Directory.Move(matchingExtractedDirectory, emulatorTargetDirectory);
                 }
             }
 
             File.Delete(temporaryArchiveFilePath);
         }
+
         else
         {
             if (!Directory.Exists(emulatorTargetDirectory))
@@ -81,10 +92,12 @@ public static class UniversalInstaller
             }
 
             string destinationExecutablePath = Path.Combine(emulatorTargetDirectory, emulatorMetadata.ExecutableName[currentOperatingSystem]);
+
             if (File.Exists(destinationExecutablePath))
             {
                 File.Delete(destinationExecutablePath);
             }
+
             File.Move(temporaryArchiveFilePath, destinationExecutablePath);
 
             if (currentOperatingSystem != "windows")
@@ -104,10 +117,12 @@ public static class UniversalInstaller
         {
             case "github_release":
                 string githubAssetUrl = await FetchGithubReleaseAssetUrl(installRecipe.Repo, installRecipe.AssetRegex);
+
                 if (string.IsNullOrEmpty(githubAssetUrl))
                 {
                     GD.PrintErr("Failed to fetch Github release URL.");
                 }
+
                 return githubAssetUrl;
 
             case "direct_url":
@@ -122,6 +137,7 @@ public static class UniversalInstaller
     private static async Task<string> FetchGithubReleaseAssetUrl(string repositorySlug, string assetNameRegexPattern)
     {
         string githubApiUrl = $"https://api.github.com/repos/{repositorySlug}/releases/latest";
+
         try
         {
             var githubApiResponse = await sharedHttpClient.GetStringAsync(githubApiUrl);
@@ -131,6 +147,7 @@ public static class UniversalInstaller
             if (responseRootElement.TryGetProperty("assets", out var releaseAssets))
             {
                 var assetNamePattern = new Regex(assetNameRegexPattern, RegexOptions.IgnoreCase);
+
                 foreach (var releaseAsset in releaseAssets.EnumerateArray())
                 {
                     if (releaseAsset.TryGetProperty("name", out var assetNameProperty) && releaseAsset.TryGetProperty("browser_download_url", out var downloadUrlProperty))
@@ -143,10 +160,12 @@ public static class UniversalInstaller
                 }
             }
         }
+
         catch (Exception exception)
         {
             GD.PrintErr($"Github API error: {exception.Message}");
         }
+
         return null;
     }
 
@@ -161,6 +180,7 @@ public static class UniversalInstaller
             await httpResponse.Content.CopyToAsync(destinationFileStream);
             return true;
         }
+
         catch (Exception exception)
         {
             GD.PrintErr($"Download error: {exception.Message}");
@@ -181,6 +201,7 @@ public static class UniversalInstaller
             archiveToolExecutablePath = Path.Combine(appInstance.configManager.ApplicationRootDirectory, "tools", "7zip", "windows", "7za.exe");
             archiveToolArguments = $"x \"{archiveFilePath}\" -o\"{extractionDestinationDirectory}\" -y";
         }
+
         else
         {
             archiveToolExecutablePath = "7z";
@@ -198,13 +219,22 @@ public static class UniversalInstaller
 
             extractionProcess.Exited += (sender, exitEventArgs) =>
             {
-                if (extractionProcess.ExitCode == 0) extractionTaskCompletionSource.SetResult(true);
-                else extractionTaskCompletionSource.SetResult(false);
+                if (extractionProcess.ExitCode == 0)
+                {
+                    extractionTaskCompletionSource.SetResult(true);
+                }
+
+                else
+                {
+                    extractionTaskCompletionSource.SetResult(false);
+                }
+
                 extractionProcess.Dispose();
             };
 
             extractionProcess.Start();
         }
+
         catch (Exception exception)
         {
             GD.PrintErr($"Extraction error: {exception.Message}");
@@ -217,6 +247,7 @@ public static class UniversalInstaller
     private static void CopyDefaultConfigurations(AppInstance appInstance, string emulatorName, string emulatorTargetDirectory)
     {
         string defaultConfigDirectory = Path.Combine(appInstance.configManager.InstallScriptsPath, emulatorName, "default_config");
+
         if (Directory.Exists(defaultConfigDirectory))
         {
             try
@@ -224,6 +255,7 @@ public static class UniversalInstaller
                 CopyDirectoryRecursively(defaultConfigDirectory, emulatorTargetDirectory);
                 GD.Print($"Copied default configurations for {emulatorName}");
             }
+
             catch (Exception exception)
             {
                 GD.PrintErr($"Failed to copy default configurations for {emulatorName}: {exception.Message}");

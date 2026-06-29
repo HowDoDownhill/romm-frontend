@@ -218,9 +218,11 @@ public partial class ControllerIcons : Node
 		//Input can fire before controller is ready, typically
 		//during hotreload
 		if( !IsControllerIconsPluginReady() )
-			return;
+        {
+            return;
+        }
 
-		EInputType inputType = LastInputType;
+        EInputType inputType = LastInputType;
 		int controller = LastController;
 		switch( e.GetClass() )
 		{
@@ -301,9 +303,11 @@ public partial class ControllerIcons : Node
 			// for f: Callable in _cached_callables:
 			foreach( Callable f in _CachedCallables )
 			{
-				if( f.Target != null && f.Delegate != null ) 
-					f.Call();
-			}
+				if( f.Target != null && f.Delegate != null )
+                {
+                    f.Call();
+                }
+            }
 		}
 
 		_CachedCallables.Clear();
@@ -369,9 +373,11 @@ public partial class ControllerIcons : Node
 	public List<Texture2D> ParseEventModifiers(InputEvent e )
 	{
 		if( e == null || e is not InputEventWithModifiers )
-			return new();
+        {
+            return new();
+        }
 
-		InputEventWithModifiers eModifiers = e as InputEventWithModifiers;
+        InputEventWithModifiers eModifiers = e as InputEventWithModifiers;
 
 		List<Texture2D> icons = new();
 		List<string> modifiers = new();
@@ -433,9 +439,11 @@ public partial class ControllerIcons : Node
 	public string ParsePathToTTS(string path, EInputType? input_type = EInputType.NONE, int controller = int.MinValue)
 	{
 		if( input_type == null )
-			return "";
+        {
+            return "";
+        }
 
-		if( input_type == EInputType.NONE )
+        if ( input_type == EInputType.NONE )
 		{
 			input_type = LastInputType;
 		}
@@ -453,9 +461,11 @@ public partial class ControllerIcons : Node
 	{
 		string path = ConvertEventToPath( e );
 		if( string.IsNullOrWhiteSpace(path) )
-			return null;
+        {
+            return null;
+        }
 
-		List<string> basePaths = new(){
+        List<string> basePaths = new(){
 			Settings.custom_asset_dir + "/",
 			"res://addons/controller_icons/assets/"
 		};
@@ -463,13 +473,17 @@ public partial class ControllerIcons : Node
 		foreach( string basePath in basePaths )
 		{
 			if( string.IsNullOrWhiteSpace(basePath) )
-				continue;
+            {
+                continue;
+            }
 
-			string dictPath = basePath + path + "." + BaseExtension;
+            string dictPath = basePath + path + "." + BaseExtension;
 			if( LoadIcon(dictPath) != Error.Ok )
-				continue;
+            {
+                continue;
+            }
 
-			return _CachedIcons[dictPath];
+            return _CachedIcons[dictPath];
 		}
 
 		return null;
@@ -478,12 +492,18 @@ public partial class ControllerIcons : Node
 	public EPathType GetPathType(string path)
 	{
 		if (CustomInputActions.ContainsKey(path) || InputMap.HasAction(path))
-			return EPathType.INPUT_ACTION;
-		else if( path.Split("/")[0] == "joypad" )
-			return EPathType.JOYPAD_PATH;
-		else
-			return EPathType.SPECIFIC_PATH;
-	}
+        {
+            return EPathType.INPUT_ACTION;
+        }
+        else if( path.Split("/")[0] == "joypad" )
+        {
+            return EPathType.JOYPAD_PATH;
+        }
+        else
+        {
+            return EPathType.SPECIFIC_PATH;
+        }
+    }
 
 	public InputEvent GetMatchingEvent( string path, EInputType inputType = EInputType.NONE, long controller = int.MinValue )
 	{
@@ -499,37 +519,53 @@ public partial class ControllerIcons : Node
 
 		Godot.Collections.Array<InputEvent> events;
 		if( CustomInputActions.TryGetValue(path, out Godot.Collections.Array<InputEvent> value) )
-			events = value;
-		else
-			events = InputMap.ActionGetEvents(path);
+        {
+            events = value;
+        }
+        else
+        {
+            events = InputMap.ActionGetEvents(path);
+        }
 
-		List<InputEvent> fallbacks = new();
+        List<InputEvent> fallbacks = new();
 		foreach( InputEvent inputEvent in events )
 		{
-			if( !IsInstanceValid(inputEvent) ) continue;
+			if( !IsInstanceValid(inputEvent) )
+            {
+                continue;
+            }
 
-			switch( inputEvent.GetClass() )
+            switch ( inputEvent.GetClass() )
 			{
 				case "InputEventKey":
 				case "InputEventMouse":
 				case "InputEventMouseMotion":
 				case "InputEventMouseButton":
 					if( inputType == EInputType.KEYBOARD_MOUSE )
-						return inputEvent;
-					break;
+                    {
+                        return inputEvent;
+                    }
+
+                    break;
 				case "InputEventJoypadButton":
 				case "InputEventJoypadMotion":
 					if( inputType == EInputType.CONTROLLER )
 					{
 						// Use the first device specific mapping if there is one.
 						if( inputEvent.Device == controller )
-							return inputEvent;
-						// Otherwise use the first "all devices" mapping.
-						if( inputEvent.Device < 0 ) // All-device event
-							fallbacks.Insert(0, inputEvent );
-						else
-							fallbacks.Add(inputEvent);
-					}
+                        {
+                            return inputEvent;
+                        }
+                        // Otherwise use the first "all devices" mapping.
+                        if ( inputEvent.Device < 0 ) // All-device event
+                        {
+                            fallbacks.Insert(0, inputEvent );
+                        }
+                        else
+                        {
+                            fallbacks.Add(inputEvent);
+                        }
+                    }
 				break;
 			}
 		}
@@ -547,8 +583,11 @@ public partial class ControllerIcons : Node
 		foreach( string basePath in basePaths )
 		{
 			if( string.IsNullOrWhiteSpace(basePath) )
-				continue;
-			string asset_path = basePath + ConvertPathToAssetFile(path, inputType, controller, forceControllerIconStyle);
+            {
+                continue;
+            }
+
+            string asset_path = basePath + ConvertPathToAssetFile(path, inputType, controller, forceControllerIconStyle);
 
 			paths.Add(asset_path + "." + BaseExtension);
 		}
@@ -563,8 +602,11 @@ public partial class ControllerIcons : Node
 			case EPathType.INPUT_ACTION:
 				InputEvent e = GetMatchingEvent(path, inputType, controller);
 				if( e != null)
-					return ConvertEventToPath(e, controller, forceControllerIconStyle);
-				return path;
+                {
+                    return ConvertEventToPath(e, controller, forceControllerIconStyle);
+                }
+
+                return path;
 			case EPathType.JOYPAD_PATH:
 				return Mapper.ConvertJoypadPath(path, controller, Settings.joypad_fallback, forceControllerIconStyle);
 			case EPathType.SPECIFIC_PATH:
@@ -617,17 +659,26 @@ public partial class ControllerIcons : Node
 		{
 			// If this is a physical key, convert to localized scancode
 			if( keyEvent.Keycode == 0 )
-				return ConvertKeyToPath(DisplayServer.KeyboardGetKeycodeFromPhysical(keyEvent.PhysicalKeycode));
-			return ConvertKeyToPath(keyEvent.Keycode);
+            {
+                return ConvertKeyToPath(DisplayServer.KeyboardGetKeycodeFromPhysical(keyEvent.PhysicalKeycode));
+            }
+
+            return ConvertKeyToPath(keyEvent.Keycode);
 		}
 		else if( e is InputEventMouseButton mouseEvent )
-			return ConvertMouseButtonToPath(mouseEvent.ButtonIndex);
-		else if( e is InputEventJoypadButton joypadButtonEvent )
-			return ConvertJoypadButtonToPath(joypadButtonEvent.ButtonIndex, controller, forcedControllerIconStyle);
-		else if( e is InputEventJoypadMotion joypadMotionEvent )
-			return ConvertJoypadMotionToPath(joypadMotionEvent.Axis, controller, forcedControllerIconStyle);
+        {
+            return ConvertMouseButtonToPath(mouseEvent.ButtonIndex);
+        }
+        else if( e is InputEventJoypadButton joypadButtonEvent )
+        {
+            return ConvertJoypadButtonToPath(joypadButtonEvent.ButtonIndex, controller, forcedControllerIconStyle);
+        }
+        else if( e is InputEventJoypadMotion joypadMotionEvent )
+        {
+            return ConvertJoypadMotionToPath(joypadMotionEvent.Axis, controller, forcedControllerIconStyle);
+        }
 
-		return "";
+        return "";
 	}
 
 	private static string ConvertKeyToPath( Key keycode )
@@ -846,30 +897,42 @@ public partial class ControllerIcons : Node
 
 	private Error LoadIcon( string path )
 	{
-		if( _CachedIcons.ContainsKey(path) ) return Error.Ok;
+		if( _CachedIcons.ContainsKey(path) )
+        {
+            return Error.Ok;
+        }
 
-		Texture2D tex;
+        Texture2D tex;
 		if( path.StartsWith("res://") )
 		{
 			if( ResourceLoader.Exists(path) )
 			{
 				tex = ResourceLoader.Load<Texture2D>(path);
 				if( tex == null )
-					return Error.FileCorrupt;
-			}
+                {
+                    return Error.FileCorrupt;
+                }
+            }
 			else
-				return Error.FileNotFound;
-		}
+            {
+                return Error.FileNotFound;
+            }
+        }
 		else
 		{
 			if( !FileAccess.FileExists(path) )
-				return Error.FileNotFound;
+            {
+                return Error.FileNotFound;
+            }
 
-			Image img = new();
+            Image img = new();
 			Error err = img.Load(path);
 			if( err != Error.Ok )
-				return err;
-			tex = ImageTexture.CreateFromImage(img);			
+            {
+                return err;
+            }
+
+            tex = ImageTexture.CreateFromImage(img);			
 		}
 		_CachedIcons[path] = tex;
 

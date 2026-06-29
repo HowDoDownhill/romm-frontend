@@ -7,8 +7,8 @@ using FileAccess = System.IO.FileAccess;
 
 public partial class LoadingScreen : Control
 {
-    [Export] private ProgressBar _progressBar;
-    [Export] private Label _statusLabel;
+    [Export] private ProgressBar progressBar;
+    [Export] private Label statusLabel;
 
     private AppInstance appInstance;
 
@@ -21,9 +21,9 @@ public partial class LoadingScreen : Control
 
     private async void AttemptLoadFromCacheAsync()
     {
-        if (_statusLabel != null)
+        if (statusLabel != null)
         {
-            _statusLabel.Text = "Checking cache...";
+            statusLabel.Text = "Checking cache...";
         }
 
         var (cachedSystems, cachedGames) = appInstance.cacheManager.LoadCache();
@@ -44,22 +44,26 @@ public partial class LoadingScreen : Control
             appInstance.dataBus.systems = cachedSystems;
             appInstance.dataBus.gameCache = cachedGames;
             
-            if (_statusLabel != null)
+            if (statusLabel != null)
             {
-                _statusLabel.Text = "Loaded from cache!";
+                statusLabel.Text = "Loaded from cache!";
             }
-            if (_progressBar != null)
+
+
+            if (progressBar != null)
             {
-                _progressBar.Value = 100;
+                progressBar.Value = 100;
             }
 
             await SyncFirmwareAsync();
+
             await PopulateAvailableFirmwareAsync();
 
 
             await Task.Delay(200);
             GetTree().ChangeSceneToFile("res://scenes/main_scene.tscn");
         }
+
         else
         {
             PreloadDataAsync();
@@ -68,9 +72,9 @@ public partial class LoadingScreen : Control
 
     private async void PreloadDataAsync()
     {
-        if (_statusLabel != null)
+        if (statusLabel != null)
         {
-            _statusLabel.Text = "Loading systems...";
+            statusLabel.Text = "Loading systems...";
         }
 
         List<GameSystem> systems = await appInstance.rommApi.GetSystemsAsync();
@@ -78,15 +82,19 @@ public partial class LoadingScreen : Control
 
         if (systems == null || !systems.Any())
         {
-            if (_statusLabel != null) _statusLabel.Text = "No systems found.";
+            if (statusLabel != null)
+            {
+                statusLabel.Text = "No systems found.";
+            }
+
             await Task.Delay(1000);
             GetTree().ChangeSceneToFile("res://scenes/main_scene.tscn");
             return;
         }
 
-        if (_statusLabel != null)
+        if (statusLabel != null)
         {
-            _statusLabel.Text = "Loading games...";
+            statusLabel.Text = "Loading games...";
         }
 
         appInstance.dataBus.gameCache.Clear();
@@ -114,6 +122,7 @@ public partial class LoadingScreen : Control
                     hasMoreGames = allGamesForSystem.Count < gameResponse.Total;
                     currentPage++;
                 }
+
                 else
                 {
                     hasMoreGames = false;
@@ -124,9 +133,10 @@ public partial class LoadingScreen : Control
             GD.Print($"Found {allGamesForSystem.Count} games for {system.Name}");
             
             systemsProcessed++;
-            if (_progressBar != null)
+
+            if (progressBar != null)
             {
-                _progressBar.Value = ((float)systemsProcessed / systems.Count) * 100;
+                progressBar.Value = ((float)systemsProcessed / systems.Count) * 100;
             }
         }
         
@@ -134,12 +144,13 @@ public partial class LoadingScreen : Control
         appInstance.cacheManager.SaveCache(appInstance.dataBus.systems, appInstance.dataBus.gameCache);
         
         await SyncFirmwareAsync();
+
         await PopulateAvailableFirmwareAsync();
         
         
-        if (_statusLabel != null)
+        if (statusLabel != null)
         {
-            _statusLabel.Text = "Finished!";
+            statusLabel.Text = "Finished!";
         }
         
         await Task.Delay(200);
@@ -148,9 +159,9 @@ public partial class LoadingScreen : Control
 
     private async Task SyncFirmwareAsync()
     {
-        if (_statusLabel != null)
+        if (statusLabel != null)
         {
-            _statusLabel.Text = "Checking for BIOS updates...";
+            statusLabel.Text = "Checking for BIOS updates...";
         }
 
         var firmwareToDownload = new List<(Firmware fw, string slug, string systemName)>();
@@ -168,7 +179,10 @@ public partial class LoadingScreen : Control
             }
         }
 
-        if (!firmwareToDownload.Any()) return;
+        if (!firmwareToDownload.Any())
+        {
+            return;
+        }
 
         int processed = 0;
         var authHeaders = appInstance.rommApi.GetAuthHeaders();
@@ -179,6 +193,7 @@ public partial class LoadingScreen : Control
             string slug = item.slug;
             
             string systemBiosDir = Path.Combine(appInstance.configManager.BiosPath, slug);
+
             if (!Directory.Exists(systemBiosDir))
             {
                 Directory.CreateDirectory(systemBiosDir);
@@ -188,12 +203,13 @@ public partial class LoadingScreen : Control
 
             if (!File.Exists(savePath))
             {
-                if (_statusLabel != null)
+                if (statusLabel != null)
                 {
-                    _statusLabel.Text = $"Downloading BIOS: {fw.FileName} ({item.systemName})...";
+                    statusLabel.Text = $"Downloading BIOS: {fw.FileName} ({item.systemName})...";
                 }
 
                 string downloadUrl = appInstance.rommApi.GetFirmwareDownloadUrl(fw);
+
                 await DownloadFirmwareWrapperAsync(downloadUrl, savePath, authHeaders);
 
                 string configPath = Path.Combine(systemBiosDir, $"{Path.GetFileNameWithoutExtension(fw.FileName)}.config.json");
@@ -202,9 +218,10 @@ public partial class LoadingScreen : Control
             }
 
             processed++;
-            if (_progressBar != null)
+
+            if (progressBar != null)
             {
-                _progressBar.Value = ((float)processed / firmwareToDownload.Count) * 100;
+                progressBar.Value = ((float)processed / firmwareToDownload.Count) * 100;
             }
         }
     }
@@ -214,12 +231,14 @@ public partial class LoadingScreen : Control
         foreach (var system in appInstance.dataBus.systems)
         {
             var firmwareDir = appInstance.configManager.BiosPath.PathJoin(system.Slug);
+
             if (DirAccess.DirExistsAbsolute(firmwareDir))
             {
                 var firmwaresFromApi = await appInstance.rommApi.GetFirmwareAsync(system.Id);
                 var localFiles = DirAccess.GetFilesAt(firmwareDir);
 
                 var availableFirmwares = new List<Firmware>();
+
                 foreach (var fw in firmwaresFromApi)
                 {
                     if (localFiles.Contains(fw.FileName))
@@ -228,6 +247,7 @@ public partial class LoadingScreen : Control
                         availableFirmwares.Add(fw);
                     }
                 }
+
                 system.AvailableFirmwares = availableFirmwares;
 
                 if (string.IsNullOrEmpty(system.PrefferedFirmware) && system.AvailableFirmwares.Any())
@@ -250,6 +270,7 @@ public partial class LoadingScreen : Control
             {
                 tcs.SetResult(path);
             }
+
         );
         
         return tcs.Task;

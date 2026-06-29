@@ -27,6 +27,7 @@ public partial class CacheManager : Node
             systemsCacheFilePath = ProjectSettings.GlobalizePath("res://systems.cache");
             gamesCacheFilePath = ProjectSettings.GlobalizePath("res://games.cache");
         }
+
         else
         {
             systemsCacheFilePath = OS.GetExecutablePath().GetBaseDir() + "/systems.cache";
@@ -55,8 +56,8 @@ public partial class CacheManager : Node
 
         if (cachedSystems != null && cachedGames != null)
         {
-            // Validate that the cache isn't from a previous broken export
-            // The broken export could have serialized Files as null OR as an empty list for EVERY game.
+
+
             bool isCacheValid = true;
             bool foundAnyGameWithFiles = false;
 
@@ -70,10 +71,14 @@ public partial class CacheManager : Node
                         break;
                     }
                 }
-                if (foundAnyGameWithFiles) break;
+
+
+                if (foundAnyGameWithFiles)
+                {
+                    break;
+                }
             }
 
-            // If we have games, but literally zero files across the entire cache, it's a broken cache from the old export.
             if (cachedGames.Values.Any(list => list.Count > 0) && !foundAnyGameWithFiles)
             {
                 isCacheValid = false;
@@ -83,6 +88,7 @@ public partial class CacheManager : Node
             {
                 return (cachedSystems, cachedGames);
             }
+
             else 
             {
                 GD.Print("Cache invalid (missing Files). Rebuilding cache...");
@@ -95,6 +101,7 @@ public partial class CacheManager : Node
     private void WriteJsonToFile<T>(string filePath, T dataToSerialize, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo)
     {
         using var fileHandle = FileAccess.Open(filePath, FileAccess.ModeFlags.Write);
+
         if (fileHandle == null)
         {
             GD.PrintErr($"Failed to open file for writing: {filePath}");
@@ -113,6 +120,7 @@ public partial class CacheManager : Node
         }
 
         using var fileHandle = FileAccess.Open(filePath, FileAccess.ModeFlags.Read);
+
         if (fileHandle == null)
         {
             GD.PrintErr($"Failed to open file for reading: {filePath}");

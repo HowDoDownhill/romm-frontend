@@ -46,8 +46,10 @@ public partial class ControllerButton : Button
 			_show_only = value;
 			
 			if( IsControllerIconsPluginReady() )
-				OnInputTypeChanged((int)CI.LastInputType, CI.LastController);
-		}
+            {
+                OnInputTypeChanged((int)CI.LastInputType, CI.LastController);
+            }
+        }
 	}
 	private EShowMode _show_only = EShowMode.ANY;
 
@@ -64,8 +66,10 @@ public partial class ControllerButton : Button
 			_force_type = value;
 
 			if( IsControllerIconsPluginReady() )
-				OnInputTypeChanged((int)CI.LastInputType, CI.LastController);
-		}
+            {
+                OnInputTypeChanged((int)CI.LastInputType, CI.LastController);
+            }
+        }
 	}
 	private EInputType _force_type = EInputType.NONE;
 
@@ -106,8 +110,10 @@ public partial class ControllerButton : Button
 			this.path = path;
 		}
 		else
-			Visible = false;
-	}
+        {
+            Visible = false;
+        }
+    }
 
 	private string GetTTSString()
 	{

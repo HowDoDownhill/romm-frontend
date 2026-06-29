@@ -9,7 +9,7 @@ using System.Linq;
 
 public partial class AppUpdater : Node
 {
-    public const string CurrentVersion = "v1.0.1";
+    public const string CurrentVersion = "v1.0.3";
     private const string RepoOwner = "HowDoDownhill";
     private const string RepoName = "romm-frontend";
 
@@ -27,7 +27,7 @@ public partial class AppUpdater : Node
     public override void _Ready()
     {
         httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("RommFrontendUpdater", "1.0"));
-        // Ensure downloads directory exists
+
         if (!DirAccess.DirExistsAbsolute("user://downloads"))
         {
             DirAccess.MakeDirRecursiveAbsolute("user://downloads");
@@ -40,6 +40,7 @@ public partial class AppUpdater : Node
         {
             string url = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/latest";
             var response = await httpClient.GetAsync(url);
+
             if (!response.IsSuccessStatusCode)
             {
                 GD.PrintErr($"Failed to check for updates: {response.StatusCode}");
@@ -57,6 +58,7 @@ public partial class AppUpdater : Node
                 }
             }
         }
+
         catch (Exception ex)
         {
             GD.PrintErr($"Exception checking for updates: {ex.Message}");
@@ -74,7 +76,7 @@ public partial class AppUpdater : Node
             return vRemote > vLocal;
         }
         
-        return remoteVersion != localVersion;
+        return cleanRemote != cleanLocal;
     }
 
     public async Task DownloadUpdateAsync(string remoteVersion)
@@ -83,6 +85,7 @@ public partial class AppUpdater : Node
         {
             string url = $"https://api.github.com/repos/{RepoOwner}/{RepoName}/releases/tags/{remoteVersion}";
             var response = await httpClient.GetAsync(url);
+
             if (!response.IsSuccessStatusCode)
             {
                 CallDeferred(MethodName.EmitSignal, SignalName.UpdateDownloadCompleted, false);
@@ -96,6 +99,7 @@ public partial class AppUpdater : Node
             string targetZipName = OS.HasFeature("windows") ? "romm-frontend-windows.zip" : "romm-frontend-linux.zip";
             
             var asset = releaseInfo?.Assets?.FirstOrDefault(a => a.Name.Contains(targetZipName, StringComparison.OrdinalIgnoreCase));
+
             if (asset == null)
             {
                 
@@ -126,10 +130,12 @@ public partial class AppUpdater : Node
                     do
                     {
                         var read = await contentStream.ReadAsync(buffer, 0, buffer.Length);
+
                         if (read == 0)
                         {
                             isMoreToRead = false;
                         }
+
                         else
                         {
                             await fileStream.WriteAsync(buffer, 0, read);
@@ -141,12 +147,14 @@ public partial class AppUpdater : Node
                                 CallDeferred(MethodName.EmitSignal, SignalName.UpdateDownloadProgress, progress);
                             }
                         }
+
                     } while (isMoreToRead);
                 }
             }
 
             CallDeferred(MethodName.EmitSignal, SignalName.UpdateDownloadCompleted, true);
         }
+
         catch (Exception ex)
         {
             GD.PrintErr($"Exception downloading update: {ex.Message}");
@@ -157,6 +165,7 @@ public partial class AppUpdater : Node
     public void ApplyUpdateAndRestart()
     {
         string downloadPath = ProjectSettings.GlobalizePath("user://downloads/update.zip");
+
         if (!File.Exists(downloadPath))
         {
             GD.PrintErr("Update zip not found.");
@@ -189,6 +198,7 @@ del ""%~f0""
                 WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
             });
         }
+
         else if (OS.HasFeature("linux"))
         {
             string shPath = ProjectSettings.GlobalizePath("user://downloads/update.sh");

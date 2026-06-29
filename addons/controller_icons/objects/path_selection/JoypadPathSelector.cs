@@ -37,8 +37,10 @@ public partial class JoypadPathSelector : SelectorPanel
 		// statically typed:
 		// for button:Button in button_nodes:
 		foreach( Button button in ButtonNodes )
-			button.ButtonPressed = false;
-	}
+        {
+            button.ButtonPressed = false;
+        }
+    }
 
 	public string GetIconPath()
 	{
@@ -48,27 +50,39 @@ public partial class JoypadPathSelector : SelectorPanel
 		foreach( Button button in ButtonNodes )
 		{
 			if( button.ButtonPressed )
-				return ( button.Icon as ControllerIconTexture ).path;
-		}
+            {
+                return ( button.Icon as ControllerIconTexture ).path;
+            }
+        }
 
 		return "";
 	}
 
 	public override void _Input( InputEvent e )
 	{
-		if( !Visible ) return;
+		if( !Visible )
+        {
+            return;
+        }
 
-		if( e is InputEventJoypadMotion motionEvent )
-			InputMotion(motionEvent);
-		else if( e is InputEventJoypadButton buttonEvent )
-			InputButton(buttonEvent);
-	}
+        if ( e is InputEventJoypadMotion motionEvent )
+        {
+            InputMotion(motionEvent);
+        }
+        else if( e is InputEventJoypadButton buttonEvent )
+        {
+            InputButton(buttonEvent);
+        }
+    }
 
 	private void InputMotion(InputEventJoypadMotion e )
 	{
-		if( Mathf.Abs(e.AxisValue) < 0.5f ) return;
+		if( Mathf.Abs(e.AxisValue) < 0.5f )
+        {
+            return;
+        }
 
-		switch( e.Axis )
+        switch ( e.Axis )
 		{
 			case JoyAxis.LeftX:
 			case JoyAxis.LeftY:
@@ -89,9 +103,12 @@ public partial class JoypadPathSelector : SelectorPanel
 
 	private void InputButton( InputEventJoypadButton e )
 	{
-		if( !e.Pressed ) return;
+		if( !e.Pressed )
+        {
+            return;
+        }
 
-		switch( e.ButtonIndex )
+        switch ( e.ButtonIndex )
 		{
 			case JoyButton.A:
 				SimulateButtonPress(GetNode<Button>("%A"));
@@ -162,9 +179,12 @@ public partial class JoypadPathSelector : SelectorPanel
 		// for button:Button in button_nodes:
 		foreach( Button button in ButtonNodes )
 		{
-			if( button.HasMeta("from_ui") && (bool)button.GetMeta("from_ui", true) == false ) return;
+			if( button.HasMeta("from_ui") && (bool)button.GetMeta("from_ui", true) == false )
+            {
+                return;
+            }
 
-			if( button.ButtonPressed )
+            if ( button.ButtonPressed )
 			{
 				if( LastPressedButton == button )
 				{
@@ -177,8 +197,10 @@ public partial class JoypadPathSelector : SelectorPanel
 					#endif
 					}
 					else
-						LastPressedTimestamp = Time.GetTicksMsec() + 1000;
-				}
+                    {
+                        LastPressedTimestamp = Time.GetTicksMsec() + 1000;
+                    }
+                }
 				else
 				{
 					LastPressedButton = button;

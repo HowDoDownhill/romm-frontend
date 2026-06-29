@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://c1c22gg5ecr81" path="res://scripts/login/LoadingScreen.cs" id="1_ep5rh"]
 
-[node name="LoadingScreen" type="Control" unique_id=1334140658 node_paths=PackedStringArray("_progressBar", "_statusLabel")]
+[node name="LoadingScreen" type="Control" unique_id=1334140658 node_paths=PackedStringArray("progressBar", "statusLabel")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -10,8 +10,8 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_ep5rh")
-_progressBar = NodePath("TextureRect/Panel/VBoxContainer/ProgressBar")
-_statusLabel = NodePath("TextureRect/Panel/VBoxContainer/Label")
+progressBar = NodePath("TextureRect/Panel/VBoxContainer/ProgressBar")
+statusLabel = NodePath("TextureRect/Panel/VBoxContainer/Label")
 
 [node name="TextureRect" type="ColorRect" parent="." unique_id=1301104698]
 layout_mode = 1
@@ -49,3 +49,4 @@ text = "Fetching Game List..."
 
 [node name="ProgressBar" type="ProgressBar" parent="TextureRect/Panel/VBoxContainer" unique_id=1954517853]
 layout_mode = 2
+
