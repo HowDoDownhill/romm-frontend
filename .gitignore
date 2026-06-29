@@ -45,6 +45,7 @@ States/
 config.cfg
 games.cache
 systems.cache
+assets/screenshots/
 
 .claude/
 
