@@ -2,7 +2,7 @@
   "name": "Dolphin",
   "executable_name": {
     "windows": "Dolphin.exe",
-    "linux": "dolphin.AppImage",
+    "linux": "Dolphin_Emulator-2603a-anylinux-x86_64.AppImage",
     "macos": "Dolphin"
   },
   "emulator_dir_name": {
@@ -16,10 +16,16 @@
       "url": "https://dl.dolphin-emu.org/releases/2606/dolphin-2606-x64.7z",
       "extract": true,
       "extract_folder_regex": "dolphin-*"
+    },
+    "linux": {
+      "type": "github_release",
+      "repo": "pkgforge-dev/Dolphin-emu-AppImage",
+      "asset_regex": "Dolphin_Emulator-2603a-anylinux-x86_64.AppImage",
+      "extract": false
     }
   },
-  "launch_args_with_game": "-b -e \"{rom_path}\"",
-  "launch_args_without_game": "",
+  "launch_args_with_game": "-b -u ./ -e \"{rom_path}\"",
+  "launch_args_without_game": "-u ./",
   "settings_fields": [
     {
       "id": "fullscreen",
