@@ -25,9 +25,16 @@ test_*.png
 test_*.png.import
 
 .agents/
+/.agents/
+.agents/*
+/.agents/*
 build_errors.txt
 
+
 releases/
+/releases/
+releases/*
+/releases/*
 
 /build/
 /bios/

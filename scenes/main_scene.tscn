@@ -79,7 +79,7 @@ downloadProgressPopup = NodePath("Background/DownloadProgressPopup")
 downloadProgressLabel = NodePath("Background/DownloadProgressPopup/Panel/VBoxContainer/LabelContianer/Label")
 downloadProgressBar = NodePath("Background/DownloadProgressPopup/Panel/VBoxContainer/ProgressContainer/ProgressBar")
 changelogPopup = NodePath("Background/ChangelogContainer")
-changelogRichTextLabel = NodePath("Background/ChangelogContainer/Panel/MarginContainer/RichTextLabel")
+changelogRichTextLabel = NodePath("Background/ChangelogContainer/Panel/MarginContainer/VBoxContainer/RichTextLabel")
 backgroundRect = NodePath("Background")
 mainVBoxContainer = NodePath("Background/VBoxContainer")
 startMenu = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu")
@@ -712,7 +712,6 @@ layout_mode = 2
 size_flags_vertical = 8
 
 [node name="ChangelogContainer" type="MarginContainer" parent="Background" unique_id=664785356]
-visible = false
 custom_minimum_size = Vector2(600, 800)
 layout_mode = 1
 anchors_preset = 8
@@ -742,5 +741,22 @@ theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="RichTextLabel" type="RichTextLabel" parent="Background/ChangelogContainer/Panel/MarginContainer" unique_id=1651234799]
+[node name="VBoxContainer" type="VBoxContainer" parent="Background/ChangelogContainer/Panel/MarginContainer" unique_id=2108610997]
 layout_mode = 2
+
+[node name="RichTextLabel" type="RichTextLabel" parent="Background/ChangelogContainer/Panel/MarginContainer/VBoxContainer" unique_id=1651234799]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Background/ChangelogContainer/Panel/MarginContainer/VBoxContainer" unique_id=1669800469]
+layout_mode = 2
+
+[node name="AcceptButton" type="Button" parent="Background/ChangelogContainer/Panel/MarginContainer/VBoxContainer/HBoxContainer" unique_id=898341432]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Accept"
+
+[node name="CancelButton" type="Button" parent="Background/ChangelogContainer/Panel/MarginContainer/VBoxContainer/HBoxContainer" unique_id=85801708]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Cancel"
