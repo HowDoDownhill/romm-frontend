@@ -61,6 +61,7 @@ public partial class MainScene : Control
     [Export] public Node RefreshGamesPopupOption;
     [Export] public Node RefreshCurrentSystemGamesPopupOption;
     [Export] public Node QuitPopupOption;
+    [Export] public Node RandomGamePopupOption;
 
     [ExportGroup("Update & Refresh UI")]
     [Export] private Control downloadProgressPopup;
@@ -69,6 +70,8 @@ public partial class MainScene : Control
     
     [Export] private Control changelogPopup;
     [Export] private RichTextLabel changelogRichTextLabel;
+    [Export] private Button acceptUpdateBtn;
+    [Export] private Button cancelUpdateBtn;
 
     private AppInstance appInstance;
     private ImageTexture placeholderTexture;
@@ -135,6 +138,11 @@ public partial class MainScene : Control
             {
                 quitBtn.Pressed += OnQuitPressed;
             }
+
+            if (RandomGamePopupOption is Button randomGameBtn)
+            {
+                randomGameBtn.Pressed += OnRandomGamePressed;
+            }
         }
 
         if (settingsMenuContainer != null)
@@ -142,6 +150,16 @@ public partial class MainScene : Control
             settingsMenuContainer.Visible = false;
             settingsSectionsTree?.AddThemeStyleboxOverride("focus", new StyleBoxEmpty());
             SetupSettingsTree();
+        }
+
+        if (acceptUpdateBtn != null)
+        {
+            acceptUpdateBtn.Pressed += OnAcceptUpdatePressed;
+        }
+        
+        if (cancelUpdateBtn != null)
+        {
+            cancelUpdateBtn.Pressed += OnCancelUpdatePressed;
         }
 
         GetCache();
@@ -176,8 +194,18 @@ public partial class MainScene : Control
 
         if (changelogPopup != null && changelogRichTextLabel != null)
         {
-            changelogRichTextLabel.Text = $"[b]A new version ({version}) of Romm Frontend is available.[/b]\n\nRelease Notes:\n{releaseNotes}\n\nPress (A)/Enter to download and install, or (B)/Escape to cancel.";
+            string sanitizedNotes = releaseNotes.Replace("\r", "").Replace("\b", "");
+            changelogRichTextLabel.Text = $"[b]A new version ({version}) of Romm Frontend is available.[/b]\n\nRelease Notes:\n{sanitizedNotes}";
             changelogPopup.Visible = true;
+
+            if (acceptUpdateBtn != null)
+            {
+                acceptUpdateBtn.Text = "Select";
+            }
+            if (cancelUpdateBtn != null)
+            {
+                cancelUpdateBtn.Text = "Close";
+            }
         }
     }
 
@@ -504,6 +532,28 @@ public partial class MainScene : Control
         GetTree().Quit();
     }
 
+    private void OnRandomGamePressed()
+    {
+        if (currentlyShownGames.Count > 0)
+        {
+            int randomIndex = new Random().Next(currentlyShownGames.Count);
+            OnGameSelected(randomIndex);
+
+            if (gameList != null && gameList.HasMethod("Refresh"))
+            {
+                gameList.Set("SelectedIndex", randomIndex);
+                gameList.Call("Refresh");
+            }
+
+            if (startMenuRoot != null)
+            {
+                startMenuRoot.Visible = false;
+            }
+            
+            gameList?.GrabFocus();
+        }
+    }
+
     private void OnAssetDownloaded(int gameId, string assetType)
     {
         if (currentlySelectedGame != null && currentlySelectedGame.Id == gameId)
@@ -512,6 +562,39 @@ public partial class MainScene : Control
         }
     }
     
+    private string fuzzySearchBuffer = "";
+    private ulong lastKeystrokeTime = 0;
+    
+    private void OnAcceptUpdatePressed()
+    {
+        if (changelogPopup != null) changelogPopup.Visible = false;
+
+        if (!string.IsNullOrEmpty(pendingUpdateVersion))
+        {
+            if (downloadProgressPopup != null)
+            {
+                downloadProgressPopup.Visible = true;
+            }
+
+            if (downloadProgressLabel != null)
+            {
+                downloadProgressLabel.Text = "Downloading...";
+            }
+
+            if (downloadProgressBar != null)
+            {
+                downloadProgressBar.Value = 0;
+            }
+
+            _ = appUpdater.DownloadUpdateAsync(pendingUpdateVersion);
+        }
+    }
+
+    private void OnCancelUpdatePressed()
+    {
+        if (changelogPopup != null) changelogPopup.Visible = false;
+    }
+
     public override void _Input(InputEvent @event)
     {
         if (changelogPopup != null && changelogPopup.Visible)
@@ -520,32 +603,12 @@ public partial class MainScene : Control
 
             if (@event.IsActionPressed("ui_accept"))
             {
-                changelogPopup.Visible = false;
-
-                if (!string.IsNullOrEmpty(pendingUpdateVersion))
-                {
-                    if (downloadProgressPopup != null)
-                    {
-                        downloadProgressPopup.Visible = true;
-                    }
-
-                    if (downloadProgressLabel != null)
-                    {
-                        downloadProgressLabel.Text = "Downloading...";
-                    }
-
-                    if (downloadProgressBar != null)
-                    {
-                        downloadProgressBar.Value = 0;
-                    }
-
-                    _ = appUpdater.DownloadUpdateAsync(pendingUpdateVersion);
-                }
+                OnAcceptUpdatePressed();
             }
 
             else if (@event.IsActionPressed("ui_cancel") || @event.IsActionPressed("Back"))
             {
-                changelogPopup.Visible = false;
+                OnCancelUpdatePressed();
             }
 
             return;
@@ -623,6 +686,38 @@ public partial class MainScene : Control
 
             GetViewport().SetInputAsHandled();
             return;
+        }
+        
+        bool isAnyPopupVisible = (startMenuRoot != null && startMenuRoot.Visible) || 
+                                 (settingsMenuContainer != null && settingsMenuContainer.Visible) ||
+                                 (downloadsListContainer != null && downloadsListContainer.Visible);
+
+        if (!isAnyPopupVisible && @event is InputEventKey keyEvent && keyEvent.Pressed)
+        {
+            if (keyEvent.Unicode != 0)
+            {
+                ulong currentTime = Time.GetTicksMsec();
+                if (currentTime - lastKeystrokeTime > 1500)
+                {
+                    fuzzySearchBuffer = "";
+                }
+                
+                fuzzySearchBuffer += (char)keyEvent.Unicode;
+                fuzzySearchBuffer = fuzzySearchBuffer.ToLower();
+                lastKeystrokeTime = currentTime;
+
+                int matchIndex = currentlyShownGames.FindIndex(g => g.Name.ToLower().Contains(fuzzySearchBuffer));
+                
+                if (matchIndex != -1)
+                {
+                    OnGameSelected(matchIndex);
+                    if (gameList != null && gameList.HasMethod("Refresh"))
+                    {
+                        gameList.Set("SelectedIndex", matchIndex);
+                        gameList.Call("Refresh");
+                    }
+                }
+            }
         }
 
         if (startMenuRoot != null && startMenuRoot.Visible)
@@ -1813,7 +1908,7 @@ public partial class MainScene : Control
             return;
         }
 
-        string tempZipName = game.Files[0].FileName;
+        string tempZipName = game.Files[0].FileName + ".zip";
         string tempZipPath = appInstance.configManager.DownloadsPath.PathJoin(tempZipName);
         
         string baseDir = tempZipPath.GetBaseDir();
@@ -1845,39 +1940,50 @@ public partial class MainScene : Control
 
         GD.Print($"Download complete. Starting extraction for: {tempZipPath}");
 
-        try
+        string finalDir = appInstance.configManager.RomsPath.PathJoin(game.System.Slug);
+        
+        if (!DirAccess.DirExistsAbsolute(finalDir))
         {
-            using (ZipArchive archive = ZipFile.OpenRead(ProjectSettings.GlobalizePath(tempZipPath)))
-            {
-                foreach (ZipArchiveEntry entry in archive.Entries)
-                {
-                    if (entry.FullName.StartsWith("roms/") && !entry.FullName.EndsWith("/"))
-                    {
-                        string finalFileName = entry.Name;
-                        string finalDir = appInstance.configManager.RomsPath.PathJoin(game.System.Slug);
-                        string finalPath = finalDir.PathJoin(finalFileName);
-
-                        if (!DirAccess.DirExistsAbsolute(finalDir))
-                        {
-                            DirAccess.MakeDirRecursiveAbsolute(finalDir);
-                        }
-                        
-                        entry.ExtractToFile(ProjectSettings.GlobalizePath(finalPath), true);
-                        GD.Print($"Extracted {entry.FullName} to {finalPath}");
-                        
-                        UpdateDetailsPanelButtons(game);
-                        RefreshGameList();
-                        break; 
-                    }
-                }
-            }
+            DirAccess.MakeDirRecursiveAbsolute(finalDir);
         }
 
-        catch (Exception e)
+        string toolsDir = appInstance.configManager.ToolsPath;
+        string sevenZipPath = OS.HasFeature("windows") 
+            ? System.IO.Path.Combine(toolsDir, "7zip", "windows", "7za.exe")
+            : System.IO.Path.Combine(toolsDir, "7zip", "linux", "7zz");
+
+        try
+        {
+            if (OS.HasFeature("linux") || OS.GetName() == "Linux" || OS.GetName() == "X11" || OS.GetName() == "Wayland")
+            {
+                OS.Execute("chmod", new string[] { "+x", sevenZipPath }, new Godot.Collections.Array());
+            }
+            
+            string globalTempZip = ProjectSettings.GlobalizePath(tempZipPath);
+            string globalFinalDir = ProjectSettings.GlobalizePath(finalDir);
+            
+            string[] arguments = { "e", globalTempZip, $"-o{globalFinalDir}", "roms/*", "-r", "-y" };
+            
+            int exitCode = OS.Execute(sevenZipPath, arguments, new Godot.Collections.Array());
+            
+            if (exitCode == 0)
+            {
+                GD.Print($"Successfully extracted {tempZipPath} to {finalDir}");
+                
+                if (OS.HasFeature("linux") || OS.GetName() == "Linux" || OS.GetName() == "X11" || OS.GetName() == "Wayland")
+                {
+                    OS.Execute("chmod", new string[] { "-R", "a+rwx", globalFinalDir }, new Godot.Collections.Array());
+                }
+            }
+            else
+            {
+                GD.PrintErr($"Failed to extract zip file. 7zip exit code: {exitCode}");
+            }
+        }
+        catch (System.Exception e)
         {
             GD.PrintErr($"Error extracting zip file: {e.Message}");
         }
-
         finally
         {
             if (Godot.FileAccess.FileExists(tempZipPath))
@@ -1888,6 +1994,7 @@ public partial class MainScene : Control
         }
 
         UpdateDetailsPanelButtons(game);
+        RefreshGameList();
     }
     
     private void OnDownloadCompleted(string fileName, bool success)

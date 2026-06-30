@@ -107,23 +107,6 @@ public partial class DownloadManager : Node
         if (wasSuccessful)
         {
             downloadEntry.CompletionCallback?.Invoke(downloadEntry.DestinationPath);
-
-            if (OS.GetName( ) == "Linux")
-            {
-                string filePath = downloadEntry.DestinationPath; 
-                string[] arguments = {"+r", filePath};
-
-                int exitCode = OS.Execute("chmod", arguments, new Godot.Collections.Array());
-                
-                if (exitCode == 0)
-                {
-                    GD.Print($"Successfully changed permissions for {filePath}");
-                }
-                else
-                {
-                    GD.PrintErr($"Failed to change permissions. Exit code: {exitCode}");
-                }
-            }
         }
 
         else

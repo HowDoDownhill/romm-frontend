@@ -36,7 +36,7 @@ script = ExtResource("7_18nlu")
 [sub_resource type="Resource" id="Resource_6wevv"]
 script = ExtResource("7_18nlu")
 
-[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "gameList", "detailsPanelContainer", "gameTitle", "gameDescription", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "LaunchEmulatorPopupOption", "SelectBiosPopupOption", "SettingsPopupOption", "RefreshGamesPopupOption", "RefreshCurrentSystemGamesPopupOption", "QuitPopupOption", "downloadProgressPopup", "downloadProgressLabel", "downloadProgressBar", "changelogPopup", "changelogRichTextLabel", "backgroundRect", "mainVBoxContainer", "startMenu", "startMenuContainer", "biosSelectorContainer", "biosSelector", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
+[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "gameList", "detailsPanelContainer", "gameTitle", "gameDescription", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "LaunchEmulatorPopupOption", "SelectBiosPopupOption", "SettingsPopupOption", "RefreshGamesPopupOption", "RefreshCurrentSystemGamesPopupOption", "QuitPopupOption", "RandomGamePopupOption", "downloadProgressPopup", "downloadProgressLabel", "downloadProgressBar", "changelogPopup", "changelogRichTextLabel", "acceptUpdateBtn", "cancelUpdateBtn", "backgroundRect", "mainVBoxContainer", "startMenu", "startMenuContainer", "biosSelectorContainer", "biosSelector", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -75,11 +75,14 @@ SettingsPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/St
 RefreshGamesPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/RefreshAllGamesButton")
 RefreshCurrentSystemGamesPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/RefreshCurrentSystemsGamesButton")
 QuitPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/QuitButton")
+RandomGamePopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/RandomGameButton")
 downloadProgressPopup = NodePath("Background/DownloadProgressPopup")
 downloadProgressLabel = NodePath("Background/DownloadProgressPopup/Panel/VBoxContainer/LabelContianer/Label")
 downloadProgressBar = NodePath("Background/DownloadProgressPopup/Panel/VBoxContainer/ProgressContainer/ProgressBar")
 changelogPopup = NodePath("Background/ChangelogContainer")
 changelogRichTextLabel = NodePath("Background/ChangelogContainer/Panel/MarginContainer/VBoxContainer/RichTextLabel")
+acceptUpdateBtn = NodePath("Background/ChangelogContainer/Panel/MarginContainer/VBoxContainer/HBoxContainer/AcceptButton")
+cancelUpdateBtn = NodePath("Background/ChangelogContainer/Panel/MarginContainer/VBoxContainer/HBoxContainer/CancelButton")
 backgroundRect = NodePath("Background")
 mainVBoxContainer = NodePath("Background/VBoxContainer")
 startMenu = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu")
@@ -560,7 +563,6 @@ alignment = 0
 expand_icon = true
 
 [node name="StartMenu" type="MarginContainer" parent="Background" unique_id=1160206546]
-visible = false
 custom_minimum_size = Vector2(400, 600)
 layout_mode = 1
 anchors_preset = 8
@@ -605,6 +607,10 @@ text = "Select Bios For Emulator"
 [node name="SettingsButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=357423038]
 layout_mode = 2
 text = "Settings"
+
+[node name="RandomGameButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=825955596]
+layout_mode = 2
+text = "Jump to Random Game"
 
 [node name="RefreshAllGamesButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=325705108]
 layout_mode = 2
@@ -712,6 +718,7 @@ layout_mode = 2
 size_flags_vertical = 8
 
 [node name="ChangelogContainer" type="MarginContainer" parent="Background" unique_id=664785356]
+visible = false
 custom_minimum_size = Vector2(600, 800)
 layout_mode = 1
 anchors_preset = 8

@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.IO;
+using System.IO.Compression;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -9,7 +10,7 @@ using System.Linq;
 
 public partial class AppUpdater : Node
 {
-    public const string CurrentVersion = "v1.0.4";
+    public const string CurrentVersion = "v1.0.5";
     private const string RepoOwner = "HowDoDownhill";
     private const string RepoName = "romm-frontend";
 
@@ -28,9 +29,10 @@ public partial class AppUpdater : Node
     {
         httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("RommFrontendUpdater", "1.0"));
 
-        if (!DirAccess.DirExistsAbsolute("user://downloads"))
+        string downloadsPath = GetNode<AppInstance>("/root/AppInstance").configManager.DownloadsPath;
+        if (!DirAccess.DirExistsAbsolute(downloadsPath))
         {
-            DirAccess.MakeDirRecursiveAbsolute("user://downloads");
+            DirAccess.MakeDirRecursiveAbsolute(downloadsPath);
         }
     }
 
@@ -113,7 +115,8 @@ public partial class AppUpdater : Node
                 return;
             }
 
-            string downloadPath = ProjectSettings.GlobalizePath("user://downloads/update.zip");
+            string downloadsPath = GetNode<AppInstance>("/root/AppInstance").configManager.DownloadsPath;
+            string downloadPath = System.IO.Path.Combine(downloadsPath, "update.zip");
             
             using (var downloadResponse = await httpClient.GetAsync(asset.BrowserDownloadUrl, HttpCompletionOption.ResponseHeadersRead))
             {
@@ -164,7 +167,8 @@ public partial class AppUpdater : Node
 
     public void ApplyUpdateAndRestart()
     {
-        string downloadPath = ProjectSettings.GlobalizePath("user://downloads/update.zip");
+        string downloadsPath = GetNode<AppInstance>("/root/AppInstance").configManager.DownloadsPath;
+        string downloadPath = System.IO.Path.Combine(downloadsPath, "update.zip");
 
         if (!File.Exists(downloadPath))
         {
@@ -174,16 +178,18 @@ public partial class AppUpdater : Node
 
         string appPath = OS.GetExecutablePath();
         string appDir = System.IO.Path.GetDirectoryName(appPath);
+        string toolsDir = GetNode<AppInstance>("/root/AppInstance").configManager.ToolsPath;
         
         if (OS.HasFeature("windows"))
         {
-            string batPath = ProjectSettings.GlobalizePath("user://downloads/update.bat");
+            string sevenZipPath = System.IO.Path.Combine(toolsDir, "7zip", "windows", "7za.exe");
+            string batPath = System.IO.Path.Combine(downloadsPath, "update.bat");
             string batContent = $@"
 @echo off
 echo Waiting for application to close...
 timeout /t 3 /nobreak >nul
 echo Extracting update...
-powershell -Command ""Expand-Archive -Path '{downloadPath}' -DestinationPath '{appDir}' -Force""
+""{sevenZipPath}"" x ""{downloadPath}"" -o""{appDir}"" -y
 echo Restarting application...
 start """" ""{appPath}""
 del ""{downloadPath}""
@@ -198,18 +204,19 @@ del ""%~f0""
                 WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden
             });
         }
-
         else if (OS.HasFeature("linux"))
         {
-            string shPath = ProjectSettings.GlobalizePath("user://downloads/update.sh");
+            string sevenZipPath = System.IO.Path.Combine(toolsDir, "7zip", "linux", "7zz");
+            string shPath = System.IO.Path.Combine(downloadsPath, "update.sh");
             string shContent = $@"#!/bin/bash
 sleep 3
-unzip -o ""{downloadPath}"" -d ""{appDir}""
+chmod +x ""{sevenZipPath}""
+""{sevenZipPath}"" x ""{downloadPath}"" -o""{appDir}"" -y
 chmod +x ""{appPath}""
 ""{appPath}"" &
 rm ""{downloadPath}""
 rm ""$0""
-";
+".Replace("\r", "");
             File.WriteAllText(shPath, shContent);
             
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo

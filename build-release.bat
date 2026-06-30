@@ -11,12 +11,12 @@ if not exist releases mkdir releases
 echo.
 echo Zipping Windows Release...
 if exist releases\romm-frontend-windows.zip del releases\romm-frontend-windows.zip
-powershell -Command "Compress-Archive -Path 'build\windows\*' -DestinationPath 'releases\romm-frontend-windows.zip' -Force"
+tools\7zip\windows\7za.exe a -tzip "releases\romm-frontend-windows.zip" ".\build\windows\*"
 
 echo.
 echo Zipping Linux Release...
 if exist releases\romm-frontend-linux.zip del releases\romm-frontend-linux.zip
-powershell -Command "Compress-Archive -Path 'build\linux\*' -DestinationPath 'releases\romm-frontend-linux.zip' -Force"
+tools\7zip\windows\7za.exe a -tzip "releases\romm-frontend-linux.zip" ".\build\linux\*"
 
 echo.
 echo Release packages created successfully in the 'releases' folder!
