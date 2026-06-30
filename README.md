@@ -1,5 +1,10 @@
 # Frontend User Guide
 
+<img width="1969" height="1182" alt="image" src="https://github.com/user-attachments/assets/d52d23c1-fb2a-48d0-acf7-80fa05132720" />
+<img width="1983" height="1188" alt="image" src="https://github.com/user-attachments/assets/acdc1791-f39a-4e2c-9122-c8dd63f907d7" />
+<img width="1992" height="1210" alt="image" src="https://github.com/user-attachments/assets/2dd19953-6748-4a97-837f-0bb601603922" />
+
+
 Welcome to the **Frontend User Guide**! This guide covers the basics of getting started, including how to log in, map systems to emulators, and define custom emulators and their settings.
 
 ---
