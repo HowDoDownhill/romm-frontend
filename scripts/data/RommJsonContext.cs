@@ -14,6 +14,7 @@ using System.Text.Json.Serialization;
 [JsonSerializable(typeof(Firmware))]
 [JsonSerializable(typeof(List<Firmware>))]
 [JsonSerializable(typeof(Dictionary<string, string>))]
+[JsonSerializable(typeof(List<string>))]
 [JsonSerializable(typeof(Dictionary<string, List<string>>))]
 [JsonSerializable(typeof(SyncNegotiateResponse))]
 [JsonSerializable(typeof(EmulatorMeta))]

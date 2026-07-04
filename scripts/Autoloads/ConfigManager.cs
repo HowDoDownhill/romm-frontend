@@ -26,6 +26,8 @@ public partial class ConfigManager : Node
     
     public System.Collections.Generic.Dictionary<string, string> PreferredEmulators { get; private set; } = new System.Collections.Generic.Dictionary<string, string>();
 
+    public System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<int, System.Collections.Generic.Dictionary<string, string>>> PlatformInputMappings { get; private set; } = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<int, System.Collections.Generic.Dictionary<string, string>>>();
+
     private AppInstance appInstance;
 
     private static readonly string[] requiredSubdirectories = new string[]
@@ -121,6 +123,29 @@ public partial class ConfigManager : Node
             }
         }
 
+        if (configurationFile.HasSection("PlatformInputMappings"))
+        {
+            foreach (string systemSlug in configurationFile.GetSectionKeys("PlatformInputMappings"))
+            {
+                var mappingsForSystem = (Godot.Collections.Dictionary)configurationFile.GetValue("PlatformInputMappings", systemSlug);
+                var dict = new System.Collections.Generic.Dictionary<int, System.Collections.Generic.Dictionary<string, string>>();
+                foreach (var playerKey in mappingsForSystem.Keys)
+                {
+                    if (int.TryParse(playerKey.ToString(), out int playerIndex))
+                    {
+                        var playerMappings = (Godot.Collections.Dictionary)mappingsForSystem[playerKey];
+                        var playerDict = new System.Collections.Generic.Dictionary<string, string>();
+                        foreach (var key in playerMappings.Keys)
+                        {
+                            playerDict[key.ToString()] = playerMappings[key].ToString();
+                        }
+                        dict[playerIndex] = playerDict;
+                    }
+                }
+                PlatformInputMappings[systemSlug] = dict;
+            }
+        }
+
         ApplyInputMap();
     }
 
@@ -173,6 +198,24 @@ public partial class ConfigManager : Node
             foreach (var kvp in PreferredEmulators)
             {
                 configurationFile.SetValue("PreferredEmulators", kvp.Key, kvp.Value);
+            }
+        }
+
+        if (PlatformInputMappings != null)
+        {
+            foreach (var kvp in PlatformInputMappings)
+            {
+                var godotDict = new Godot.Collections.Dictionary();
+                foreach (var playerMapping in kvp.Value)
+                {
+                    var playerGodotDict = new Godot.Collections.Dictionary();
+                    foreach (var mapping in playerMapping.Value)
+                    {
+                        playerGodotDict[mapping.Key] = mapping.Value;
+                    }
+                    godotDict[playerMapping.Key] = playerGodotDict;
+                }
+                configurationFile.SetValue("PlatformInputMappings", kvp.Key, godotDict);
             }
         }
     }
@@ -248,6 +291,20 @@ public partial class ConfigManager : Node
     public void SavePreferredEmulator(string systemSlug, string emulatorSlug)
     {
         PreferredEmulators[systemSlug] = emulatorSlug;
+        SaveConfig();
+    }
+
+    public void SavePlatformInputMapping(string systemSlug, int playerIndex, string platformButton, string standardSdlInput)
+    {
+        if (!PlatformInputMappings.ContainsKey(systemSlug))
+        {
+            PlatformInputMappings[systemSlug] = new System.Collections.Generic.Dictionary<int, System.Collections.Generic.Dictionary<string, string>>();
+        }
+        if (!PlatformInputMappings[systemSlug].ContainsKey(playerIndex))
+        {
+            PlatformInputMappings[systemSlug][playerIndex] = new System.Collections.Generic.Dictionary<string, string>();
+        }
+        PlatformInputMappings[systemSlug][playerIndex][platformButton] = standardSdlInput;
         SaveConfig();
     }
 }

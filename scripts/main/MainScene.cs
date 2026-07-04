@@ -88,6 +88,9 @@ public partial class MainScene : Control
 	[Export] private Tree settingsSectionsTree;
 	[Export] private VBoxContainer sectionOptionsContainer;
 	
+	private bool isListeningForInput = false;
+	private Action<string> inputListenCallback;
+	
 	public override void _Ready()
 	{
 		var whiteImage = Image.CreateEmpty(1, 1, false, Image.Format.Rgba8);
@@ -597,6 +600,31 @@ public partial class MainScene : Control
 
 	public override void _Input(InputEvent @event)
 	{
+		if (isListeningForInput)
+		{
+			if ((@event is InputEventKey listenKeyEvent && listenKeyEvent.Pressed) || 
+				(@event is InputEventJoypadButton listenJoyBtn && listenJoyBtn.Pressed) || 
+				(@event is InputEventJoypadMotion listenJoyMotion && Mathf.Abs(listenJoyMotion.AxisValue) > 0.5f))
+			{
+				string mappedInput = ConvertInputEventToStandardString(@event);
+				if (mappedInput != null)
+				{
+					isListeningForInput = false;
+					GetViewport().SetInputAsHandled();
+					inputListenCallback?.Invoke(mappedInput);
+				}
+				else
+				{
+					GetViewport().SetInputAsHandled();
+				}
+			}
+			else if (@event is InputEventKey || @event is InputEventJoypadButton || @event is InputEventJoypadMotion)
+			{
+				GetViewport().SetInputAsHandled();
+			}
+			return;
+		}
+
 		if (changelogPopup != null && changelogPopup.Visible)
 		{
 			GetViewport().SetInputAsHandled();
@@ -1212,6 +1240,140 @@ public partial class MainScene : Control
 		}
 	}
 	
+	public static readonly string[] StandardSdlInputs = new string[]
+	{
+		"FaceSouth", "FaceEast", "FaceWest", "FaceNorth",
+		"LeftShoulder", "RightShoulder",
+		"LeftTrigger", "RightTrigger",
+		"DpadUp", "DpadDown", "DpadLeft", "DpadRight",
+		"Back", "Start", "Guide",
+		"LeftStick", "RightStick",
+		"LeftStick_Up", "LeftStick_Down", "LeftStick_Left", "LeftStick_Right",
+		"RightStick_Up", "RightStick_Down", "RightStick_Left", "RightStick_Right"
+	};
+
+	private string ConvertInputEventToStandardString(InputEvent @event)
+	{
+		if (@event is InputEventJoypadButton joyBtn)
+		{
+			switch (joyBtn.ButtonIndex)
+			{
+				case JoyButton.A: return "A";
+				case JoyButton.B: return "B";
+				case JoyButton.X: return "X";
+				case JoyButton.Y: return "Y";
+				case JoyButton.LeftShoulder: return "LeftShoulder";
+				case JoyButton.RightShoulder: return "RightShoulder";
+				case JoyButton.Back: return "Back";
+				case JoyButton.Start: return "Start";
+				case JoyButton.Guide: return "Guide";
+				case JoyButton.LeftStick: return "LeftStick";
+				case JoyButton.RightStick: return "RightStick";
+				case JoyButton.DpadUp: return "DpadUp";
+				case JoyButton.DpadDown: return "DpadDown";
+				case JoyButton.DpadLeft: return "DpadLeft";
+				case JoyButton.DpadRight: return "DpadRight";
+			}
+		}
+		else if (@event is InputEventJoypadMotion joyMotion && Mathf.Abs(joyMotion.AxisValue) > 0.5f)
+		{
+			bool isPositive = joyMotion.AxisValue > 0;
+			switch (joyMotion.Axis)
+			{
+				case JoyAxis.TriggerLeft: return "LeftTrigger";
+				case JoyAxis.TriggerRight: return "RightTrigger";
+				case JoyAxis.LeftX: return isPositive ? "LeftStick_Right" : "LeftStick_Left";
+				case JoyAxis.LeftY: return isPositive ? "LeftStick_Down" : "LeftStick_Up";
+				case JoyAxis.RightX: return isPositive ? "RightStick_Right" : "RightStick_Left";
+				case JoyAxis.RightY: return isPositive ? "RightStick_Down" : "RightStick_Up";
+			}
+		}
+		else if (@event is InputEventKey keyEvent)
+		{
+			return "Key_" + keyEvent.Keycode.ToString();
+		}
+		return null;
+	}
+
+	private void GeneratePlatformControllerMappingsUI(string systemSlug, EmulatorMeta meta, Control parentContainer)
+	{
+		foreach (Node child in parentContainer.GetChildren())
+		{
+			child.QueueFree();
+		}
+
+		if (meta.ControllerConfig == null || meta.ControllerConfig.PlatformLayout == null || meta.ControllerConfig.PlatformLayout.Count == 0)
+		{
+			return;
+		}
+
+		VBoxContainer vbox = new VBoxContainer();
+		parentContainer.AddChild(vbox);
+
+		vbox.AddChild(new HSeparator());
+
+		Label title = new Label();
+		title.Text = "Controller Mappings";
+		title.AddThemeColorOverride("font_color", new Color(0.8f, 0.8f, 0.8f));
+		vbox.AddChild(title);
+
+		int maxControllers = meta.ControllerConfig.MaxControllers > 0 ? meta.ControllerConfig.MaxControllers : 1;
+
+		var allMappings = appInstance.configManager.PlatformInputMappings.ContainsKey(systemSlug) 
+			? appInstance.configManager.PlatformInputMappings[systemSlug] 
+			: new Dictionary<int, Dictionary<string, string>>();
+
+		for (int playerIndex = 0; playerIndex < maxControllers; playerIndex++)
+		{
+			int currentPlayerIndex = playerIndex;
+			var currentMappings = allMappings.ContainsKey(currentPlayerIndex) ? allMappings[currentPlayerIndex] : new Dictionary<string, string>();
+
+			VBoxContainer playerBox = new VBoxContainer();
+			vbox.AddChild(playerBox);
+
+			Label playerLabel = new Label();
+			playerLabel.Text = $"Player {currentPlayerIndex + 1}";
+			playerLabel.AddThemeColorOverride("font_color", new Color(0.6f, 0.8f, 1.0f));
+			playerBox.AddChild(playerLabel);
+
+			foreach (var kvp in meta.ControllerConfig.PlatformLayout)
+			{
+				string buttonName = kvp.Key;
+				string defaultSdl = kvp.Value;
+
+				HBoxContainer row = new HBoxContainer();
+				Label lbl = new Label();
+				lbl.Text = buttonName;
+				lbl.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+				row.AddChild(lbl);
+
+				Button mappingBtn = new Button();
+				string mappedInput = currentMappings.ContainsKey(buttonName) ? currentMappings[buttonName] : defaultSdl;
+				mappingBtn.Text = string.IsNullOrEmpty(mappedInput) ? "Unmapped" : mappedInput;
+				
+				mappingBtn.Pressed += () =>
+				{
+					mappingBtn.Text = "Listening...";
+					isListeningForInput = true;
+					inputListenCallback = (string detectedInput) =>
+					{
+						mappingBtn.Text = detectedInput;
+						appInstance.configManager.SavePlatformInputMapping(systemSlug, currentPlayerIndex, buttonName, detectedInput);
+						mappingBtn.GrabFocus();
+					};
+				};
+
+				row.AddChild(mappingBtn);
+				playerBox.AddChild(row);
+			}
+
+			if (playerIndex < maxControllers - 1)
+			{
+				playerBox.AddChild(new HSeparator());
+			}
+		}
+	}
+
 	private void SelectSystemByIndex(int index)
 	{
 		if (index < 0 || index >= gameSystems.Count)
@@ -2304,9 +2466,17 @@ public partial class MainScene : Control
 		MarginContainer formContainer = new MarginContainer();
 		formContainer.Name = nodeName;
 		formContainer.Visible = false;
+		formContainer.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
 		
+		ScrollContainer scrollContainer = new ScrollContainer();
+		scrollContainer.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+		scrollContainer.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		scrollContainer.HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled;
+		formContainer.AddChild(scrollContainer);
+
 		VBoxContainer vbox = new VBoxContainer();
-		formContainer.AddChild(vbox);
+		vbox.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		scrollContainer.AddChild(vbox);
 		sectionOptionsContainer.AddChild(formContainer);
 
 		HBoxContainer fieldBox = new HBoxContainer();
@@ -2368,9 +2538,17 @@ public partial class MainScene : Control
 		MarginContainer formContainer = new MarginContainer();
 		formContainer.Name = nodeName;
 		formContainer.Visible = false;
+		formContainer.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
 		
+		ScrollContainer scrollContainer = new ScrollContainer();
+		scrollContainer.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+		scrollContainer.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		scrollContainer.HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled;
+		formContainer.AddChild(scrollContainer);
+
 		VBoxContainer vbox = new VBoxContainer();
-		formContainer.AddChild(vbox);
+		vbox.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		scrollContainer.AddChild(vbox);
 		sectionOptionsContainer.AddChild(formContainer);
 
 		HBoxContainer countBox = new HBoxContainer();
@@ -2467,9 +2645,17 @@ public partial class MainScene : Control
 		MarginContainer formContainer = new MarginContainer();
 		formContainer.Name = nodeName;
 		formContainer.Visible = false;
+		formContainer.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+		
+		ScrollContainer scrollContainer = new ScrollContainer();
+		scrollContainer.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
+		scrollContainer.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		scrollContainer.HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled;
+		formContainer.AddChild(scrollContainer);
 
 		VBoxContainer vbox = new VBoxContainer();
-		formContainer.AddChild(vbox);
+		vbox.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+		scrollContainer.AddChild(vbox);
 		sectionOptionsContainer.AddChild(formContainer);
 
 		HBoxContainer prefEmulatorBox = new HBoxContainer();
@@ -2484,6 +2670,9 @@ public partial class MainScene : Control
 
 		MarginContainer emulatorSettingsContainer = new MarginContainer();
 		vbox.AddChild(emulatorSettingsContainer);
+
+		MarginContainer controllerMappingsContainer = new MarginContainer();
+		vbox.AddChild(controllerMappingsContainer);
 
 		List<string> supportedEmulators = appInstance.emulatorManager.GetSupportedEmulators(system.Slug);
 		var allEmulators = appInstance.emulatorManager.GetAllAvailableEmulators();
@@ -2519,6 +2708,7 @@ public partial class MainScene : Control
 			if (allEmulators.ContainsKey(currentPref))
 			{
 				GenerateEmulatorSettingsUI(currentPref, allEmulators[currentPref], emulatorSettingsContainer);
+				GeneratePlatformControllerMappingsUI(system.Slug, allEmulators[currentPref], controllerMappingsContainer);
 			}
 
 			emulatorOptionButton.ItemSelected += (long index) =>
@@ -2528,6 +2718,7 @@ public partial class MainScene : Control
 				if (allEmulators.ContainsKey(selectedSlug))
 				{
 					GenerateEmulatorSettingsUI(selectedSlug, allEmulators[selectedSlug], emulatorSettingsContainer);
+					GeneratePlatformControllerMappingsUI(system.Slug, allEmulators[selectedSlug], controllerMappingsContainer);
 				}
 			};
 		}

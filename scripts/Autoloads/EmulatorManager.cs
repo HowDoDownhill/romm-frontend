@@ -495,6 +495,12 @@ public class ControllerConfig
     [JsonPropertyName("format")]
     public string Format { get; set; }
 
+    [JsonPropertyName("platform_layout")]
+    public Dictionary<string, string> PlatformLayout { get; set; }
+
+    [JsonPropertyName("sdl_string_map")]
+    public Dictionary<string, string> SdlStringMap { get; set; }
+
     [JsonPropertyName("controller_sections")]
     public List<ControllerSection> ControllerSections { get; set; }
 
@@ -1173,7 +1179,8 @@ public partial class EmulatorManager : Node
                 }
             }
 
-            ApplyControllerMappings(emulatorMetadata, emulatorInstallDirectory);
+            GameSystem currentGameSystem = appInstance.dataBus.systems.FirstOrDefault(s => s.Id == game.PlatformId);
+            ApplyControllerMappings(emulatorMetadata, emulatorInstallDirectory, currentGameSystem);
 
             DateTime sessionStart = DateTime.UtcNow;
 
@@ -1352,7 +1359,7 @@ public partial class EmulatorManager : Node
         }
     }
 
-    private void ApplyControllerMappings(EmulatorMeta emulatorMetadata, string emulatorInstallDirectory)
+    private void ApplyControllerMappings(EmulatorMeta emulatorMetadata, string emulatorInstallDirectory, GameSystem currentGameSystem)
     {
         if (emulatorMetadata.ControllerConfig == null)
         {
@@ -1368,7 +1375,7 @@ public partial class EmulatorManager : Node
 
         if (controllerConfig.Format == "ini" && controllerConfig.ControllerSections != null)
         {
-            ApplyIniControllerMappings(controllerConfig, connectedControllers, availableControllerCount, configFilePath);
+            ApplyIniControllerMappings(controllerConfig, connectedControllers, availableControllerCount, configFilePath, currentGameSystem);
         }
 
         else if (controllerConfig.Format == "json")
@@ -1377,7 +1384,7 @@ public partial class EmulatorManager : Node
         }
     }
 
-    private void ApplyIniControllerMappings(ControllerConfig controllerConfig, List<ConnectedController> connectedControllers, int availableControllerCount, string configFilePath)
+    private void ApplyIniControllerMappings(ControllerConfig controllerConfig, List<ConnectedController> connectedControllers, int availableControllerCount, string configFilePath, GameSystem currentGameSystem)
     {
         var iniUpdater = new IniConfigurationUpdater();
 
@@ -1418,7 +1425,7 @@ public partial class EmulatorManager : Node
 
                     foreach (var mapping in sectionDef.Mappings)
                     {
-                        string resolvedValue = mapping.Value
+                        string resolvedValue = ResolvePlatformMacros(mapping.Value, currentGameSystem, controllerConfig, portOffset)
                             .Replace("{sdl_index}", sdlIndex.ToString())
                             .Replace("{controller_name}", controllerName);
                         iniUpdater.UpdateValue(configFilePath, sectionName, mapping.Key, resolvedValue, resolvedValue);
@@ -1434,6 +1441,40 @@ public partial class EmulatorManager : Node
                 }
             }
         }
+    }
+
+    private string ResolvePlatformMacros(string value, GameSystem system, ControllerConfig config, int playerIndex)
+    {
+        if (string.IsNullOrEmpty(value) || system == null || config.PlatformLayout == null) return value;
+
+        string result = value;
+
+        foreach (var kvp in config.PlatformLayout)
+        {
+            string platformButton = kvp.Key;
+            string defaultSdlInput = kvp.Value;
+            string macro = $"{{Platform_{platformButton}}}";
+            if (result.Contains(macro))
+            {
+                string mappedSdlInput = defaultSdlInput;
+                if (appInstance.configManager.PlatformInputMappings.ContainsKey(system.Slug) &&
+                    appInstance.configManager.PlatformInputMappings[system.Slug].ContainsKey(playerIndex) &&
+                    appInstance.configManager.PlatformInputMappings[system.Slug][playerIndex].ContainsKey(platformButton))
+                {
+                    mappedSdlInput = appInstance.configManager.PlatformInputMappings[system.Slug][playerIndex][platformButton];
+                }
+
+                string emulatorSpecificString = "";
+                if (!string.IsNullOrEmpty(mappedSdlInput) && config.SdlStringMap != null && config.SdlStringMap.ContainsKey(mappedSdlInput))
+                {
+                    emulatorSpecificString = config.SdlStringMap[mappedSdlInput];
+                }
+
+                result = result.Replace(macro, emulatorSpecificString);
+            }
+        }
+
+        return result;
     }
 
     private void ApplyJsonControllerMappings(ControllerConfig controllerConfig, List<ConnectedController> connectedControllers, int availableControllerCount, string configFilePath)
