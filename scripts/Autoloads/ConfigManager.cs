@@ -23,6 +23,8 @@ public partial class ConfigManager : Node
 
     public int EmulatorCloseHotkeyCount { get; private set; }
     public Godot.Collections.Array EmulatorCloseHotkeys { get; private set; }
+    
+    public System.Collections.Generic.Dictionary<string, string> PreferredEmulators { get; private set; } = new System.Collections.Generic.Dictionary<string, string>();
 
     private AppInstance appInstance;
 
@@ -110,6 +112,15 @@ public partial class ConfigManager : Node
         EmulatorCloseHotkeyCount = (int)configurationFile.GetValue("Input", "EmulatorCloseHotkeyCount", 4);
         var defaultHotkeyButtons = new Godot.Collections.Array { (int)JoyButton.LeftShoulder, (int)JoyButton.RightShoulder, (int)JoyButton.Back, (int)JoyButton.Start };
         EmulatorCloseHotkeys = (Godot.Collections.Array)configurationFile.GetValue("Input", "EmulatorCloseHotkeys", defaultHotkeyButtons);
+        
+        if (configurationFile.HasSection("PreferredEmulators"))
+        {
+            foreach (string key in configurationFile.GetSectionKeys("PreferredEmulators"))
+            {
+                PreferredEmulators[key] = (string)configurationFile.GetValue("PreferredEmulators", key);
+            }
+        }
+
         ApplyInputMap();
     }
 
@@ -156,6 +167,14 @@ public partial class ConfigManager : Node
         configurationFile.SetValue("UI", "ShowAllSystems", ShowAllSystems);
         configurationFile.SetValue("Input", "EmulatorCloseHotkeyCount", EmulatorCloseHotkeyCount);
         configurationFile.SetValue("Input", "EmulatorCloseHotkeys", EmulatorCloseHotkeys);
+
+        if (PreferredEmulators != null)
+        {
+            foreach (var kvp in PreferredEmulators)
+            {
+                configurationFile.SetValue("PreferredEmulators", kvp.Key, kvp.Value);
+            }
+        }
     }
 
     public void SaveConfig()
@@ -224,5 +243,11 @@ public partial class ConfigManager : Node
 
             InputMap.ActionAddEvent(inputActionName, joypadButtonEvent);
         }
+    }
+
+    public void SavePreferredEmulator(string systemSlug, string emulatorSlug)
+    {
+        PreferredEmulators[systemSlug] = emulatorSlug;
+        SaveConfig();
     }
 }

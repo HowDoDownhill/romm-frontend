@@ -55,5 +55,47 @@
       "User/GC/JAP/Card A",
       "User/GC/USA/Card A"
     ]
+  },
+  "controller_config": {
+    "max_controllers": 4,
+    "config_file_relative_path": "User/Config/GCPadNew.ini",
+    "format": "ini",
+    "controller_sections": [
+      {
+        "section_template": "GCPad{port}",
+        "port_start": 1,
+        "device_key": "Device",
+        "device_template": "SDL/{sdl_index}/{controller_name}",
+        "device_disconnected": "DInput/0/Keyboard Mouse",
+        "mappings": {
+          "Buttons/A": "`Button S`",
+          "Buttons/B": "`Button E`",
+          "Buttons/X": "`Button W`",
+          "Buttons/Y": "`Button N`",
+          "Buttons/Z": "`Shoulder R`",
+          "Buttons/Start": "Start",
+          "Main Stick/Up": "`Left Y+`",
+          "Main Stick/Down": "`Left Y-`",
+          "Main Stick/Left": "`Left X-`",
+          "Main Stick/Right": "`Left X+`",
+          "Main Stick/Modifier": "`Shift`",
+          "Main Stick/Calibration": "100.00 141.42 100.00 141.42 100.00 141.42 100.00 141.42",
+          "C-Stick/Up": "`Right Y+`",
+          "C-Stick/Down": "`Right Y-`",
+          "C-Stick/Left": "`Right X-`",
+          "C-Stick/Right": "`Right X+`",
+          "C-Stick/Modifier": "`Ctrl`",
+          "C-Stick/Calibration": "100.00 141.42 100.00 141.42 100.00 141.42 100.00 141.42",
+          "Triggers/L": "`Trigger L`",
+          "Triggers/R": "`Trigger R`",
+          "D-Pad/Up": "`Pad N`",
+          "D-Pad/Down": "`Pad S`",
+          "D-Pad/Left": "`Pad W`",
+          "D-Pad/Right": "`Pad E`",
+          "Triggers/L-Analog": "`Trigger L`",
+          "Triggers/R-Analog": "`Trigger R`"
+        }
+      }
+    ]
   }
 }

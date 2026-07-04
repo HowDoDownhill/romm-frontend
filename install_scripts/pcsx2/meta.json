@@ -89,5 +89,55 @@
         "Standard": "1"
       }
     }
-  ]
+  ],
+  "controller_config": {
+    "max_controllers": 2,
+    "config_file_relative_path": "inis/PCSX2.ini",
+    "format": "ini",
+    "controller_sections": [
+      {
+        "section_template": "Pad{port}",
+        "port_start": 1,
+        "type_key": "Type",
+        "type_connected": "DualShock2",
+        "type_disconnected": "None",
+        "mappings": {
+          "Up": "SDL-{sdl_index}/DPadUp",
+          "Right": "SDL-{sdl_index}/DPadRight",
+          "Down": "SDL-{sdl_index}/DPadDown",
+          "Left": "SDL-{sdl_index}/DPadLeft",
+          "Select": "SDL-{sdl_index}/Back",
+          "Start": "SDL-{sdl_index}/Start",
+          "L1": "SDL-{sdl_index}/LeftShoulder",
+          "L2": "SDL-{sdl_index}/+LeftTrigger",
+          "R1": "SDL-{sdl_index}/RightShoulder",
+          "R2": "SDL-{sdl_index}/+RightTrigger",
+          "L3": "SDL-{sdl_index}/LeftStick",
+          "R3": "SDL-{sdl_index}/RightStick",
+          "LUp": "SDL-{sdl_index}/-LeftY",
+          "LRight": "SDL-{sdl_index}/+LeftX",
+          "LDown": "SDL-{sdl_index}/+LeftY",
+          "LLeft": "SDL-{sdl_index}/-LeftX",
+          "RUp": "SDL-{sdl_index}/-RightY",
+          "RRight": "SDL-{sdl_index}/+RightX",
+          "RDown": "SDL-{sdl_index}/+RightY",
+          "RLeft": "SDL-{sdl_index}/-RightX",
+          "Analog": "SDL-{sdl_index}/Guide",
+          "LargeMotor": "SDL-{sdl_index}/LargeMotor",
+          "SmallMotor": "SDL-{sdl_index}/SmallMotor",
+          "Triangle": "SDL-{sdl_index}/FaceNorth",
+          "Circle": "SDL-{sdl_index}/FaceEast",
+          "Cross": "SDL-{sdl_index}/FaceSouth",
+          "Square": "SDL-{sdl_index}/FaceWest"
+        },
+        "static_values": {
+          "Deadzone": "0.000000",
+          "AxisScale": "1.330000",
+          "LargeMotorScale": "1.000000",
+          "SmallMotorScale": "1.000000",
+          "PressureModifier": "0.5"
+        }
+      }
+    ]
+  }
 }

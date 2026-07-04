@@ -3,6 +3,7 @@ using Godot;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading.Tasks;
@@ -418,6 +419,9 @@ public class EmulatorMeta
 
     [JsonPropertyName("settings_fields")]
     public List<EmulatorSettingField> SettingsFields { get; set; }
+
+    [JsonPropertyName("controller_config")]
+    public ControllerConfig ControllerConfig { get; set; }
 }
 
 public class EmulatorSettingField
@@ -480,6 +484,63 @@ public class InstallRecipe
     public string ExtractFolderRegex { get; set; }
 }
 
+public class ControllerConfig
+{
+    [JsonPropertyName("max_controllers")]
+    public int MaxControllers { get; set; }
+
+    [JsonPropertyName("config_file_relative_path")]
+    public string ConfigFileRelativePath { get; set; }
+
+    [JsonPropertyName("format")]
+    public string Format { get; set; }
+
+    [JsonPropertyName("controller_sections")]
+    public List<ControllerSection> ControllerSections { get; set; }
+
+    [JsonPropertyName("assignment_key_path")]
+    public string AssignmentKeyPath { get; set; }
+
+    [JsonPropertyName("assignment_template")]
+    public string AssignmentTemplate { get; set; }
+
+    [JsonPropertyName("enabled_key_path")]
+    public string EnabledKeyPath { get; set; }
+}
+
+public class ControllerSection
+{
+    [JsonPropertyName("section_template")]
+    public string SectionTemplate { get; set; }
+
+    [JsonPropertyName("port_start")]
+    public int PortStart { get; set; }
+
+    [JsonPropertyName("device_key")]
+    public string DeviceKey { get; set; }
+
+    [JsonPropertyName("device_template")]
+    public string DeviceTemplate { get; set; }
+
+    [JsonPropertyName("device_disconnected")]
+    public string DeviceDisconnected { get; set; }
+
+    [JsonPropertyName("type_key")]
+    public string TypeKey { get; set; }
+
+    [JsonPropertyName("type_connected")]
+    public string TypeConnected { get; set; }
+
+    [JsonPropertyName("type_disconnected")]
+    public string TypeDisconnected { get; set; }
+
+    [JsonPropertyName("mappings")]
+    public Dictionary<string, string> Mappings { get; set; }
+
+    [JsonPropertyName("static_values")]
+    public Dictionary<string, string> StaticValues { get; set; }
+}
+
 public partial class EmulatorManager : Node
 {
     [Signal]
@@ -488,17 +549,19 @@ public partial class EmulatorManager : Node
     private string emulatorMapFilePath;
     private string executableMapFilePath;
 
-    private Dictionary<string, string> systemToEmulatorMap = new Dictionary<string, string>();
+    private Dictionary<string, List<string>> systemToEmulatorMap = new Dictionary<string, List<string>>();
     private Process activeEmulatorProcess = null;
     private Game activeGame = null;
     private DateTime activeSessionStart;
 
     private AppInstance appInstance;
+    private ControllerManager controllerManager;
 
     public override void _Ready()
     {
         appInstance = GetNode<AppInstance>("/root/AppInstance");
         appInstance.emulatorManager = this;
+        controllerManager = GetNode<ControllerManager>("/root/ControllerManager");
 
         InitializeFilePaths();
         LoadOrGenerateEmulatorMap();
@@ -536,12 +599,23 @@ public partial class EmulatorManager : Node
         try
         {
             string mapJsonContent = FileAccess.GetFileAsString(emulatorMapFilePath);
-            systemToEmulatorMap = JsonSerializer.Deserialize<Dictionary<string, string>>(mapJsonContent, RommJsonContext.Default.Options);
+            systemToEmulatorMap = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(mapJsonContent, RommJsonContext.Default.Options);
         }
 
         catch (Exception exception)
         {
-            GD.PrintErr($"Failed to load emulator map: {exception.Message}");
+            GD.PrintErr($"Failed to load emulator map (likely old format): {exception.Message}. Regenerating...");
+            GenerateDefaultMaps();
+            
+            try
+            {
+                string mapJsonContent = FileAccess.GetFileAsString(emulatorMapFilePath);
+                systemToEmulatorMap = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(mapJsonContent, RommJsonContext.Default.Options);
+            }
+            catch (Exception ex)
+            {
+                GD.PrintErr($"Failed to load emulator map after regeneration: {ex.Message}");
+            }
         }
     }
 
@@ -552,12 +626,36 @@ public partial class EmulatorManager : Node
             return null;
         }
 
+        if (appInstance.configManager.PreferredEmulators.ContainsKey(systemSlug))
+        {
+            string preferred = appInstance.configManager.PreferredEmulators[systemSlug];
+            if (systemToEmulatorMap.ContainsKey(systemSlug) && systemToEmulatorMap[systemSlug].Contains(preferred))
+            {
+                return preferred;
+            }
+        }
+
+        if (systemToEmulatorMap.ContainsKey(systemSlug) && systemToEmulatorMap[systemSlug].Count > 0)
+        {
+            return systemToEmulatorMap[systemSlug][0];
+        }
+
+        return null;
+    }
+
+    public List<string> GetSupportedEmulators(string systemSlug)
+    {
+        if (string.IsNullOrEmpty(systemSlug))
+        {
+            return new List<string>();
+        }
+
         if (systemToEmulatorMap.ContainsKey(systemSlug))
         {
             return systemToEmulatorMap[systemSlug];
         }
 
-        return null;
+        return new List<string>();
     }
 
     public Dictionary<string, EmulatorMeta> GetAllAvailableEmulators()
@@ -1075,6 +1173,8 @@ public partial class EmulatorManager : Node
                 }
             }
 
+            ApplyControllerMappings(emulatorMetadata, emulatorInstallDirectory);
+
             DateTime sessionStart = DateTime.UtcNow;
 
             if (appInstance.saveSyncManager != null)
@@ -1205,26 +1305,26 @@ public partial class EmulatorManager : Node
 
     private void GenerateDefaultMaps()
     {
-        var defaultPlatformToEmulatorMap = new Dictionary<string, string>
+        var defaultPlatformToEmulatorMap = new Dictionary<string, List<string>>
         {
-            {"ngc", "dolphin"},
-            {"wii", "dolphin"},
-            {"snes", "snes9x"},
-            {"n64", "gopher64"},
-            {"nes", "nestopia"},
-            {"gb", "mGBA"},
-            {"gba", "mGBA"},
-            {"nds", "melonDS"},
-            {"psx", "duckstation"},
-            {"ps2", "pcsx2"},
-            {"ps3", "rpcs3"},
-            {"ps4", "shadPS4"},
-            {"psp", "ppsspp"},
-            {"sega32", "ares"},
-            {"segacd", "ares"},
-            {"sms", "ares"},
-            {"genesis", "ares"},
-            {"dc", "flycast"}
+            {"ngc", new List<string>{"dolphin"}},
+            {"wii", new List<string>{"dolphin"}},
+            {"snes", new List<string>{"snes9x"}},
+            {"n64", new List<string>{"gopher64"}},
+            {"nes", new List<string>{"nestopia"}},
+            {"gb", new List<string>{"mGBA"}},
+            {"gba", new List<string>{"mGBA"}},
+            {"nds", new List<string>{"melonDS"}},
+            {"psx", new List<string>{"duckstation"}},
+            {"ps2", new List<string>{"pcsx2"}},
+            {"ps3", new List<string>{"rpcs3"}},
+            {"ps4", new List<string>{"shadPS4"}},
+            {"psp", new List<string>{"ppsspp"}},
+            {"sega32", new List<string>{"ares"}},
+            {"segacd", new List<string>{"ares"}},
+            {"sms", new List<string>{"ares"}},
+            {"genesis", new List<string>{"ares"}},
+            {"dc", new List<string>{"flycast"}}
         };
 
         try
@@ -1250,6 +1350,171 @@ public partial class EmulatorManager : Node
         {
             GD.PrintErr($"Failed to generate default executable map: {exception.Message}");
         }
+    }
+
+    private void ApplyControllerMappings(EmulatorMeta emulatorMetadata, string emulatorInstallDirectory)
+    {
+        if (emulatorMetadata.ControllerConfig == null)
+        {
+            return;
+        }
+
+        var controllerConfig = emulatorMetadata.ControllerConfig;
+        var connectedControllers = controllerManager.GetConnectedControllers();
+        int availableControllerCount = Math.Min(connectedControllers.Count, controllerConfig.MaxControllers);
+        string configFilePath = Path.Combine(emulatorInstallDirectory, controllerConfig.ConfigFileRelativePath);
+
+        GD.Print($"Applying controller mappings: {availableControllerCount} of {controllerConfig.MaxControllers} max controllers");
+
+        if (controllerConfig.Format == "ini" && controllerConfig.ControllerSections != null)
+        {
+            ApplyIniControllerMappings(controllerConfig, connectedControllers, availableControllerCount, configFilePath);
+        }
+
+        else if (controllerConfig.Format == "json")
+        {
+            ApplyJsonControllerMappings(controllerConfig, connectedControllers, availableControllerCount, configFilePath);
+        }
+    }
+
+    private void ApplyIniControllerMappings(ControllerConfig controllerConfig, List<ConnectedController> connectedControllers, int availableControllerCount, string configFilePath)
+    {
+        var iniUpdater = new IniConfigurationUpdater();
+
+        foreach (var sectionDef in controllerConfig.ControllerSections)
+        {
+            for (int portOffset = 0; portOffset < controllerConfig.MaxControllers; portOffset++)
+            {
+                int portNumber = sectionDef.PortStart + portOffset;
+                string sectionName = sectionDef.SectionTemplate.Replace("{port}", portNumber.ToString());
+                bool isControllerConnected = portOffset < availableControllerCount;
+
+                if (!string.IsNullOrEmpty(sectionDef.TypeKey))
+                {
+                    string typeValue = isControllerConnected ? sectionDef.TypeConnected : sectionDef.TypeDisconnected;
+                    iniUpdater.UpdateValue(configFilePath, sectionName, sectionDef.TypeKey, typeValue, typeValue);
+                }
+
+                if (!string.IsNullOrEmpty(sectionDef.DeviceKey))
+                {
+                    if (isControllerConnected)
+                    {
+                        string deviceValue = sectionDef.DeviceTemplate
+                            .Replace("{sdl_index}", connectedControllers[portOffset].ConnectionOrder.ToString())
+                            .Replace("{controller_name}", connectedControllers[portOffset].ControllerName);
+                        iniUpdater.UpdateValue(configFilePath, sectionName, sectionDef.DeviceKey, deviceValue, deviceValue);
+                    }
+
+                    else if (!string.IsNullOrEmpty(sectionDef.DeviceDisconnected))
+                    {
+                        iniUpdater.UpdateValue(configFilePath, sectionName, sectionDef.DeviceKey, sectionDef.DeviceDisconnected, sectionDef.DeviceDisconnected);
+                    }
+                }
+
+                if (isControllerConnected && sectionDef.Mappings != null)
+                {
+                    int sdlIndex = connectedControllers[portOffset].ConnectionOrder;
+                    string controllerName = connectedControllers[portOffset].ControllerName;
+
+                    foreach (var mapping in sectionDef.Mappings)
+                    {
+                        string resolvedValue = mapping.Value
+                            .Replace("{sdl_index}", sdlIndex.ToString())
+                            .Replace("{controller_name}", controllerName);
+                        iniUpdater.UpdateValue(configFilePath, sectionName, mapping.Key, resolvedValue, resolvedValue);
+                    }
+                }
+
+                if (isControllerConnected && sectionDef.StaticValues != null)
+                {
+                    foreach (var staticEntry in sectionDef.StaticValues)
+                    {
+                        iniUpdater.UpdateValue(configFilePath, sectionName, staticEntry.Key, staticEntry.Value, staticEntry.Value);
+                    }
+                }
+            }
+        }
+    }
+
+    private void ApplyJsonControllerMappings(ControllerConfig controllerConfig, List<ConnectedController> connectedControllers, int availableControllerCount, string configFilePath)
+    {
+        if (string.IsNullOrEmpty(controllerConfig.AssignmentKeyPath) && string.IsNullOrEmpty(controllerConfig.EnabledKeyPath))
+        {
+            return;
+        }
+
+        JsonNode rootNode = null;
+
+        if (System.IO.File.Exists(configFilePath))
+        {
+            try
+            {
+                string existingJson = System.IO.File.ReadAllText(configFilePath);
+                rootNode = JsonNode.Parse(existingJson);
+            }
+
+            catch { }
+        }
+
+        if (rootNode == null)
+        {
+            rootNode = new JsonObject();
+        }
+
+        if (!string.IsNullOrEmpty(controllerConfig.AssignmentKeyPath))
+        {
+            var assignmentArray = new JsonArray();
+
+            for (int i = 0; i < controllerConfig.MaxControllers; i++)
+            {
+                if (i < availableControllerCount && !string.IsNullOrEmpty(controllerConfig.AssignmentTemplate))
+                {
+                    string assignmentValue = controllerConfig.AssignmentTemplate
+                        .Replace("{sdl_index}", connectedControllers[i].ConnectionOrder.ToString())
+                        .Replace("{controller_name}", connectedControllers[i].ControllerName);
+                    assignmentArray.Add(assignmentValue);
+                }
+
+                else
+                {
+                    assignmentArray.Add("");
+                }
+            }
+
+            SetNestedJsonValue(rootNode, controllerConfig.AssignmentKeyPath, assignmentArray);
+        }
+
+        if (!string.IsNullOrEmpty(controllerConfig.EnabledKeyPath))
+        {
+            var enabledArray = new JsonArray();
+
+            for (int i = 0; i < controllerConfig.MaxControllers; i++)
+            {
+                enabledArray.Add(i < availableControllerCount);
+            }
+
+            SetNestedJsonValue(rootNode, controllerConfig.EnabledKeyPath, enabledArray);
+        }
+
+        System.IO.File.WriteAllText(configFilePath, rootNode.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    private void SetNestedJsonValue(JsonNode rootNode, string dotSeparatedKeyPath, JsonNode valueToSet)
+    {
+        string[] pathSegments = dotSeparatedKeyPath.Split('.');
+        JsonNode currentNode = rootNode;
+
+        for (int i = 0; i < pathSegments.Length - 1; i++)
+        {
+            if (currentNode[pathSegments[i]] == null)
+            {
+                currentNode[pathSegments[i]] = new JsonObject();
+            }
+
+            currentNode = currentNode[pathSegments[i]];
+        }
+
+        currentNode[pathSegments.Last()] = valueToSet;
     }
 }
 

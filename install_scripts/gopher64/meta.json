@@ -148,5 +148,13 @@
       "config_key": "emulate_vru",
       "default_value_bool": false
     }
-  ]
+  ],
+  "controller_config": {
+    "max_controllers": 4,
+    "config_file_relative_path": "portable_data/config/config.json",
+    "format": "json",
+    "assignment_key_path": "input.controller_assignment",
+    "assignment_template": "XInput#{sdl_index}",
+    "enabled_key_path": "input.controller_enabled"
+  }
 }

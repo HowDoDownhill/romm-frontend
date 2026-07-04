@@ -11,6 +11,7 @@ public partial class AppInstance : Node
     public DataBus dataBus;
     public AssetManager assetManager;
     public SaveSyncManager saveSyncManager;
+    public ControllerManager controllerManager;
     
     public override void _Ready()
     {
@@ -25,5 +26,6 @@ public partial class AppInstance : Node
             OS.Execute("chmod", new string[] { "-R", "a+rwx", appDir }, new Godot.Collections.Array());
         }
         dataBus = GetNode<DataBus>("/root/DataBus");
+        controllerManager = GetNode<ControllerManager>("/root/ControllerManager");
     }
 }

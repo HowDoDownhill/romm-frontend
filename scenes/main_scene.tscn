@@ -563,6 +563,7 @@ alignment = 0
 expand_icon = true
 
 [node name="StartMenu" type="MarginContainer" parent="Background" unique_id=1160206546]
+visible = false
 custom_minimum_size = Vector2(400, 600)
 layout_mode = 1
 anchors_preset = 8
