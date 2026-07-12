@@ -91,6 +91,28 @@ public partial class MainScene : Control
 	private bool isListeningForInput = false;
 	private Action<string> inputListenCallback;
 	
+	private bool isListeningForEmulatorCloseHotkeys = false;
+	private int expectedEmulatorCloseHotkeysCount = 0;
+	private Godot.Collections.Array collectedEmulatorCloseHotkeys = new Godot.Collections.Array();
+	private Button emulatorCloseHotkeysBtn;
+
+	private void UpdateEmulatorCloseHotkeysBtnText()
+	{
+		if (emulatorCloseHotkeysBtn != null)
+		{
+			var currentKeys = appInstance.configManager.EmulatorCloseHotkeys;
+			var keyNames = new List<string>();
+			for (int i = 0; i < appInstance.configManager.EmulatorCloseHotkeyCount; i++)
+			{
+				if (i < currentKeys.Count)
+				{
+					keyNames.Add(((JoyButton)currentKeys[i].AsInt32()).ToString());
+				}
+			}
+			emulatorCloseHotkeysBtn.Text = $"Record Hotkeys [{string.Join(", ", keyNames)}]";
+		}
+	}
+	
 	public override void _Ready()
 	{
 		var whiteImage = Image.CreateEmpty(1, 1, false, Image.Format.Rgba8);
@@ -600,6 +622,36 @@ public partial class MainScene : Control
 
 	public override void _Input(InputEvent @event)
 	{
+		if (isListeningForEmulatorCloseHotkeys)
+		{
+			if (@event is InputEventJoypadButton listenJoyBtn && listenJoyBtn.Pressed)
+			{
+				int btnVal = (int)listenJoyBtn.ButtonIndex;
+				if (!collectedEmulatorCloseHotkeys.Contains(btnVal))
+				{
+					collectedEmulatorCloseHotkeys.Add(btnVal);
+					int currentCount = collectedEmulatorCloseHotkeys.Count;
+					if (emulatorCloseHotkeysBtn != null)
+					{
+						emulatorCloseHotkeysBtn.Text = $"Listening... ({currentCount}/{expectedEmulatorCloseHotkeysCount})";
+					}
+
+					if (currentCount >= expectedEmulatorCloseHotkeysCount)
+					{
+						isListeningForEmulatorCloseHotkeys = false;
+						appInstance.configManager.SaveInputSettings(expectedEmulatorCloseHotkeysCount, collectedEmulatorCloseHotkeys);
+						UpdateEmulatorCloseHotkeysBtnText();
+					}
+				}
+				GetViewport().SetInputAsHandled();
+			}
+			else if (@event is InputEventKey || @event is InputEventJoypadButton || @event is InputEventJoypadMotion)
+			{
+				GetViewport().SetInputAsHandled();
+			}
+			return;
+		}
+
 		if (isListeningForInput)
 		{
 			if ((@event is InputEventKey listenKeyEvent && listenKeyEvent.Pressed) || 
@@ -841,6 +893,24 @@ public partial class MainScene : Control
 							return;
 						}
 					}
+				}
+				else if (isFocusInOptions && focusOwner is BaseButton btn)
+				{
+					if (btn is CheckButton checkBtn)
+					{
+						checkBtn.ButtonPressed = !checkBtn.ButtonPressed;
+						checkBtn.EmitSignal(BaseButton.SignalName.Toggled, checkBtn.ButtonPressed);
+					}
+					else if (btn is OptionButton)
+					{
+						// OptionButtons are cycled with left/right
+					}
+					else
+					{
+						btn.EmitSignal(BaseButton.SignalName.Pressed);
+					}
+					GetViewport().SetInputAsHandled();
+					return;
 				}
 			}
 
@@ -2564,75 +2634,22 @@ public partial class MainScene : Control
 		countBox.AddChild(countSpin);
 		vbox.AddChild(countBox);
 
-		VBoxContainer keysBox = new VBoxContainer();
-		vbox.AddChild(keysBox);
-
-		void RebuildKeysBox(int count)
+		emulatorCloseHotkeysBtn = new Button();
+		UpdateEmulatorCloseHotkeysBtnText();
+		emulatorCloseHotkeysBtn.Pressed += () =>
 		{
-			foreach (Node child in keysBox.GetChildren())
-			{
-				keysBox.RemoveChild(child);
-				child.QueueFree();
-			}
-			
-			var currentKeys = appInstance.configManager.EmulatorCloseHotkeys;
-			
-			for (int i = 0; i < count; i++)
-			{
-				HBoxContainer keyBox = new HBoxContainer();
-				Label keyLabel = new Label();
-				keyLabel.Text = $"Close Key {i + 1}";
-				keyLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-				
-				OptionButton opt = new OptionButton();
-
-				foreach (JoyButton btn in Enum.GetValues(typeof(JoyButton)))
-				{
-					opt.AddItem(btn.ToString(), (int)btn);
-				}
-
-				if (i < currentKeys.Count)
-				{
-					int btnVal = currentKeys[i].AsInt32();
-
-					for(int idx = 0; idx < opt.ItemCount; idx++)
-					{
-						if(opt.GetItemId(idx) == btnVal)
-						{
-							opt.Select(idx);
-							break;
-						}
-					}
-				}
-				
-				int localI = i;
-				opt.ItemSelected += (long index) => 
-				{
-					int selectedBtn = opt.GetItemId((int)index);
-					var newKeys = new Godot.Collections.Array(appInstance.configManager.EmulatorCloseHotkeys);
-
-					while(newKeys.Count <= localI)
-					{
-						newKeys.Add(0);
-					}
-
-					newKeys[localI] = selectedBtn;
-					appInstance.configManager.SaveInputSettings(appInstance.configManager.EmulatorCloseHotkeyCount, newKeys);
-				};
-
-				keyBox.AddChild(keyLabel);
-				keyBox.AddChild(opt);
-				keysBox.AddChild(keyBox);
-			}
-		}
-
-		RebuildKeysBox(appInstance.configManager.EmulatorCloseHotkeyCount);
+			expectedEmulatorCloseHotkeysCount = (int)countSpin.Value;
+			collectedEmulatorCloseHotkeys.Clear();
+			isListeningForEmulatorCloseHotkeys = true;
+			emulatorCloseHotkeysBtn.Text = $"Listening... (0/{expectedEmulatorCloseHotkeysCount})";
+		};
+		vbox.AddChild(emulatorCloseHotkeysBtn);
 
 		countSpin.ValueChanged += (double val) =>
 		{
 			int newCount = (int)val;
 			appInstance.configManager.SaveInputSettings(newCount, appInstance.configManager.EmulatorCloseHotkeys);
-			RebuildKeysBox(newCount);
+			UpdateEmulatorCloseHotkeysBtnText();
 		};
 	}
 

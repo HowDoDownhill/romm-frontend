@@ -2,8 +2,10 @@
 
 [ext_resource type="Script" uid="uid://iu78vi21qhv0" path="res://scripts/main/MainScene.cs" id="1_6l7je"]
 [ext_resource type="PackedScene" uid="uid://cdhj70uq5atqd" path="res://scenes/downloads_list/downloads_page.tscn" id="2_6l7je"]
+[ext_resource type="Material" uid="uid://dhmv62s1oow6i" path="res://assets/materials/moving_background.tres" id="2_movbg"]
 [ext_resource type="PackedScene" uid="uid://cew2a8jxcgu6t" path="res://scenes/games_list/game_list_entry.tscn" id="2_rt2n2"]
 [ext_resource type="Script" uid="uid://cwtykxfgbvhv6" path="res://scripts/ui/VerticalCarousel.cs" id="3_gubc5"]
+[ext_resource type="Material" uid="uid://b822n10q6f56b" path="res://assets/materials/mica_panel.tres" id="3_mica"]
 [ext_resource type="PackedScene" uid="uid://cffanb3xjob1c" path="res://scenes/downloads_list/download_entry.tscn" id="4_pu3yx"]
 [ext_resource type="Script" uid="uid://bgqglerkcylxx" path="res://addons/SmoothScroll/smooth_scroll_container.gd" id="6_c16ls"]
 [ext_resource type="Script" uid="uid://b7h0k2h2qwlqv" path="res://addons/SmoothScroll/scroll_damper/expo_scroll_damper.gd" id="7_18nlu"]
@@ -36,7 +38,7 @@ script = ExtResource("7_18nlu")
 [sub_resource type="Resource" id="Resource_6wevv"]
 script = ExtResource("7_18nlu")
 
-[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "gameList", "detailsPanelContainer", "gameTitle", "gameDescription", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "LaunchEmulatorPopupOption", "SelectBiosPopupOption", "SettingsPopupOption", "RefreshGamesPopupOption", "RefreshCurrentSystemGamesPopupOption", "QuitPopupOption", "RandomGamePopupOption", "downloadProgressPopup", "downloadProgressLabel", "downloadProgressBar", "changelogPopup", "changelogRichTextLabel", "acceptUpdateBtn", "cancelUpdateBtn", "backgroundRect", "mainVBoxContainer", "startMenu", "startMenuContainer", "biosSelectorContainer", "biosSelector", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
+[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "gameList", "detailsPanelContainer", "gameMarquee", "gameDescription", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "LaunchEmulatorPopupOption", "SelectBiosPopupOption", "SettingsPopupOption", "RefreshGamesPopupOption", "RefreshCurrentSystemGamesPopupOption", "QuitPopupOption", "RandomGamePopupOption", "downloadProgressPopup", "downloadProgressLabel", "downloadProgressBar", "changelogPopup", "changelogRichTextLabel", "acceptUpdateBtn", "cancelUpdateBtn", "backgroundRect", "mainVBoxContainer", "startMenu", "startMenuContainer", "biosSelectorContainer", "biosSelector", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -52,7 +54,7 @@ platformIcon = NodePath("Background/VBoxContainer/MarginContainer/Panel/MarginCo
 gameList = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/GameList")
 gameListEntryScene = ExtResource("2_rt2n2")
 detailsPanelContainer = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel")
-gameTitle = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/NameMargin/GameName")
+gameMarquee = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/NameMargin/GameMarquee")
 gameDescription = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/DescMargin/GameDesc")
 downloadsListContainer = NodePath("Background/VBoxContainer/DownloadsPageContainer")
 downloadProgressUI = NodePath("Background/VBoxContainer/DownloadsPageContainer/DownloadsPage")
@@ -90,10 +92,11 @@ startMenuContainer = NodePath("Background/StartMenu/Panel/StartMenuContainer")
 biosSelectorContainer = NodePath("Background/StartMenu/Panel/BiosSelectorContainer")
 biosSelector = NodePath("Background/StartMenu/Panel/BiosSelectorContainer/SmoothScrollContainer/MarginContainer/BiosSelector")
 settingsMenuContainer = NodePath("Background/VBoxContainer/SettingsMenuContainer")
-settingsSectionsTree = NodePath("Background/VBoxContainer/SettingsMenuContainer/HBoxContainer/SettingsSections")
+settingsSectionsTree = NodePath("Background/VBoxContainer/SettingsMenuContainer/HBoxContainer/SettingsTreePanel/MarginContainer/SettingsSections")
 sectionOptionsContainer = NodePath("Background/VBoxContainer/SettingsMenuContainer/HBoxContainer/Panel/MarginContainer/SectionOptions")
 
-[node name="Background" type="TextureRect" parent="." unique_id=586301297]
+[node name="Background" type="ColorRect" parent="." unique_id=586301297]
+material = ExtResource("2_movbg")
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -113,12 +116,13 @@ grow_vertical = 2
 layout_mode = 2
 size_flags_vertical = 3
 size_flags_stretch_ratio = 0.1
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 5
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
 
 [node name="Panel" type="Panel" parent="Background/VBoxContainer/MarginContainer" unique_id=2010479366]
+material = ExtResource("3_mica")
 layout_mode = 2
 size_flags_vertical = 3
 size_flags_stretch_ratio = 0.1
@@ -154,10 +158,10 @@ vertical_alignment = 1
 [node name="GamesListContainer" type="MarginContainer" parent="Background/VBoxContainer" unique_id=749665635]
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 5
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
 
 [node name="HBoxContainer" type="HBoxContainer" parent="Background/VBoxContainer/GamesListContainer" unique_id=2086912777]
 layout_mode = 2
@@ -172,13 +176,14 @@ size_flags_vertical = 3
 focus_mode = 2
 script = ExtResource("3_gubc5")
 depthOffset = 400.0
-xOffset = -400.0
-minimumScale = 0.2
+xOffset = -300.0
+visibleItemsHalfCount = 6
+preloadItemsHalfCount = 6
 
 [node name="Panel" type="Panel" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer" unique_id=1330960290]
+material = ExtResource("3_mica")
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_stretch_ratio = 0.3
 
 [node name="DetailsPanel" type="VBoxContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel" unique_id=280236495]
 layout_mode = 1
@@ -197,14 +202,10 @@ theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="GameName" type="Label" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/NameMargin" unique_id=1077688247]
+[node name="GameMarquee" type="TextureRect" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/NameMargin" unique_id=992628909]
 layout_mode = 2
-size_flags_vertical = 1
-text = "TEXT
-"
-horizontal_alignment = 1
-vertical_alignment = 1
-clip_text = true
+expand_mode = 5
+stretch_mode = 5
 
 [node name="DescMargin" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel" unique_id=2114637104]
 layout_mode = 2
@@ -239,10 +240,10 @@ stretch_mode = 5
 visible = false
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 5
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
 
 [node name="DownloadsPage" parent="Background/VBoxContainer/DownloadsPageContainer" unique_id=141579046 node_paths=PackedStringArray("downloadsVBox") instance=ExtResource("2_6l7je")]
 layout_mode = 2
@@ -262,20 +263,42 @@ size_flags_vertical = 3
 visible = false
 layout_mode = 2
 size_flags_vertical = 3
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Background/VBoxContainer/SettingsMenuContainer" unique_id=1387841732]
+layout_mode = 2
+
+[node name="SettingsTreePanel" type="Panel" parent="Background/VBoxContainer/SettingsMenuContainer/HBoxContainer" unique_id=1546846272]
+material = ExtResource("3_mica")
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 0.3
+
+[node name="MarginContainer" type="MarginContainer" parent="Background/VBoxContainer/SettingsMenuContainer/HBoxContainer/SettingsTreePanel" unique_id=293847561]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_constants/margin_left = 5
 theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="HBoxContainer" type="HBoxContainer" parent="Background/VBoxContainer/SettingsMenuContainer" unique_id=1387841732]
+[node name="SettingsSections" type="Tree" parent="Background/VBoxContainer/SettingsMenuContainer/HBoxContainer/SettingsTreePanel/MarginContainer" unique_id=2021569588]
 layout_mode = 2
-
-[node name="SettingsSections" type="Tree" parent="Background/VBoxContainer/SettingsMenuContainer/HBoxContainer" unique_id=2021569588]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_stretch_ratio = 0.3
+theme_override_constants/inner_item_margin_bottom = 5
+theme_override_constants/inner_item_margin_left = 5
+theme_override_constants/inner_item_margin_right = 5
+theme_override_constants/inner_item_margin_top = 5
+theme_override_styles/panel = SubResource("StyleBoxEmpty_pu3yx")
 
 [node name="Panel" type="Panel" parent="Background/VBoxContainer/SettingsMenuContainer/HBoxContainer" unique_id=1892134041]
+material = ExtResource("3_mica")
 layout_mode = 2
 size_flags_horizontal = 3
 
@@ -299,12 +322,13 @@ size_flags_horizontal = 3
 layout_mode = 2
 size_flags_vertical = 3
 size_flags_stretch_ratio = 0.1
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 5
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
 
 [node name="Panel" type="Panel" parent="Background/VBoxContainer/FooterButtonsContainer" unique_id=1828947604]
+material = ExtResource("3_mica")
 layout_mode = 2
 
 [node name="GameListFooter" type="HBoxContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel" unique_id=1733423683]
@@ -325,6 +349,7 @@ theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
 [node name="ActionButton" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter/ActionButtonContainer" unique_id=401908397]
+custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 size_flags_horizontal = 13
 size_flags_vertical = 13
@@ -334,6 +359,7 @@ NOTE: launching the emulator from the exectuable from outside the app may restul
 focus_mode = 0
 theme_type_variation = &"FlatButton"
 theme_override_constants/icon_max_width = 48
+theme_override_font_sizes/font_size = 32
 theme_override_styles/normal = SubResource("StyleBoxEmpty_pu3yx")
 theme_override_styles/normal_mirrored = SubResource("StyleBoxEmpty_gubc5")
 theme_override_styles/pressed = SubResource("StyleBoxEmpty_rt2n2")
@@ -347,7 +373,8 @@ theme_override_styles/disabled_mirrored = SubResource("StyleBoxEmpty_4w45t")
 theme_override_styles/focus = SubResource("StyleBoxEmpty_r6p65")
 text = "Action"
 flat = true
-alignment = 0
+alignment = 2
+icon_alignment = 2
 expand_icon = true
 
 [node name="DeleteGameContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter" unique_id=1773723543]
@@ -359,6 +386,7 @@ theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
 [node name="DeleteGameButton" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter/DeleteGameContainer" unique_id=610111342]
+custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 size_flags_horizontal = 13
 size_flags_vertical = 13
@@ -368,8 +396,10 @@ NOTE: launching the emulator from the exectuable from outside the app may restul
 focus_mode = 0
 theme_type_variation = &"FlatButton"
 theme_override_constants/icon_max_width = 48
+theme_override_font_sizes/font_size = 32
 text = "Delete Game"
-alignment = 0
+alignment = 2
+icon_alignment = 2
 expand_icon = true
 
 [node name="ToggleInstalledContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter" unique_id=1797492776]
@@ -381,14 +411,17 @@ theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
 [node name="ToggleInstalledButton" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter/ToggleInstalledContainer" unique_id=1230347477]
+custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 size_flags_horizontal = 13
 size_flags_vertical = 13
 focus_mode = 0
 theme_type_variation = &"FlatButton"
 theme_override_constants/icon_max_width = 48
+theme_override_font_sizes/font_size = 32
 text = "Toggle Installed"
-alignment = 0
+alignment = 2
+icon_alignment = 2
 expand_icon = true
 
 [node name="ToggleDownloadsContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter" unique_id=775250903]
@@ -400,14 +433,17 @@ theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
 [node name="ToggleDownloadsButton" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter/ToggleDownloadsContainer" unique_id=1665320228]
+custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 size_flags_horizontal = 13
 size_flags_vertical = 13
 focus_mode = 0
 theme_type_variation = &"FlatButton"
 theme_override_constants/icon_max_width = 48
+theme_override_font_sizes/font_size = 32
 text = "Downloads"
-alignment = 0
+alignment = 2
+icon_alignment = 2
 expand_icon = true
 
 [node name="MenuContainer" type="MarginContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter" unique_id=2067252156]
@@ -419,6 +455,7 @@ theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
 [node name="MenuButton" type="Button" parent="Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter/MenuContainer" unique_id=529449134]
+custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 size_flags_horizontal = 13
 size_flags_vertical = 13
@@ -426,9 +463,11 @@ tooltip_text = "Force refresh games from RomM"
 focus_mode = 0
 theme_type_variation = &"FlatButton"
 theme_override_constants/icon_max_width = 48
+theme_override_font_sizes/font_size = 32
 text = "Menu
 "
-alignment = 0
+alignment = 2
+icon_alignment = 2
 expand_icon = true
 
 [node name="DownloadsFooter" type="HBoxContainer" parent="Background/VBoxContainer/FooterButtonsContainer/Panel" unique_id=543660800]
@@ -577,8 +616,13 @@ offset_right = 200.0
 offset_bottom = 300.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
 
 [node name="Panel" type="Panel" parent="Background/StartMenu" unique_id=1083749050]
+material = ExtResource("3_mica")
 layout_mode = 2
 
 [node name="StartMenuContainer" type="MarginContainer" parent="Background/StartMenu/Panel" unique_id=93641177]
@@ -677,12 +721,13 @@ offset_right = 20.0
 offset_bottom = 20.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 5
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
 
 [node name="Panel" type="Panel" parent="Background/DownloadProgressPopup" unique_id=428372210]
+material = ExtResource("3_mica")
 layout_mode = 2
 
 [node name="VBoxContainer" type="VBoxContainer" parent="Background/DownloadProgressPopup/Panel" unique_id=949079431]
@@ -733,8 +778,13 @@ offset_right = 20.0
 offset_bottom = 20.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
 
 [node name="Panel" type="Panel" parent="Background/ChangelogContainer" unique_id=1450288382]
+material = ExtResource("3_mica")
 layout_mode = 2
 
 [node name="MarginContainer" type="MarginContainer" parent="Background/ChangelogContainer/Panel" unique_id=846107793]

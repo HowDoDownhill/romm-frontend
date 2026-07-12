@@ -23,11 +23,11 @@ RomMAPI="*uid://c45fdarm7kidr"
 CacheManager="*uid://0rycpw7unjjb"
 DataBus="*uid://c3ihjck7ojmb6"
 DownloadManager="*uid://cahae8cxkj01b"
-ControllerManager="*res://scripts/Autoloads/ControllerManager.cs"
+ControllerManager="*res://scripts/autoloads/ControllerManager.cs"
 EmulatorManager="*uid://mc0jjiebfh7k"
-AssetManager="*res://scripts/Autoloads/AssetManager.cs"
-SaveSyncManager="*res://scripts/Autoloads/SaveSyncManager.cs"
-AppUpdater="*res://scripts/Autoloads/AppUpdater.cs"
+AssetManager="*res://scripts/autoloads/AssetManager.cs"
+SaveSyncManager="*res://scripts/autoloads/SaveSyncManager.cs"
+AppUpdater="*res://scripts/autoloads/AppUpdater.cs"
 ControllerIcons="*uid://cbgqhfjlifwga"
 
 [display]
@@ -45,6 +45,10 @@ project/assembly_name="romm-frontend"
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/SmoothScroll/plugin.cfg", "res://addons/controller_icons/plugin.cfg", "res://addons/tnowe_extra_controls/plugin.cfg")
+
+[gui]
+
+theme/custom_font="res://assets/fonts/Inter-Regular.woff2"
 
 [input]
 

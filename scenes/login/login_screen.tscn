@@ -1,6 +1,8 @@
 [gd_scene format=3 uid="uid://c181xd67fwosi"]
 
 [ext_resource type="Script" uid="uid://d0sdyc3lh8p1u" path="res://scripts/login/LoginScreen.cs" id="1_frse4"]
+[ext_resource type="Material" uid="uid://dhmv62s1oow6i" path="res://assets/materials/moving_background.tres" id="2_movbg"]
+[ext_resource type="Material" uid="uid://b822n10q6f56b" path="res://assets/materials/mica_panel.tres" id="3_mica"]
 
 [node name="LoginScreen" type="Control" unique_id=2048380402 node_paths=PackedStringArray("loginButton", "errorLabel", "rommHostInput", "rommUserInput", "rommPasswordInput", "rommApiKeyInput")]
 layout_mode = 3
@@ -24,6 +26,7 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+material = ExtResource("2_movbg")
 color = Color(0, 0, 0, 1)
 
 [node name="Background" type="Panel" parent="TextureRect" unique_id=878216554]
@@ -43,6 +46,7 @@ anchor_right = 0.7
 anchor_bottom = 0.7
 grow_horizontal = 2
 grow_vertical = 2
+material = ExtResource("3_mica")
 
 [node name="MarginContainer" type="MarginContainer" parent="TextureRect/Background/PanelContainer" unique_id=2078386266]
 layout_mode = 2
