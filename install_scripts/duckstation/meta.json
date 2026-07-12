@@ -1,0 +1,94 @@
+{
+  "name": "DuckStation",
+  "executable_name": {
+    "windows": "duckstation-qt.exe",
+    "linux": "DuckStation-x64.AppImage",
+    "macos": "DuckStation"
+  },
+  "emulator_dir_name": {
+    "windows": "duckstation",
+    "linux": "duckstation",
+    "macos": "duckstation"
+  },
+  "emulator_bios_path": {
+    "windows": "bios",
+    "linux": "bios",
+    "macos": "bios"
+  },
+  "relative_save_path": {
+    "psx": "memcards"
+  },
+  "launch_args_with_game": "-batch -fullscreen -portable -- \"{rom_path}\"",
+  "launch_args_without_game": "-portable",
+  "install_recipe": {
+    "windows": {
+      "type": "github_release",
+      "repo": "stenzek/duckstation",
+      "asset_regex": ".*windows-x64-release\\.zip$",
+      "extract": true
+    },
+    "linux": {
+      "type": "github_release",
+      "repo": "stenzek/duckstation",
+      "asset_regex": ".*DuckStation-x64\\.AppImage$",
+      "extract": false
+    }
+  },
+  "settings_fields": [
+    {
+      "id": "internal_resolution",
+      "label": "Internal Resolution",
+      "type": "dropdown",
+      "default_value_string": "1",
+      "config_file_relative_path": "settings.ini",
+      "config_section": "Enhancements",
+      "config_key": "InternalResolutionScale",
+      "options": {
+        "Native (1x)": "1",
+        "720p (2x)": "2",
+        "1080p (3x)": "3",
+        "1440p (4x)": "4",
+        "1620p (5x)": "5",
+        "2160p (6x)": "6",
+        "2880p (8x)": "8"
+      }
+    },
+    {
+      "id": "aspect_ratio",
+      "label": "Aspect Ratio",
+      "type": "dropdown",
+      "default_value_string": "0",
+      "config_file_relative_path": "settings.ini",
+      "config_section": "Display",
+      "config_key": "AspectRatio",
+      "options": {
+        "Auto (Game Native)": "0",
+        "Standard (4:3)": "1",
+        "Widescreen (16:9)": "2",
+        "Stretch to Window": "5"
+      }
+    },
+    {
+      "id": "per_game_memcard",
+      "label": "Per-Game Memory Card",
+      "type": "hidden",
+      "default_value_string": "2",
+      "config_file_relative_path": "settings.ini",
+      "config_section": "MemoryCards",
+      "config_key": "Card1Type"
+    },
+    {
+      "id": "vsync",
+      "label": "VSync",
+      "type": "dropdown",
+      "default_value_string": "false",
+      "config_file_relative_path": "settings.ini",
+      "config_section": "Display",
+      "config_key": "VSync",
+      "options": {
+        "Off": "false",
+        "On": "true"
+      }
+    }
+  ]
+}
