@@ -20,6 +20,20 @@ public partial class ConfigManager : Node
     public bool RomMValidLoginLastUsed { get; private set; }
     public bool HideGamesWithoutBoxArt { get; private set; }
     public bool ShowAllSystems { get; private set; }
+    public string AppTheme { get; private set; }
+
+    public static readonly System.Collections.Generic.Dictionary<string, (Color Bg, Color Primary, Color Secondary, Color Panel)> Themes = new System.Collections.Generic.Dictionary<string, (Color Bg, Color Primary, Color Secondary, Color Panel)>
+    {
+        { "Default", (new Color(0.05f, 0.02f, 0.1f, 1f).Darkened(0.3f), new Color(0.3f, 0f, 0.4f, 1f).Darkened(0.4f), new Color(0f, 0.2f, 0.4f, 1f).Darkened(0.4f), new Color(0f, 0f, 0f, 0.25f)) },
+        { "Rose-pine", (new Color("#191724").Darkened(0.5f), new Color("#c4a7e7").Darkened(0.65f), new Color("#eb6f92").Darkened(0.65f), new Color("#1f1d2e40")) },
+        { "Gruvbox", (new Color("#282828").Darkened(0.5f), new Color("#cc241d").Darkened(0.65f), new Color("#458588").Darkened(0.65f), new Color("#1d202140")) },
+        { "catppuccin", (new Color("#1e1e2e").Darkened(0.5f), new Color("#cba6f7").Darkened(0.65f), new Color("#89b4fa").Darkened(0.65f), new Color("#18182540")) },
+        { "Solarized Dark", (new Color("#002b36").Darkened(0.5f), new Color("#cb4b16").Darkened(0.65f), new Color("#268bd2").Darkened(0.65f), new Color("#00212b40")) },
+        { "Solarized Light", (new Color("#fdf6e3").Darkened(0.7f), new Color("#d33682").Darkened(0.65f), new Color("#2aa198").Darkened(0.65f), new Color("#eee8d540")) },
+        { "monokai", (new Color("#272822").Darkened(0.5f), new Color("#f92672").Darkened(0.65f), new Color("#66d9ef").Darkened(0.65f), new Color("#1e1f1c40")) },
+        { "Nord", (new Color("#2e3440").Darkened(0.5f), new Color("#81a1c1").Darkened(0.65f), new Color("#b48ead").Darkened(0.65f), new Color("#24293340")) },
+        { "Dracula", (new Color("#282a36").Darkened(0.5f), new Color("#bd93f9").Darkened(0.65f), new Color("#ff79c6").Darkened(0.65f), new Color("#1e1f2940")) }
+    };
 
     public int EmulatorCloseHotkeyCount { get; private set; }
     public Godot.Collections.Array EmulatorCloseHotkeys { get; private set; }
@@ -110,6 +124,7 @@ public partial class ConfigManager : Node
         RomMValidLoginLastUsed = (bool)configurationFile.GetValue("RomM", "ValidLoginLastUsed", "");
         HideGamesWithoutBoxArt = (bool)configurationFile.GetValue("UI", "HideGamesWithoutBoxArt", false);
         ShowAllSystems = (bool)configurationFile.GetValue("UI", "ShowAllSystems", false);
+        AppTheme = (string)configurationFile.GetValue("UI", "AppTheme", "Default");
 
         EmulatorCloseHotkeyCount = (int)configurationFile.GetValue("Input", "EmulatorCloseHotkeyCount", 4);
         var defaultHotkeyButtons = new Godot.Collections.Array { (int)JoyButton.LeftShoulder, (int)JoyButton.RightShoulder, (int)JoyButton.Back, (int)JoyButton.Start };
@@ -165,6 +180,7 @@ public partial class ConfigManager : Node
         RomMValidLoginLastUsed = false;
         HideGamesWithoutBoxArt = false;
         ShowAllSystems = false;
+        AppTheme = "Default";
 
         EmulatorCloseHotkeyCount = 4;
         EmulatorCloseHotkeys = new Godot.Collections.Array { (int)JoyButton.LeftShoulder, (int)JoyButton.RightShoulder, (int)JoyButton.Back, (int)JoyButton.Start };
@@ -190,6 +206,7 @@ public partial class ConfigManager : Node
         configurationFile.SetValue("RomM", "ValidLoginLastUsed", RomMValidLoginLastUsed);
         configurationFile.SetValue("UI", "HideGamesWithoutBoxArt", HideGamesWithoutBoxArt);
         configurationFile.SetValue("UI", "ShowAllSystems", ShowAllSystems);
+        configurationFile.SetValue("UI", "AppTheme", AppTheme);
         configurationFile.SetValue("Input", "EmulatorCloseHotkeyCount", EmulatorCloseHotkeyCount);
         configurationFile.SetValue("Input", "EmulatorCloseHotkeys", EmulatorCloseHotkeys);
 
@@ -247,6 +264,12 @@ public partial class ConfigManager : Node
     {
         HideGamesWithoutBoxArt = shouldHideGamesWithoutBoxArt;
         ShowAllSystems = showAllSystems;
+        SaveConfig();
+    }
+
+    public void SaveAppTheme(string themeName)
+    {
+        AppTheme = themeName;
         SaveConfig();
     }
 

@@ -1,0 +1,30 @@
+[gd_scene format=3 uid="uid://er6um1xk8tvd"]
+
+[ext_resource type="Script" path="res://scripts/settings/SettingsSectionNavEntry.cs" id="1_setnav"]
+
+[node name="SettingsSectionNavEntry" type="MarginContainer"]
+custom_minimum_size = Vector2(0, 50)
+offset_right = 40.0
+offset_bottom = 40.0
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+script = ExtResource("1_setnav")
+
+[node name="PanelContainer" type="PanelContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="PanelContainer"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="Label" type="Label" parent="PanelContainer/MarginContainer"]
+layout_mode = 2
+mouse_filter = 2
+text = "Section Name"

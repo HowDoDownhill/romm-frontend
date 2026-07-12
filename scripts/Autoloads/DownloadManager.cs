@@ -6,7 +6,7 @@ using System.Security.AccessControl;
 public partial class DownloadManager : Node
 {
     [Signal]
-    public delegate void DownloadProgressUpdatedEventHandler(string fileName, long currentBytes, long totalBytes);
+    public delegate void DownloadProgressUpdatedEventHandler(string fileName, long currentBytes, long totalBytes, string gameId);
 
     [Signal]
     public delegate void DownloadCompletedEventHandler(string fileName, bool wasSuccessful);
@@ -25,11 +25,13 @@ public partial class DownloadManager : Node
         public string FileName { get; set; }
         public string DestinationPath { get; set; }
         public System.Action<string> CompletionCallback { get; set; }
+        public bool IsCancelled { get; set; }
+        public string GameId { get; set; }
     }
 
     private List<ActiveDownloadEntry> activeDownloadEntries = new List<ActiveDownloadEntry>();
 
-    public void DownloadFile(string downloadUrl, string destinationFilePath, string[] requestHeaders, System.Action<string> onDownloadComplete)
+    public void DownloadFile(string downloadUrl, string destinationFilePath, string[] requestHeaders, System.Action<string> onDownloadComplete, string gameId = null)
     {
         var httpRequest = new HttpRequest();
         AddChild(httpRequest);
@@ -39,7 +41,8 @@ public partial class DownloadManager : Node
             Request = httpRequest,
             FileName = destinationFilePath.GetFile(),
             DestinationPath = destinationFilePath,
-            CompletionCallback = onDownloadComplete
+            CompletionCallback = onDownloadComplete,
+            GameId = gameId
         };
 
         activeDownloadEntries.Add(downloadEntry);
@@ -79,7 +82,8 @@ public partial class DownloadManager : Node
                 EmitSignal(SignalName.DownloadProgressUpdated,
                     downloadEntry.FileName,
                     downloadEntry.Request.GetDownloadedBytes(),
-                    downloadEntry.Request.GetBodySize());
+                    downloadEntry.Request.GetBodySize(),
+                    downloadEntry.GameId);
             }
         }
     }
@@ -95,13 +99,31 @@ public partial class DownloadManager : Node
 
         if (downloadEntryToCancel != null)
         {
-            downloadEntryToCancel.Request.RequestCompleted -= (long resultCode, long responseCode, string[] responseHeaders, byte[] responseBody) => HandleDownloadCompleted(downloadEntryToCancel, resultCode, responseCode);
-            HandleDownloadCompleted(downloadEntryToCancel, (long)HttpRequest.Result.RequestFailed, 0);
+            downloadEntryToCancel.IsCancelled = true;
+            downloadEntryToCancel.Request.CancelRequest();
+            
+            activeDownloadEntries.Remove(downloadEntryToCancel);
+            EmitSignal(SignalName.DownloadCompleted, downloadEntryToCancel.FileName, false);
+
+            var timer = GetTree().CreateTimer(2.0f);
+            timer.Timeout += () => 
+            {
+                if (FileAccess.FileExists(downloadEntryToCancel.DestinationPath))
+                {
+                    DirAccess.RemoveAbsolute(downloadEntryToCancel.DestinationPath);
+                }
+                if (GodotObject.IsInstanceValid(downloadEntryToCancel.Request))
+                {
+                    downloadEntryToCancel.Request.QueueFree();
+                }
+            };
         }
     }
 
     private void HandleDownloadCompleted(ActiveDownloadEntry downloadEntry, long resultCode, long responseCode)
     {
+        if (downloadEntry.IsCancelled) return;
+
         bool wasSuccessful = resultCode == (long)HttpRequest.Result.Success && responseCode == 200;
 
         if (wasSuccessful)

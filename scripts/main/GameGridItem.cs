@@ -22,7 +22,7 @@ public partial class GameGridItem : Control
             BorderWidthBottom = 2,
             BorderWidthLeft = 2,
             BorderWidthRight = 2,
-            BorderColor = new Color("#4f8fcf"), // A nice blue color for focus
+            BorderColor = new Color(1f, 1f, 1f, 0.5f), // White semi-transparent for focus
             DrawCenter = false // We only want the border
         };
 

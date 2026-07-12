@@ -1,8 +1,8 @@
-[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://b822n10q6f56b"]
+[gd_resource type="ShaderMaterial" format=3 uid="uid://b822n10q6f56b"]
 
-[ext_resource type="Shader" path="res://assets/shaders/mica_panel.gdshader" id="1_mica"]
+[ext_resource type="Shader" uid="uid://byhma5romwgsa" path="res://assets/shaders/mica_panel.gdshader" id="1_mica"]
 
 [resource]
 shader = ExtResource("1_mica")
-shader_parameter/blur_amount = 2.0
+shader_parameter/blur_amount = 4.5
 shader_parameter/mix_color = Color(0, 0, 0, 0.4)

@@ -1,8 +1,10 @@
 [gd_scene format=3 uid="uid://cdhj70uq5atqd"]
 
 [ext_resource type="Script" uid="uid://ufgi6x3sv40m" path="res://scripts/downloads/DownloadProgressUI.cs" id="1_imuyf"]
+[ext_resource type="Material" uid="uid://b822n10q6f56b" path="res://assets/materials/mica_panel.tres" id="2_mica"]
 
 [node name="DownloadsPage" type="Panel" unique_id=1760904928 node_paths=PackedStringArray("downloadsVBox")]
+material = ExtResource("2_mica")
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0

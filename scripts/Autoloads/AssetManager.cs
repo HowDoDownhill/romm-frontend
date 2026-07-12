@@ -101,12 +101,15 @@ public partial class AssetManager : Node
             pendingAssetDownloadQueue.Enqueue((game.Id, "marquee", marqueeImageUrl, marqueeImagePath));
         }
 
-        string screenshotImagePath = Path.Combine(assetsDirectoryPath, "screenshots", $"{game.Id}.jpg");
-
-        if (!File.Exists(screenshotImagePath))
+        for (int i = 0; i < 5; i++)
         {
-            string screenshotImageUrl = $"{appInstance.rommApi.ApiHost}/assets/romm/resources/roms/{game.PlatformId}/{game.Id}/screenshot/0.jpg";
-            pendingAssetDownloadQueue.Enqueue((game.Id, "screenshot", screenshotImageUrl, screenshotImagePath));
+            string screenshotImagePath = Path.Combine(assetsDirectoryPath, "screenshots", $"{game.Id}_{i}.jpg");
+
+            if (!File.Exists(screenshotImagePath))
+            {
+                string screenshotImageUrl = $"{appInstance.rommApi.ApiHost}/assets/romm/resources/roms/{game.PlatformId}/{game.Id}/screenshots/{i}.jpg";
+                pendingAssetDownloadQueue.Enqueue((game.Id, "screenshot", screenshotImageUrl, screenshotImagePath));
+            }
         }
     }
 
@@ -138,7 +141,12 @@ public partial class AssetManager : Node
 
                     if (downloadSucceeded)
                     {
+                        GD.Print($"[AssetManager] Successfully downloaded {downloadTask.assetType} for game {downloadTask.gameId} to {downloadTask.localFilePath}");
                         CallDeferred(MethodName.EmitAssetDownloaded, downloadTask.gameId, downloadTask.assetType);
+                    }
+                    else
+                    {
+                        GD.PrintErr($"[AssetManager] Failed to download {downloadTask.assetType} for game {downloadTask.gameId} from {downloadTask.downloadUrl}");
                     }
 
                     await Task.Delay(100, cancellationToken);

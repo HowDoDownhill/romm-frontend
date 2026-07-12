@@ -9,7 +9,6 @@ public partial class DownloadProgressUI : Panel
     
     private Dictionary<string, DownloadEntryUI> downloadEntries = new Dictionary<string, DownloadEntryUI>();
     private string currentlySelectedFile;
-
     private AppInstance appInstance;
 
     public void CycleSelection(int direction)
@@ -28,6 +27,10 @@ public partial class DownloadProgressUI : Panel
             if (child is DownloadEntryUI entry)
             {
                 entries.Add(entry);
+            }
+            else if (child is MarginContainer mc && mc.GetChildCount() > 0 && mc.GetChild(0) is DownloadEntryUI mcEntry)
+            {
+                entries.Add(mcEntry);
             }
         }
 
@@ -89,7 +92,7 @@ public partial class DownloadProgressUI : Panel
         }
     }
 
-    private void OnDownloadProgressUpdated(string fileName, long current, long total)
+    private void OnDownloadProgressUpdated(string fileName, long current, long total, string gameId)
     {
         if (!downloadEntries.ContainsKey(fileName))
         {
@@ -100,8 +103,15 @@ public partial class DownloadProgressUI : Panel
             }
 
             var entryUi = downloadEntryScene.Instantiate<DownloadEntryUI>();
-            downloadsVBox.AddChild(entryUi);
-            entryUi.SetFileName(fileName);
+            var entryWrapper = new MarginContainer();
+            entryWrapper.AddThemeConstantOverride("margin_left", 5);
+            entryWrapper.AddThemeConstantOverride("margin_right", 5);
+            entryWrapper.AddThemeConstantOverride("margin_top", 5);
+            entryWrapper.AddThemeConstantOverride("margin_bottom", 5);
+            entryWrapper.AddChild(entryUi);
+            downloadsVBox.AddChild(entryWrapper);
+            
+            entryUi.SetFileName(fileName, gameId);
             entryUi.EntrySelected += OnEntrySelected;
             
             downloadEntries[fileName] = entryUi;
@@ -143,7 +153,15 @@ public partial class DownloadProgressUI : Panel
     {
         if (downloadEntries.TryGetValue(fileName, out var entry))
         {
-            entry.QueueFree();
+            var wrapper = entry.GetParent();
+            if (wrapper != null && wrapper is MarginContainer)
+            {
+                wrapper.QueueFree();
+            }
+            else
+            {
+                entry.QueueFree();
+            }
             downloadEntries.Remove(fileName);
             
             if (currentlySelectedFile == fileName)

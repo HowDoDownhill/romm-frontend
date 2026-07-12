@@ -13,14 +13,19 @@ public partial class DownloadEntryUI : MarginContainer
     private StyleBoxFlat backgroundStyle;
 
     public string FileName { get; private set; }
+    public string GameId { get; private set; }
+    private AppInstance appInstance;
 
     public override void _Ready()
     {
+        appInstance = GetNode<AppInstance>("/root/AppInstance");
         FocusMode = FocusModeEnum.All;
         
         if (backgroundPanel != null)
         {
             backgroundStyle = new StyleBoxFlat();
+            backgroundStyle.BgColor = new Color(0, 0, 0, 0);
+            backgroundStyle.DrawCenter = false;
             backgroundPanel.AddThemeStyleboxOverride("panel", backgroundStyle);
         }
 
@@ -65,9 +70,10 @@ public partial class DownloadEntryUI : MarginContainer
         Unhighlight();
     }
 
-    public void SetFileName(string fileName)
+    public void SetFileName(string fileName, string gameId = null)
     {
         FileName = fileName;
+        GameId = gameId;
 
         if (nameLabel != null)
         {
@@ -98,7 +104,8 @@ public partial class DownloadEntryUI : MarginContainer
     {
         if (backgroundStyle != null)
         {
-            backgroundStyle.BgColor = new Color(0.3f, 0.3f, 0.4f);
+            backgroundStyle.BgColor = new Color(1f, 1f, 1f, 0.5f);
+            backgroundStyle.DrawCenter = true;
         }
     }
 
@@ -106,7 +113,8 @@ public partial class DownloadEntryUI : MarginContainer
     {
         if (backgroundStyle != null)
         {
-            backgroundStyle.BgColor = new Color(0.1f, 0.1f, 0.15f, 0.5f);
+            backgroundStyle.BgColor = new Color(0, 0, 0, 0);
+            backgroundStyle.DrawCenter = false;
         }
     }
 }
