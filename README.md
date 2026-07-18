@@ -1,8 +1,11 @@
 # RomM Frontend
 
-<img width="1969" height="1182" alt="image" src="https://github.com/user-attachments/assets/d52d23c1-fb2a-48d0-acf7-80fa05132720" />
-<img width="1983" height="1188" alt="image" src="https://github.com/user-attachments/assets/acdc1791-f39a-4e2c-9122-c8dd63f907d7" />
-<img width="1992" height="1210" alt="image" src="https://github.com/user-attachments/assets/2dd19953-6748-4a97-837f-0bb601603922" />
+<img width="1967" height="1117" alt="Screenshot 2026-07-18 115411" src="https://github.com/user-attachments/assets/06f85a3e-729c-488f-9f94-ba897407a7c7" />
+<img width="2027" height="1163" alt="Screenshot 2026-07-18 115238" src="https://github.com/user-attachments/assets/e3988e20-7f8f-4a1c-8829-b09cdf0a320f" />
+<img width="2153" height="1172" alt="Screenshot 2026-07-18 115223" src="https://github.com/user-attachments/assets/5ddc01d5-12b8-4366-95b2-19116cd8794e" />
+<img width="2033" height="1178" alt="Screenshot 2026-07-18 115201" src="https://github.com/user-attachments/assets/56203c7a-509a-4d4c-840a-8542b7519f0b" />
+<img width="2162" height="1251" alt="Screenshot 2026-07-18 115035" src="https://github.com/user-attachments/assets/304a7db6-79e4-458a-a00f-0d5341a98557" />
+
 
 Welcome to the **RomM Frontend**! This application is a native companion client designed to connect to your [RomM (Rom Manager)](https://github.com/rommapp/romm) backend instance. It is built using the Godot engine, allowing you to browse, search, and download your retro game library from your RomM backend and play games locally using automatically installed and configured emulators.
 
