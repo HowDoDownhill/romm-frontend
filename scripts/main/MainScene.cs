@@ -143,13 +143,19 @@ public partial class MainScene : Control
 
         if (systemCarousel != null)
         {
-            systemCarousel.SystemSelected += (index) => 
+            systemCarousel.SystemSelected += (index) =>
             {
                 if (GameListHandler.gameSystems != null && index >= 0 && index < GameListHandler.gameSystems.Count)
                 {
                     GameListHandler.SelectSystemByIndex(index);
                 }
             };
+
+            // Clicking the platform logo opens the system jump grid (same as holding a bumper).
+            systemCarousel.JumpRequested += OpenSystemJumpPopup;
+
+            // Clicking the arrows fades the current system out immediately, like the bumpers do.
+            systemCarousel.Cycled += GameListHandler.BeginQuickSwitchFade;
         }
 
         HoverOverlay = new HoverPopupOverlay();
@@ -196,8 +202,16 @@ public partial class MainScene : Control
             SettingsHandler.SetupSettingsTree();
         }
 
-        if (acceptUpdateBtn != null) acceptUpdateBtn.Pressed += UpdaterHandler.OnAcceptUpdatePressed;
-        if (cancelUpdateBtn != null) cancelUpdateBtn.Pressed += UpdaterHandler.OnCancelUpdatePressed;
+        if (acceptUpdateBtn != null)
+        {
+            acceptUpdateBtn.Pressed += UpdaterHandler.OnAcceptUpdatePressed;
+            acceptUpdateBtn.Icon = MakeControllerGlyph("Select"); // A = Install
+        }
+        if (cancelUpdateBtn != null)
+        {
+            cancelUpdateBtn.Pressed += UpdaterHandler.OnCancelUpdatePressed;
+            cancelUpdateBtn.Icon = MakeControllerGlyph("Back"); // B = Close
+        }
 
         GameListHandler.SelectSystemByIndex(0);
         
@@ -314,6 +328,7 @@ public partial class MainScene : Control
         SetupButton(settingsBackBtn, "Back", "Back");
 
         SetupButton(optionsBtn, "ToggleSettings", "Options");
+        if (optionsBtn != null) optionsBtn.Pressed += ToggleStartMenu;
 
         SetupButton(filterInstalledGamesBtn, "ToggleInstalled", "All Games");
         if (filterInstalledGamesBtn != null) filterInstalledGamesBtn.Pressed += OnFilterInstalledGamesPressed;
@@ -336,9 +351,44 @@ public partial class MainScene : Control
         if (btn == null) return;
         btn.Text = defaultText;
         btn.ThemeTypeVariation = "FlatButton";
+        btn.Icon = MakeControllerGlyph(iconPath);
+    }
+
+    // Builds a controller-glyph texture for the given input action. It only renders when a
+    // controller is the active input, so in keyboard/mouse mode buttons show just their label.
+    private ControllerIconTexture MakeControllerGlyph(string actionPath)
+    {
         var iconTex = new ControllerIconTexture();
-        iconTex.path = iconPath;
-        btn.Icon = iconTex;
+        iconTex.path = actionPath;
+        iconTex.show_mode = ControllerIcons.EShowMode.CONTROLLER;
+        return iconTex;
+    }
+
+    // Opens/closes the start menu (or closes the settings menu if it's open). Shared by the
+    // ToggleSettings action and the footer "Options" button so both behave identically.
+    private void ToggleStartMenu()
+    {
+        if (settingsMenuContainer != null && settingsMenuContainer.Visible)
+        {
+            SettingsHandler.ToggleSettingsMenu();
+            return;
+        }
+
+        if (startMenuRoot != null)
+        {
+            if (startMenuRoot.Visible)
+            {
+                startMenuRoot.Visible = false;
+                gameList?.GrabFocus();
+            }
+            else if (downloadsListContainer == null || !downloadsListContainer.Visible)
+            {
+                startMenuRoot.Visible = true;
+                if (startMenuContainer != null) startMenuContainer.Visible = true;
+                if (biosSelectorContainer != null) biosSelectorContainer.Visible = false;
+                if (LaunchEmulatorPopupOption is Control launchBtn) launchBtn.GrabFocus();
+            }
+        }
     }
 
     private void OnFilterInstalledGamesPressed()
@@ -406,6 +456,23 @@ public partial class MainScene : Control
 
     public override void _Input(InputEvent @event)
     {
+        if (@event is InputEventMouseMotion)
+        {
+            UpdateMouseFocus();
+        }
+
+        // Mouse wheel scrolls the game selection wheel when the cursor is over it.
+        if (@event is InputEventMouseButton wheelEvent && wheelEvent.Pressed
+            && (wheelEvent.ButtonIndex == MouseButton.WheelUp || wheelEvent.ButtonIndex == MouseButton.WheelDown)
+            && IsMouseOverGameList()
+            && gameList is VerticalCarousel gameCarousel)
+        {
+            if (wheelEvent.ButtonIndex == MouseButton.WheelDown) gameCarousel.SelectNext();
+            else gameCarousel.SelectPrevious();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
         if (InputHandler.isListeningForEmulatorCloseHotkeys)
         {
             if (@event is InputEventJoypadButton listenJoyBtn && listenJoyBtn.Pressed)
@@ -463,9 +530,20 @@ public partial class MainScene : Control
 
         if (changelogPopup != null && changelogPopup.Visible)
         {
+            // Let mouse events through so the Install/Close buttons can be clicked; handle A/B
+            // (and keyboard equivalents) for controller/keyboard users.
+            if (@event is InputEventMouse) return;
+
+            if (@event.IsActionPressed("ui_accept") || @event.IsActionPressed("Select"))
+            {
+                UpdaterHandler.OnAcceptUpdatePressed();
+            }
+            else if (@event.IsActionPressed("ui_cancel") || @event.IsActionPressed("Back"))
+            {
+                UpdaterHandler.OnCancelUpdatePressed();
+            }
+
             GetViewport().SetInputAsHandled();
-            if (@event.IsActionPressed("ui_accept")) UpdaterHandler.OnAcceptUpdatePressed();
-            else if (@event.IsActionPressed("ui_cancel") || @event.IsActionPressed("Back")) UpdaterHandler.OnCancelUpdatePressed();
             return;
         }
 
@@ -509,28 +587,7 @@ public partial class MainScene : Control
 
         if (@event.IsActionPressed("ToggleSettings"))
         {
-            if (settingsMenuContainer != null && settingsMenuContainer.Visible)
-            {
-                SettingsHandler.ToggleSettingsMenu();
-                GetViewport().SetInputAsHandled();
-                return;
-            }
-
-            if (startMenuRoot != null)
-            {
-                if (startMenuRoot.Visible)
-                {
-                    startMenuRoot.Visible = false;
-                    gameList?.GrabFocus();
-                }
-                else if (downloadsListContainer == null || !downloadsListContainer.Visible)
-                {
-                    startMenuRoot.Visible = true;
-                    if (startMenuContainer != null) startMenuContainer.Visible = true;
-                    if (biosSelectorContainer != null) biosSelectorContainer.Visible = false;
-                    if (LaunchEmulatorPopupOption is Control launchBtn) launchBtn.GrabFocus();
-                }
-            }
+            ToggleStartMenu();
             GetViewport().SetInputAsHandled();
             return;
         }
@@ -541,14 +598,25 @@ public partial class MainScene : Control
 
         if (!isAnyPopupVisible && @event is InputEventKey keyEvent && keyEvent.Pressed)
         {
-            if (keyEvent.Unicode != 0)
+            ulong currentTime = Time.GetTicksMsec();
+
+            if (keyEvent.Keycode == Key.Backspace)
             {
-                ulong currentTime = Time.GetTicksMsec();
+                // Let the user fix typos by removing the last character.
+                if (GameListHandler.fuzzySearchBuffer.Length > 0)
+                {
+                    GameListHandler.fuzzySearchBuffer = GameListHandler.fuzzySearchBuffer.Substring(0, GameListHandler.fuzzySearchBuffer.Length - 1);
+                }
+                GameListHandler.lastKeystrokeTime = currentTime;
+                GameListHandler.isFuzzySearchDirty = true;
+            }
+            else if (keyEvent.Unicode >= 32) // printable characters only; skip control keys
+            {
                 if (currentTime - GameListHandler.lastKeystrokeTime > 1500)
                 {
                     GameListHandler.fuzzySearchBuffer = "";
                 }
-                
+
                 GameListHandler.fuzzySearchBuffer += (char)keyEvent.Unicode;
                 GameListHandler.fuzzySearchBuffer = GameListHandler.fuzzySearchBuffer.ToLower();
                 GameListHandler.lastKeystrokeTime = currentTime;
@@ -744,45 +812,51 @@ public partial class MainScene : Control
             return;
         }
 
-        if (@event.IsActionPressed("Select") && (downloadsListContainer == null || !downloadsListContainer.Visible))
+        // Footer-button actions are only consumed when driven by a controller. In keyboard/mouse
+        // mode the footer buttons are clicked instead, which keeps their bound keys (e.g. Backspace
+        // for ToggleDownloadsPage, Enter for Select) free for fuzzy search and normal typing.
+        if (IsControllerEvent(@event))
         {
-            OnPlayDownloadButtonPressed();
-            GetViewport().SetInputAsHandled();
-            return;
-        }
-
-        if (@event.IsActionPressed("ToggleInstalled") && (downloadsListContainer == null || !downloadsListContainer.Visible))
-        {
-            OnFilterInstalledGamesPressed();
-            GetViewport().SetInputAsHandled();
-            return;
-        }
-
-        if (@event.IsActionPressed("DeleteGame") && (downloadsListContainer == null || !downloadsListContainer.Visible))
-        {
-            if (deleteBtn != null && !deleteBtn.Disabled && deleteBtn.Visible)
+            if (@event.IsActionPressed("Select") && (downloadsListContainer == null || !downloadsListContainer.Visible))
             {
-                OnDeleteButtonPressed();
-            }
-            GetViewport().SetInputAsHandled();
-            return;
-        }
-
-        if (@event.IsActionPressed("ToggleDownloadsPage"))
-        {
-            DownloadHandler.SwapLists();
-            GetViewport().SetInputAsHandled();
-            return;
-        }
-
-        if (@event.IsActionPressed("CancelDownload"))
-        {
-            if (downloadsListContainer != null && downloadsListContainer.Visible)
-            {
-                DownloadHandler.OnCancelDownloadPressed();
+                OnPlayDownloadButtonPressed();
                 GetViewport().SetInputAsHandled();
+                return;
             }
-            return;
+
+            if (@event.IsActionPressed("ToggleInstalled") && (downloadsListContainer == null || !downloadsListContainer.Visible))
+            {
+                OnFilterInstalledGamesPressed();
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
+            if (@event.IsActionPressed("DeleteGame") && (downloadsListContainer == null || !downloadsListContainer.Visible))
+            {
+                if (deleteBtn != null && !deleteBtn.Disabled && deleteBtn.Visible)
+                {
+                    OnDeleteButtonPressed();
+                }
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
+            if (@event.IsActionPressed("ToggleDownloadsPage"))
+            {
+                DownloadHandler.SwapLists();
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
+            if (@event.IsActionPressed("CancelDownload"))
+            {
+                if (downloadsListContainer != null && downloadsListContainer.Visible)
+                {
+                    DownloadHandler.OnCancelDownloadPressed();
+                    GetViewport().SetInputAsHandled();
+                }
+                return;
+            }
         }
 
         if (@event.IsActionPressed("ui_up", true) || @event.IsActionPressed("MoveUp"))
@@ -812,10 +886,69 @@ public partial class MainScene : Control
         }
     }
 
+    // True when the input originated from a controller (button or stick/trigger), as opposed to
+    // keyboard or mouse. Used to gate footer-button shortcuts to controller-only.
+    private static bool IsControllerEvent(InputEvent @event)
+    {
+        return @event is InputEventJoypadButton || @event is InputEventJoypadMotion;
+    }
+
+    // Focus-follows-mouse for keyboard/mouse users: whichever focusable widget the cursor moves
+    // over takes focus. The nearest focusable ancestor is used, so hovering a settings entry's
+    // inner widget still focuses the entry. The game carousel is handled at the list level since
+    // it drives its own index-based selection rather than per-entry focus.
+    private void UpdateMouseFocus()
+    {
+        var viewport = GetViewport();
+        var hovered = viewport.GuiGetHoveredControl();
+        if (hovered == null) return;
+
+        Control focusable = hovered;
+        while (focusable != null && focusable.FocusMode != Control.FocusModeEnum.All)
+        {
+            focusable = focusable.GetParentOrNull<Control>();
+        }
+
+        if (focusable == null || !focusable.IsVisibleInTree()) return;
+
+        if (gameList != null && (focusable == gameList || gameList.IsAncestorOf(focusable)))
+        {
+            // Don't pull focus onto the game list while a menu/popup owns the screen.
+            if (IsAnyMenuOpen()) return;
+
+            focusable = gameList;
+        }
+
+        if (focusable != viewport.GuiGetFocusOwner())
+        {
+            focusable.GrabFocus();
+        }
+    }
+
+    // True when the start menu, settings, downloads page, or system-jump popup is showing.
+    private bool IsAnyMenuOpen()
+    {
+        return (startMenuRoot != null && startMenuRoot.Visible)
+            || (settingsMenuContainer != null && settingsMenuContainer.Visible)
+            || (downloadsListContainer != null && downloadsListContainer.Visible)
+            || (systemJumpPopup != null && systemJumpPopup.Visible);
+    }
+
+    private bool IsMouseOverGameList()
+    {
+        if (gameList == null || !gameList.IsVisibleInTree() || IsAnyMenuOpen())
+        {
+            return false;
+        }
+
+        var hovered = GetViewport().GuiGetHoveredControl();
+        return hovered != null && (hovered == gameList || gameList.IsAncestorOf(hovered));
+    }
+
     public override void _Process(double delta)
     {
         ulong currentTime = Time.GetTicksMsec();
-        
+
         if (rightBumperPressedTime > 0 && currentTime - rightBumperPressedTime >= 250)
         {
             rightBumperPressedTime = 0;
@@ -841,15 +974,21 @@ public partial class MainScene : Control
             if (GameListHandler.isFuzzySearchDirty && currentTime - GameListHandler.lastKeystrokeTime > 400)
             {
                 GameListHandler.isFuzzySearchDirty = false;
-                int matchIndex = GameListHandler.currentlyShownGames.FindIndex(g => g.Name.ToLower().Contains(GameListHandler.fuzzySearchBuffer));
-                
-                if (matchIndex != -1)
+
+                // Skip searching on an empty buffer; Contains("") matches everything and would
+                // jump to the first game when the user backspaces the query away.
+                if (!string.IsNullOrEmpty(GameListHandler.fuzzySearchBuffer))
                 {
-                    GameListHandler.OnGameSelected(matchIndex);
-                    if (gameList != null && gameList.HasMethod("Refresh"))
+                    int matchIndex = GameListHandler.currentlyShownGames.FindIndex(g => g.Name.ToLower().Contains(GameListHandler.fuzzySearchBuffer));
+
+                    if (matchIndex != -1)
                     {
-                        gameList.Set("SelectedIndex", matchIndex);
-                        gameList.Call("Refresh");
+                        GameListHandler.OnGameSelected(matchIndex);
+                        if (gameList != null && gameList.HasMethod("Refresh"))
+                        {
+                            gameList.Set("SelectedIndex", matchIndex);
+                            gameList.Call("Refresh");
+                        }
                     }
                 }
             }

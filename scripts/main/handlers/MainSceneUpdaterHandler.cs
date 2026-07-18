@@ -40,7 +40,7 @@ public class MainSceneUpdaterHandler
 
             if (_mainScene.acceptUpdateBtn != null)
             {
-                _mainScene.acceptUpdateBtn.Text = "Select";
+                _mainScene.acceptUpdateBtn.Text = "Install";
             }
             if (_mainScene.cancelUpdateBtn != null)
             {

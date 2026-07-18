@@ -49,15 +49,13 @@ public partial class VerticalCarousel : Control
 
         if (@event.IsActionPressed("ui_down", true))
         {
-            SelectedIndex = (SelectedIndex + 1) % childCount;
-            UpdateLayout(true);
+            SelectNext();
             AcceptEvent();
         }
 
         else if (@event.IsActionPressed("ui_up", true))
         {
-            SelectedIndex = (SelectedIndex - 1 + childCount) % childCount;
-            UpdateLayout(true);
+            SelectPrevious();
             AcceptEvent();
         }
 
@@ -78,6 +76,22 @@ public partial class VerticalCarousel : Control
             EmitSignal(SignalName.JumpSectionRequested, -1);
             AcceptEvent();
         }
+    }
+
+    public void SelectNext()
+    {
+        int childCount = GetChildCount();
+        if (childCount == 0) return;
+        SelectedIndex = (SelectedIndex + 1) % childCount;
+        UpdateLayout(true);
+    }
+
+    public void SelectPrevious()
+    {
+        int childCount = GetChildCount();
+        if (childCount == 0) return;
+        SelectedIndex = (SelectedIndex - 1 + childCount) % childCount;
+        UpdateLayout(true);
     }
 
     public void Refresh()

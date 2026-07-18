@@ -85,6 +85,37 @@ public partial class HoverPopupOverlay : PanelContainer
         CancelPopup(true);
     }
 
+    // Rebuilds the popup content in place (no re-animation) if it is currently showing the given
+    // target. Used to pick up a cover that finished downloading after the popup was already shown.
+    public void RefreshContentIfTarget(Control target)
+    {
+        if (target == null || target != currentTarget)
+        {
+            return;
+        }
+
+        if (!Visible || currentPopupItem == null || !GodotObject.IsInstanceValid(currentTarget))
+        {
+            return;
+        }
+
+        foreach (Node child in contentContainer.GetChildren())
+        {
+            contentContainer.RemoveChild(child);
+            child.QueueFree();
+        }
+
+        var content = currentPopupItem.GetPopupContent();
+        if (content == null) return;
+
+        contentContainer.AddChild(content);
+
+        Size = Vector2.Zero;
+        ResetSize();
+        GlobalPosition = currentTarget.GlobalPosition - (Size - currentTarget.Size) / 2;
+        PivotOffset = Size / 2;
+    }
+
     private void CancelPopup(bool instant = false)
     {
         var targetToRestore = currentTarget;

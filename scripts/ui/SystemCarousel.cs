@@ -15,12 +15,59 @@ public partial class SystemCarousel : HBoxContainer
     [Signal]
     public delegate void SystemSelectedEventHandler(int index);
 
+    [Signal]
+    public delegate void JumpRequestedEventHandler();
+
+    // Emitted when the user cycles systems via the arrows, so the list can fade out immediately
+    // (matching the controller bumper) rather than waiting for the debounce to settle.
+    [Signal]
+    public delegate void CycledEventHandler();
+
     public override void _Ready()
     {
         if (_debounceTimer != null)
         {
             _debounceTimer.Timeout += OnDebounceTimerTimeout;
         }
+
+        MakeClickable(_leftArrow, ev => HandleArrowClick(ev, false));
+        MakeClickable(_rightArrow, ev => HandleArrowClick(ev, true));
+        MakeClickable(_systemIcon, HandleLogoClick);
+        MakeClickable(_systemLabel, HandleLogoClick);
+    }
+
+    private void MakeClickable(Control control, Control.GuiInputEventHandler onGuiInput)
+    {
+        if (control == null) return;
+        control.MouseFilter = Control.MouseFilterEnum.Stop;
+        control.MouseDefaultCursorShape = Control.CursorShape.PointingHand;
+        control.GuiInput += onGuiInput;
+    }
+
+    private static bool IsLeftClick(InputEvent @event)
+    {
+        return @event is InputEventMouseButton mouseButton
+            && mouseButton.Pressed
+            && mouseButton.ButtonIndex == MouseButton.Left;
+    }
+
+    private void HandleArrowClick(InputEvent @event, bool moveNext)
+    {
+        if (!IsLeftClick(@event)) return;
+
+        if (moveNext) Next();
+        else Previous();
+
+        EmitSignal(SignalName.Cycled);
+        AcceptEvent();
+    }
+
+    private void HandleLogoClick(InputEvent @event)
+    {
+        if (!IsLeftClick(@event)) return;
+
+        EmitSignal(SignalName.JumpRequested);
+        AcceptEvent();
     }
 
     public void Populate(List<GameSystem> systems, int defaultIndex = 0)

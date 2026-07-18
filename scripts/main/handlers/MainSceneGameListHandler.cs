@@ -308,6 +308,10 @@ public partial class MainSceneGameListHandler
             return;
         }
 
+        // Drop any pending asset downloads from the previous list; the new visible entries will
+        // re-request what they need. Prevents stale-system art blocking the incoming system's art.
+        _appInstance.assetManager.ClearPendingAssetDownloads();
+
         foreach (Node child in _mainScene.gameList.GetChildren())
         {
             _mainScene.gameList.RemoveChild(child);
@@ -426,6 +430,10 @@ public partial class MainSceneGameListHandler
 
             void TryUnloadImage()
             {
+                // Prune this game's not-yet-started asset downloads now that it's off screen, so a
+                // fast scroll doesn't leave a long backlog of art for games nobody's looking at.
+                _appInstance.assetManager.CancelGameAssets(game.Id);
+
                 if (!textureLoaded) return;
                 entry.Texture = _mainScene.placeholderTexture;
                 titleLabel.Visible = true;
@@ -446,13 +454,17 @@ public partial class MainSceneGameListHandler
                 {
                     textureLoaded = false;
                     if (entry.Visible) TryLoadImage();
+                    // The popup snapshots entry.Texture when shown; refresh it now that the cover
+                    // has loaded so a game selected before its art arrived isn't stuck on the placeholder.
+                    _mainScene.HoverOverlay?.RefreshContentIfTarget(entry);
                 }
             };
             _appInstance.assetManager.AssetDownloaded += onAssetDownloaded;
 
-            entry.TreeExiting += () => 
+            entry.TreeExiting += () =>
             {
                 _appInstance.assetManager.AssetDownloaded -= onAssetDownloaded;
+                _appInstance.assetManager.CancelGameAssets(game.Id);
             };
 
             _mainScene.gameList.AddChild(entry);
