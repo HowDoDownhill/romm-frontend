@@ -7,6 +7,7 @@
 [ext_resource type="Script" uid="uid://cwtykxfgbvhv6" path="res://scripts/ui/VerticalCarousel.cs" id="3_gubc5"]
 [ext_resource type="Material" uid="uid://b822n10q6f56b" path="res://assets/materials/mica_panel.tres" id="3_mica"]
 [ext_resource type="PackedScene" uid="uid://cffanb3xjob1c" path="res://scenes/downloads_list/download_entry.tscn" id="4_pu3yx"]
+[ext_resource type="PackedScene" path="res://scenes/ui/system_carousel.tscn" id="5_6wevv"]
 [ext_resource type="Script" uid="uid://bgqglerkcylxx" path="res://addons/SmoothScroll/smooth_scroll_container.gd" id="6_c16ls"]
 [ext_resource type="Script" uid="uid://b7h0k2h2qwlqv" path="res://addons/SmoothScroll/scroll_damper/expo_scroll_damper.gd" id="7_18nlu"]
 
@@ -44,7 +45,7 @@ script = ExtResource("7_18nlu")
 [sub_resource type="Resource" id="Resource_6wevv"]
 script = ExtResource("7_18nlu")
 
-[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "platformLabel", "platformIcon", "gameList", "detailsPanelContainer", "gameMarquee", "gameScreenshotsScroll", "gameScreenshotsFlow", "gameDownloadProgressBar", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "LaunchEmulatorPopupOption", "SelectBiosPopupOption", "SettingsPopupOption", "RefreshGamesPopupOption", "RefreshCurrentSystemGamesPopupOption", "QuitPopupOption", "RandomGamePopupOption", "downloadProgressPopup", "downloadProgressLabel", "downloadProgressBar", "changelogPopup", "changelogRichTextLabel", "acceptUpdateBtn", "cancelUpdateBtn", "backgroundRect", "mainVBoxContainer", "startMenu", "startMenuContainer", "biosSelectorContainer", "biosSelector", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
+[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "systemCarousel", "gameList", "detailsPanelContainer", "gameMarquee", "gameDescription", "gameScreenshotsScroll", "gameScreenshotsFlow", "gameDownloadProgressBar", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "LaunchEmulatorPopupOption", "SelectBiosPopupOption", "SettingsPopupOption", "RefreshGamesPopupOption", "RefreshCurrentSystemGamesPopupOption", "QuitPopupOption", "RandomGamePopupOption", "downloadProgressPopup", "downloadProgressLabel", "downloadProgressBar", "changelogPopup", "changelogRichTextLabel", "acceptUpdateBtn", "cancelUpdateBtn", "backgroundRect", "mainVBoxContainer", "startMenu", "startMenuContainer", "biosSelectorContainer", "biosSelector", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -55,14 +56,14 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_6l7je")
 headerContainer = NodePath("Background/VBoxContainer/HeaderContainer")
-platformLabel = NodePath("Background/VBoxContainer/HeaderContainer/Panel/MarginContainer/HBoxContainer/PlatformLabel")
-platformIcon = NodePath("Background/VBoxContainer/HeaderContainer/Panel/MarginContainer/HBoxContainer/SystemIcon")
+systemCarousel = NodePath("Background/VBoxContainer/HeaderContainer/Panel/MarginContainer/SystemCarousel")
 gameList = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/GameList")
 gameListEntryScene = ExtResource("2_rt2n2")
 detailsPanelContainer = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel")
 gameMarquee = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/NameMargin/GameMarquee")
-gameScreenshotsScroll = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ScreenShotsContainer/SmoothScrollContainer")
-gameScreenshotsFlow = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ScreenShotsContainer/SmoothScrollContainer/VBoxContainer")
+gameDescription = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ScreenShotsContainer/HBoxContainer/RichTextLabel")
+gameScreenshotsScroll = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ScreenShotsContainer/HBoxContainer/SmoothScrollContainer")
+gameScreenshotsFlow = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ScreenShotsContainer/HBoxContainer/SmoothScrollContainer/VBoxContainer")
 gameDownloadProgressBar = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/DownloadProgressContainer/ProgressBar")
 downloadsListContainer = NodePath("Background/VBoxContainer/DownloadsPageContainer")
 downloadProgressUI = NodePath("Background/VBoxContainer/DownloadsPageContainer/DownloadsPage")
@@ -147,21 +148,8 @@ theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="HBoxContainer" type="HBoxContainer" parent="Background/VBoxContainer/HeaderContainer/Panel/MarginContainer" unique_id=1366258634]
+[node name="SystemCarousel" parent="Background/VBoxContainer/HeaderContainer/Panel/MarginContainer" unique_id=590191861 instance=ExtResource("5_6wevv")]
 layout_mode = 2
-size_flags_stretch_ratio = 0.5
-
-[node name="SystemIcon" type="TextureRect" parent="Background/VBoxContainer/HeaderContainer/Panel/MarginContainer/HBoxContainer" unique_id=1495603379]
-layout_mode = 2
-expand_mode = 3
-
-[node name="PlatformLabel" type="Label" parent="Background/VBoxContainer/HeaderContainer/Panel/MarginContainer/HBoxContainer" unique_id=2094541351]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 1
-theme_override_font_sizes/font_size = 48
-text = "Platform Label"
-vertical_alignment = 1
 
 [node name="GamesListContainer" type="MarginContainer" parent="Background/VBoxContainer" unique_id=749665635]
 layout_mode = 2
@@ -223,18 +211,28 @@ theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="SmoothScrollContainer" type="ScrollContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ScreenShotsContainer" unique_id=1605702642]
+[node name="HBoxContainer" type="HBoxContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ScreenShotsContainer" unique_id=1831732385]
 layout_mode = 2
+
+[node name="SmoothScrollContainer" type="ScrollContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ScreenShotsContainer/HBoxContainer" unique_id=1605702642]
+layout_mode = 2
+size_flags_horizontal = 3
 script = ExtResource("6_c16ls")
 wheel_scroll_damper = SubResource("Resource_e1cbu")
 dragging_scroll_damper = SubResource("Resource_mngbo")
 metadata/_custom_type_script = "uid://bgqglerkcylxx"
 
-[node name="VBoxContainer" type="GridContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ScreenShotsContainer/SmoothScrollContainer" unique_id=186625868]
+[node name="VBoxContainer" type="GridContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ScreenShotsContainer/HBoxContainer/SmoothScrollContainer" unique_id=186625868]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 columns = 2
+metadata/_smooth_scroll_default_mouse_filter_set = true
+
+[node name="RichTextLabel" type="RichTextLabel" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ScreenShotsContainer/HBoxContainer" unique_id=1341817208]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 1
 metadata/_smooth_scroll_default_mouse_filter_set = true
 
 [node name="DownloadProgressContainer" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel" unique_id=1605044611]

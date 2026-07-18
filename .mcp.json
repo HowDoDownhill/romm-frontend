@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "codebase-memory": {
+      "command": "C:\\Users\\austi\\AppData\\Local\\Programs\\codebase-memory-mcp\\codebase-memory-mcp.exe",
+      "args": []
+    }
+  }
+}

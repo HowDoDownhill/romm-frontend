@@ -10,24 +10,24 @@ public partial class HoverPopupOverlay : PanelContainer
 
     public override void _Ready()
     {
-        TopLevel = true;
+        // Not TopLevel: stays in the normal draw flow (added last, so it renders on top) where Godot
+        // auto-copies the back buffer for the mica shader. TopLevel + a manual BackBufferCopy did not
+        // feed the screen texture under the gl_compatibility renderer, so the frost never blurred.
         ZIndex = 100;
         Visible = false;
         MouseFilter = MouseFilterEnum.Ignore;
-        
+
+        // Shared mica frosted-glass material (same as the panels) so it matches exactly.
+        Material = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
         var style = new StyleBoxFlat
         {
-            BgColor = new Color(0.08f, 0.08f, 0.08f, 1.0f),
-            ShadowColor = new Color(0, 0, 0, 0.5f),
-            ShadowSize = 20,
+            // The mica shader replaces the fill with the blurred screen + theme tint; this stylebox
+            // only defines the rounded shape, so keep it opaque to cover the whole panel.
+            BgColor = new Color(0, 0, 0, 1.0f),
             CornerRadiusTopLeft = 8,
             CornerRadiusTopRight = 8,
             CornerRadiusBottomLeft = 8,
-            CornerRadiusBottomRight = 8,
-            BorderWidthTop = 0,
-            BorderWidthBottom = 0,
-            BorderWidthLeft = 0,
-            BorderWidthRight = 0
+            CornerRadiusBottomRight = 8
         };
         AddThemeStyleboxOverride("panel", style);
 
@@ -39,19 +39,10 @@ public partial class HoverPopupOverlay : PanelContainer
         AddChild(contentContainer);
     }
 
+    // Retained for MainScene.ApplyTheme compatibility; the mica material is themed globally now,
+    // so per-instance tinting is no longer needed here.
     public void ApplyThemeColor(Color bgColor, Color borderColor)
     {
-        var style = GetThemeStylebox("panel") as StyleBoxFlat;
-        if (style != null)
-        {
-            bgColor.A = 1.0f; // Force opaque as requested previously
-            style.BgColor = bgColor;
-            style.BorderColor = borderColor;
-            style.BorderWidthTop = 0;
-            style.BorderWidthBottom = 0;
-            style.BorderWidthLeft = 0;
-            style.BorderWidthRight = 0;
-        }
     }
 
     public override void _Process(double delta)

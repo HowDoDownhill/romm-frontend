@@ -15,7 +15,10 @@ public partial class LoadingScreen : Control
     public override void _Ready()
     {
         appInstance = GetNode<AppInstance>("/root/AppInstance");
-        
+
+        var micaMaterial = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
+        MicaBorder.AttachToAll(this, micaMaterial, MicaBorder.DefaultColor);
+
         AttemptLoadFromCacheAsync();
     }
 

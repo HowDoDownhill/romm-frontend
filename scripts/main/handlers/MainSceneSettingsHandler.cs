@@ -91,6 +91,7 @@ public class MainSceneSettingsHandler
 
         foreach (Node child in _mainScene.settingsSectionsTree.GetChildren())
         {
+            _mainScene.settingsSectionsTree.RemoveChild(child);
             child.QueueFree();
         }
         
@@ -98,6 +99,7 @@ public class MainSceneSettingsHandler
         {
             foreach (Node child in _mainScene.sectionOptionsContainer.GetChildren())
             {
+                _mainScene.sectionOptionsContainer.RemoveChild(child);
                 child.QueueFree();
             }
         }
@@ -360,7 +362,7 @@ public class MainSceneSettingsHandler
         label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         fieldBox.AddChild(label);
 
-        OptionButton themeOptionButton = new OptionButton();
+        CarouselButton themeOptionButton = new CarouselButton();
         int idx = 0;
         int selectedIdx = 0;
         string currentTheme = _appInstance.configManager.AppTheme;
@@ -579,7 +581,7 @@ public class MainSceneSettingsHandler
         prefLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         prefEmulatorBox.AddChild(prefLabel);
 
-        OptionButton emulatorOptionButton = new OptionButton();
+        CarouselButton emulatorOptionButton = new CarouselButton();
         prefEmulatorBox.AddChild(emulatorOptionButton);
         
         var entry = _settingsListEntryScene.Instantiate<SettingsListEntry>();
@@ -690,7 +692,7 @@ public class MainSceneSettingsHandler
             }
             else if (field.Type == "dropdown")
             {
-                OptionButton optionButton = new OptionButton();
+                CarouselButton optionButton = new CarouselButton();
                 string val = field.DefaultValueString;
                 if (hasValue && element.ValueKind == System.Text.Json.JsonValueKind.String) val = element.GetString();
                 int idx = 0; int selectedIdx = 0;

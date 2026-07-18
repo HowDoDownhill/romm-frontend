@@ -6,6 +6,10 @@ public partial class VerticalCarousel : Control
     [Export] public float itemSpacing = 160.0f;
     [Export] public float depthOffset = 80.0f; // Horizontal shift for 3D wheel curve
     [Export] public float xOffset = 0.0f; // Global horizontal adjustment
+    [Export] public bool useScreenPercentageForOffsets = true;
+    [Export] public float itemSpacingRatio = 0.074f; // roughly 160 / 2160
+    [Export] public float depthOffsetRatio = 0.104f; // roughly 400 / 3840
+    [Export] public float xOffsetRatio = -0.078f; // roughly -300 / 3840
     [Export] public float minimumScale = 0.5f;
     [Export] public float minimumOpacity = 0.3f;
     [Export] public float animationDuration = 0.25f;
@@ -106,7 +110,7 @@ public partial class VerticalCarousel : Control
         }
 
         Vector2 center = Size / 2.0f;
-        float viewportWidth = GetViewportRect().Size.X;
+        float viewportWidth = GetViewport().GetVisibleRect().Size.X;
         float targetWidth = viewportWidth * windowWidthRatio;
 
         for (int i = 0; i < childCount; i++)
@@ -154,8 +158,12 @@ public partial class VerticalCarousel : Control
             float absDiff = Mathf.Abs(diff);
             float t = Mathf.Clamp(absDiff / visibleItemsHalfCount, 0.0f, 1.0f);
             
-            float targetY = center.Y + (diff * itemSpacing) - (child.Size.Y / 2.0f);
-            float targetX = center.X - (child.Size.X / 2.0f) - (t * t * depthOffset) + xOffset;
+            float currentItemSpacing = useScreenPercentageForOffsets ? GetViewport().GetVisibleRect().Size.Y * itemSpacingRatio : itemSpacing;
+            float currentDepthOffset = useScreenPercentageForOffsets ? viewportWidth * depthOffsetRatio : depthOffset;
+            float currentXOffset = useScreenPercentageForOffsets ? viewportWidth * xOffsetRatio : xOffset;
+
+            float targetY = center.Y + (diff * currentItemSpacing) - (child.Size.Y / 2.0f);
+            float targetX = center.X - (child.Size.X / 2.0f) - (t * t * currentDepthOffset) + currentXOffset;
             
             Vector2 targetPos = new Vector2(targetX, targetY);
             

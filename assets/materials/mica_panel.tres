@@ -4,5 +4,5 @@
 
 [resource]
 shader = ExtResource("1_mica")
-shader_parameter/blur_amount = 4.5
+shader_parameter/blur_radius = 150.0
 shader_parameter/mix_color = Color(0, 0, 0, 0.4)

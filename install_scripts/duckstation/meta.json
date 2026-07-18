@@ -1,7 +1,7 @@
 {
   "name": "DuckStation",
   "executable_name": {
-    "windows": "duckstation-qt.exe",
+    "windows": "duckstation-qt-x64-ReleaseLTCG.exe",
     "linux": "DuckStation-x64.AppImage",
     "macos": "DuckStation"
   },
@@ -18,8 +18,8 @@
   "relative_save_path": {
     "psx": "memcards"
   },
-  "launch_args_with_game": "-batch -fullscreen -portable -- \"{rom_path}\"",
-  "launch_args_without_game": "-portable",
+  "launch_args_with_game": "-batch -fullscreen -- \"{rom_path}\"",
+  "launch_args_without_game": "",
   "install_recipe": {
     "windows": {
       "type": "github_release",

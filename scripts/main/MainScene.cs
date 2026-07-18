@@ -6,8 +6,7 @@ public partial class MainScene : Control
 {
     [ExportGroup("Header")] 
     [Export] public MarginContainer headerContainer;
-    [Export] public Label platformLabel;
-    [Export] public TextureRect platformIcon;
+    [Export] public SystemCarousel systemCarousel;
 
     [ExportGroup("GameList")] 
     [Export] public Control gameList;
@@ -65,7 +64,7 @@ public partial class MainScene : Control
 
     public AppInstance appInstance;
     public ImageTexture placeholderTexture;
-    [Export] public TextureRect backgroundRect;
+    [Export] public ColorRect backgroundRect;
     [Export] public VBoxContainer mainVBoxContainer;
 
     [Export] public Control startMenu;
@@ -89,6 +88,13 @@ public partial class MainScene : Control
     
     public HoverPopupOverlay HoverOverlay { get; private set; }
 
+    public PanelContainer fuzzySearchPopup;
+    public Label fuzzySearchLabel;
+
+    public SystemJumpPopup systemJumpPopup;
+    private ulong leftBumperPressedTime = 0;
+    private ulong rightBumperPressedTime = 0;
+
     public override void _Ready()
     {
         var whiteImage = Image.CreateEmpty(1, 1, false, Image.Format.Rgba8);
@@ -97,14 +103,69 @@ public partial class MainScene : Control
         appInstance = GetNode<AppInstance>("/root/AppInstance");
 
         SettingsHandler = new MainSceneSettingsHandler(this, appInstance);
-        InputHandler = new MainSceneInputHandler(this, appInstance);
+        PopupHandler = new MainScenePopupHandler(this, appInstance);
+        
+        fuzzySearchPopup = new PanelContainer();
+        fuzzySearchPopup.Visible = false;
+        // Shared mica frosted-glass material (same as the panels). In the normal draw flow, so
+        // Godot auto-copies the back buffer for the shader.
+        fuzzySearchPopup.Material = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
+        var fuzzyStyle = new StyleBoxFlat
+        {
+            // The mica shader replaces the fill; this stylebox only defines the rounded shape.
+            BgColor = new Color(0, 0, 0, 1f),
+            CornerRadiusTopLeft = 12,
+            CornerRadiusTopRight = 12,
+            CornerRadiusBottomLeft = 12,
+            CornerRadiusBottomRight = 12
+        };
+        fuzzySearchPopup.AddThemeStyleboxOverride("panel", fuzzyStyle);
+        var margin = new MarginContainer();
+        margin.AddThemeConstantOverride("margin_left", 20);
+        margin.AddThemeConstantOverride("margin_right", 20);
+        margin.AddThemeConstantOverride("margin_top", 10);
+        margin.AddThemeConstantOverride("margin_bottom", 10);
+        fuzzySearchLabel = new Label();
+        fuzzySearchLabel.AddThemeFontSizeOverride("font_size", 24);
+        margin.AddChild(fuzzySearchLabel);
+        fuzzySearchPopup.AddChild(margin);
+        // Center on screen; grow both ways from the center anchor so it stays centered as the
+        // content-sized panel resizes with the search text.
+        fuzzySearchPopup.SetAnchorsPreset(Control.LayoutPreset.Center);
+        fuzzySearchPopup.GrowHorizontal = Control.GrowDirection.Both;
+        fuzzySearchPopup.GrowVertical = Control.GrowDirection.Both;
+        AddChild(fuzzySearchPopup);
+
         GameListHandler = new MainSceneGameListHandler(this, appInstance);
         DownloadHandler = new MainSceneDownloadHandler(this, appInstance);
         UpdaterHandler = new MainSceneUpdaterHandler(this, appInstance);
-        PopupHandler = new MainScenePopupHandler(this, appInstance);
+        InputHandler = new MainSceneInputHandler(this, appInstance);
+
+        if (systemCarousel != null)
+        {
+            systemCarousel.SystemSelected += (index) => 
+            {
+                if (GameListHandler.gameSystems != null && index >= 0 && index < GameListHandler.gameSystems.Count)
+                {
+                    GameListHandler.SelectSystemByIndex(index);
+                }
+            };
+        }
 
         HoverOverlay = new HoverPopupOverlay();
         AddChild(HoverOverlay);
+
+        systemJumpPopup = new SystemJumpPopup();
+        AddChild(systemJumpPopup);
+        systemJumpPopup.SystemSelected += (index) => 
+        {
+            systemJumpPopup.Visible = false;
+            if (systemCarousel != null)
+            {
+                systemCarousel.SetSelectionSilently(index);
+            }
+            GameListHandler.SelectSystemByIndex(index);
+        };
 
         appInstance.downloadManager.DownloadCompleted += DownloadHandler.OnDownloadCompleted;
         appInstance.emulatorManager.EmulatorInstallationCompleted += OnEmulatorInstallationCompleted;
@@ -152,6 +213,10 @@ public partial class MainScene : Control
         SetupFooterUI();
         UpdaterHandler.InitUpdater();
         ApplyTheme();
+
+        // Give every frosted panel a native StyleBoxFlat outline so overlapping panels are separable.
+        var micaMaterial = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
+        MicaBorder.AttachToAll(this, micaMaterial, MicaBorder.DefaultColor);
     }
 
     public void ApplyTheme()
@@ -170,11 +235,33 @@ public partial class MainScene : Control
             var panelMaterial = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
             if (panelMaterial != null)
             {
-                panelMaterial.SetShaderParameter("mix_color", colors.Panel);
+                // Tint the mica frost with the theme's darkest palette color so panels feel themed
+                // rather than generic black. The Panel color still supplies the tint strength (alpha).
+                Color tint = GetDarkestColor(colors.Bg, colors.Primary, colors.Secondary);
+                tint.A = colors.Panel.A;
+                panelMaterial.SetShaderParameter("mix_color", tint);
             }
 
             HoverOverlay?.ApplyThemeColor(colors.Panel, colors.Secondary);
+            systemJumpPopup?.ApplyTheme(colors.Secondary);
         }
+    }
+
+    // Returns the darkest of the given colors by perceived luminance (alpha ignored).
+    private static Color GetDarkestColor(params Color[] candidates)
+    {
+        Color darkest = candidates[0];
+        float min = float.MaxValue;
+        foreach (var c in candidates)
+        {
+            float luminance = 0.2126f * c.R + 0.7152f * c.G + 0.0722f * c.B;
+            if (luminance < min)
+            {
+                min = luminance;
+                darkest = c;
+            }
+        }
+        return darkest;
     }
 
     private void OnEmulatorInstallationCompleted(string emulatorName, bool wasSuccessful)
@@ -209,6 +296,10 @@ public partial class MainScene : Control
             }
         }
         GameListHandler.games = appInstance.dataBus.gameCache;
+        if (systemCarousel != null)
+        {
+            systemCarousel.Populate(GameListHandler.gameSystems, GameListHandler.currentGameSystemIndex >= 0 ? GameListHandler.currentGameSystemIndex : 0);
+        }
     }
 
     public void SetupFooterUI()
@@ -252,12 +343,14 @@ public partial class MainScene : Control
 
     private void OnFilterInstalledGamesPressed()
     {
+        if (GameListHandler.IsFilterTransitioning) return;
+
         GameListHandler.showOnlyInstalledGames = !GameListHandler.showOnlyInstalledGames;
         if (filterInstalledGamesBtn != null)
         {
             filterInstalledGamesBtn.Text = GameListHandler.showOnlyInstalledGames ? "Installed" : "All Games";
         }
-        GameListHandler.ApplyFiltersAndRefresh();
+        GameListHandler.ApplyFiltersWithFade();
     }
 
     private void OnPlayDownloadButtonPressed()
@@ -295,25 +388,19 @@ public partial class MainScene : Control
 
     public void UpdateHeaderLabel()
     {
-        if (platformLabel == null) return;
+        if (systemCarousel == null) return;
 
         if (settingsMenuContainer != null && settingsMenuContainer.Visible)
         {
-            platformLabel.Text = "Settings";
-            platformLabel.Visible = true;
-            if (platformIcon != null) platformIcon.Visible = false;
+            systemCarousel.SetOverrideText("Settings");
         }
         else if (downloadsListContainer != null && downloadsListContainer.Visible)
         {
-            platformLabel.Text = "Downloads";
-            platformLabel.Visible = true;
-            if (platformIcon != null) platformIcon.Visible = false;
+            systemCarousel.SetOverrideText("Downloads");
         }
-        else if (GameListHandler.gameSystems != null && GameListHandler.currentGameSystemIndex >= 0 && GameListHandler.currentGameSystemIndex < GameListHandler.gameSystems.Count)
+        else
         {
-            platformLabel.Text = GameListHandler.gameSystems[GameListHandler.currentGameSystemIndex].Name;
-            platformLabel.Visible = false;
-            if (platformIcon != null) platformIcon.Visible = true;
+            systemCarousel.ClearOverride();
         }
     }
 
@@ -403,10 +490,20 @@ public partial class MainScene : Control
                 isComboPressed = false;
             }
 
-            if(isComboPressed)  
+            if(isComboPressed)
             {
                 appInstance.emulatorManager.CloseEmulator();
             }
+            return;
+        }
+
+        if (systemJumpPopup != null && systemJumpPopup.Visible)
+        {
+            // Let mouse events reach the popup's buttons; consume everything else so no
+            // input leaks through to the UI behind the popup.
+            if (@event is InputEventMouse) return;
+            systemJumpPopup.HandleInput(@event);
+            GetViewport().SetInputAsHandled();
             return;
         }
 
@@ -455,18 +552,7 @@ public partial class MainScene : Control
                 GameListHandler.fuzzySearchBuffer += (char)keyEvent.Unicode;
                 GameListHandler.fuzzySearchBuffer = GameListHandler.fuzzySearchBuffer.ToLower();
                 GameListHandler.lastKeystrokeTime = currentTime;
-
-                int matchIndex = GameListHandler.currentlyShownGames.FindIndex(g => g.Name.ToLower().Contains(GameListHandler.fuzzySearchBuffer));
-                
-                if (matchIndex != -1)
-                {
-                    GameListHandler.OnGameSelected(matchIndex);
-                    if (gameList != null && gameList.HasMethod("Refresh"))
-                    {
-                        gameList.Set("SelectedIndex", matchIndex);
-                        gameList.Call("Refresh");
-                    }
-                }
+                GameListHandler.isFuzzySearchDirty = true;
             }
         }
 
@@ -516,6 +602,7 @@ public partial class MainScene : Control
         if (settingsMenuContainer != null && settingsMenuContainer.Visible)
         {
             var focusOwner = GetViewport().GuiGetFocusOwner();
+
             bool isFocusInTree = (focusOwner != null && settingsSectionsTree.IsAncestorOf(focusOwner));
             bool isFocusInOptions = (focusOwner != null && sectionOptionsContainer.IsAncestorOf(focusOwner));
 
@@ -561,9 +648,9 @@ public partial class MainScene : Control
                             checkBtn.ButtonPressed = !checkBtn.ButtonPressed;
                             checkBtn.EmitSignal(BaseButton.SignalName.Toggled, checkBtn.ButtonPressed);
                         }
-                        else if (btn is OptionButton)
+                        else if (btn is OptionButton optBtn)
                         {
-                            // OptionButtons are cycled with left/right
+                            optBtn.ShowPopup();
                         }
                         else
                         {
@@ -617,14 +704,42 @@ public partial class MainScene : Control
 
         if(@event.IsActionPressed("CylceSystemUp") && (downloadsListContainer == null || !downloadsListContainer.Visible))
         {
-            GameListHandler.CycleSelectedSystemNext();
+            if (systemJumpPopup != null && systemJumpPopup.Visible) return;
+            rightBumperPressedTime = Time.GetTicksMsec();
+            return;
+        }
+        else if (@event.IsActionReleased("CylceSystemUp"))
+        {
+            if (rightBumperPressedTime > 0 && Time.GetTicksMsec() - rightBumperPressedTime < 250)
+            {
+                if (systemCarousel != null)
+                {
+                    systemCarousel.Next();
+                    GameListHandler.BeginQuickSwitchFade();
+                }
+            }
+            rightBumperPressedTime = 0;
             GetViewport().SetInputAsHandled();
             return;
         }
         
         if (@event.IsActionPressed("CycleSystemDown") && (downloadsListContainer == null || !downloadsListContainer.Visible))
         {
-            GameListHandler.CycleSelectedSystemLast();
+            if (systemJumpPopup != null && systemJumpPopup.Visible) return;
+            leftBumperPressedTime = Time.GetTicksMsec();
+            return;
+        }
+        else if (@event.IsActionReleased("CycleSystemDown"))
+        {
+            if (leftBumperPressedTime > 0 && Time.GetTicksMsec() - leftBumperPressedTime < 250)
+            {
+                if (systemCarousel != null)
+                {
+                    systemCarousel.Previous();
+                    GameListHandler.BeginQuickSwitchFade();
+                }
+            }
+            leftBumperPressedTime = 0;
             GetViewport().SetInputAsHandled();
             return;
         }
@@ -694,6 +809,74 @@ public partial class MainScene : Control
                 GetViewport().SetInputAsHandled();
             }
             return;
+        }
+    }
+
+    public override void _Process(double delta)
+    {
+        ulong currentTime = Time.GetTicksMsec();
+        
+        if (rightBumperPressedTime > 0 && currentTime - rightBumperPressedTime >= 250)
+        {
+            rightBumperPressedTime = 0;
+            leftBumperPressedTime = 0;
+            OpenSystemJumpPopup();
+        }
+        else if (leftBumperPressedTime > 0 && currentTime - leftBumperPressedTime >= 250)
+        {
+            leftBumperPressedTime = 0;
+            rightBumperPressedTime = 0;
+            OpenSystemJumpPopup();
+        }
+
+        if (GameListHandler != null)
+        {
+            currentTime = Time.GetTicksMsec();
+            if (GameListHandler.fuzzySearchBuffer.Length > 0 && currentTime - GameListHandler.lastKeystrokeTime > 1500)
+            {
+                GameListHandler.fuzzySearchBuffer = "";
+                if (fuzzySearchPopup != null) fuzzySearchPopup.Visible = false;
+            }
+            
+            if (GameListHandler.isFuzzySearchDirty && currentTime - GameListHandler.lastKeystrokeTime > 400)
+            {
+                GameListHandler.isFuzzySearchDirty = false;
+                int matchIndex = GameListHandler.currentlyShownGames.FindIndex(g => g.Name.ToLower().Contains(GameListHandler.fuzzySearchBuffer));
+                
+                if (matchIndex != -1)
+                {
+                    GameListHandler.OnGameSelected(matchIndex);
+                    if (gameList != null && gameList.HasMethod("Refresh"))
+                    {
+                        gameList.Set("SelectedIndex", matchIndex);
+                        gameList.Call("Refresh");
+                    }
+                }
+            }
+            if (fuzzySearchPopup != null)
+            {
+                if (!string.IsNullOrEmpty(GameListHandler.fuzzySearchBuffer))
+                {
+                    if (!fuzzySearchPopup.Visible) fuzzySearchPopup.Visible = true;
+                    if (fuzzySearchLabel != null) fuzzySearchLabel.Text = "Search: " + GameListHandler.fuzzySearchBuffer;
+                }
+                else
+                {
+                    fuzzySearchPopup.Visible = false;
+                }
+            }
+        }
+    }
+
+
+
+    private void OpenSystemJumpPopup()
+    {
+        if (systemJumpPopup != null && !systemJumpPopup.Visible && (downloadsListContainer == null || !downloadsListContainer.Visible))
+        {
+            systemJumpPopup.Populate(GameListHandler.gameSystems, GameListHandler.currentGameSystemIndex);
+            systemJumpPopup.Visible = true;
+            systemJumpPopup.FocusSystem(GameListHandler.currentGameSystemIndex >= 0 ? GameListHandler.currentGameSystemIndex : 0);
         }
     }
 }

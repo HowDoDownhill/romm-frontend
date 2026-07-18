@@ -24,15 +24,15 @@ public partial class ConfigManager : Node
 
     public static readonly System.Collections.Generic.Dictionary<string, (Color Bg, Color Primary, Color Secondary, Color Panel)> Themes = new System.Collections.Generic.Dictionary<string, (Color Bg, Color Primary, Color Secondary, Color Panel)>
     {
-        { "Default", (new Color(0.05f, 0.02f, 0.1f, 1f).Darkened(0.3f), new Color(0.3f, 0f, 0.4f, 1f).Darkened(0.4f), new Color(0f, 0.2f, 0.4f, 1f).Darkened(0.4f), new Color(0f, 0f, 0f, 0.25f)) },
-        { "Rose-pine", (new Color("#191724").Darkened(0.5f), new Color("#c4a7e7").Darkened(0.65f), new Color("#eb6f92").Darkened(0.65f), new Color("#1f1d2e40")) },
-        { "Gruvbox", (new Color("#282828").Darkened(0.5f), new Color("#cc241d").Darkened(0.65f), new Color("#458588").Darkened(0.65f), new Color("#1d202140")) },
-        { "catppuccin", (new Color("#1e1e2e").Darkened(0.5f), new Color("#cba6f7").Darkened(0.65f), new Color("#89b4fa").Darkened(0.65f), new Color("#18182540")) },
-        { "Solarized Dark", (new Color("#002b36").Darkened(0.5f), new Color("#cb4b16").Darkened(0.65f), new Color("#268bd2").Darkened(0.65f), new Color("#00212b40")) },
-        { "Solarized Light", (new Color("#fdf6e3").Darkened(0.7f), new Color("#d33682").Darkened(0.65f), new Color("#2aa198").Darkened(0.65f), new Color("#eee8d540")) },
-        { "monokai", (new Color("#272822").Darkened(0.5f), new Color("#f92672").Darkened(0.65f), new Color("#66d9ef").Darkened(0.65f), new Color("#1e1f1c40")) },
-        { "Nord", (new Color("#2e3440").Darkened(0.5f), new Color("#81a1c1").Darkened(0.65f), new Color("#b48ead").Darkened(0.65f), new Color("#24293340")) },
-        { "Dracula", (new Color("#282a36").Darkened(0.5f), new Color("#bd93f9").Darkened(0.65f), new Color("#ff79c6").Darkened(0.65f), new Color("#1e1f2940")) }
+        { "Default", (new Color(0.05f, 0.02f, 0.1f, 1f).Darkened(0.3f), new Color(0.3f, 0f, 0.4f, 1f).Darkened(0.4f), new Color(0f, 0.2f, 0.4f, 1f).Darkened(0.4f), new Color(0f, 0f, 0f, 0.55f)) },
+        { "Rose-pine", (new Color("#191724").Darkened(0.5f), new Color("#c4a7e7").Darkened(0.65f), new Color("#eb6f92").Darkened(0.65f), new Color("#1f1d2e8c")) },
+        { "Gruvbox", (new Color("#282828").Darkened(0.5f), new Color("#cc241d").Darkened(0.65f), new Color("#458588").Darkened(0.65f), new Color("#1d20218c")) },
+        { "catppuccin", (new Color("#1e1e2e").Darkened(0.5f), new Color("#cba6f7").Darkened(0.65f), new Color("#89b4fa").Darkened(0.65f), new Color("#1818258c")) },
+        { "Solarized Dark", (new Color("#002b36").Darkened(0.5f), new Color("#cb4b16").Darkened(0.65f), new Color("#268bd2").Darkened(0.65f), new Color("#00212b8c")) },
+        { "Solarized Light", (new Color("#fdf6e3").Darkened(0.7f), new Color("#d33682").Darkened(0.65f), new Color("#2aa198").Darkened(0.65f), new Color("#eee8d58c")) },
+        { "monokai", (new Color("#272822").Darkened(0.5f), new Color("#f92672").Darkened(0.65f), new Color("#66d9ef").Darkened(0.65f), new Color("#1e1f1c8c")) },
+        { "Nord", (new Color("#2e3440").Darkened(0.5f), new Color("#81a1c1").Darkened(0.65f), new Color("#b48ead").Darkened(0.65f), new Color("#2429338c")) },
+        { "Dracula", (new Color("#282a36").Darkened(0.5f), new Color("#bd93f9").Darkened(0.65f), new Color("#ff79c6").Darkened(0.65f), new Color("#1e1f298c")) }
     };
 
     public int EmulatorCloseHotkeyCount { get; private set; }

@@ -10,13 +10,16 @@ public partial class MainSceneGameListHandler
 
     public List<GameSystem> gameSystems = new List<GameSystem>();
     public Dictionary<int, List<Game>> games { get; set; } = new Dictionary<int, List<Game>>();
-    public List<Game> currentlyShownGames = new List<Game>();
+    public List<Game> currentlyShownGames = null;
     public bool showOnlyInstalledGames = false;
     public int currentGameSystemIndex;
     public Game currentlySelectedGame; 
     public bool isTransitioningSystem = false;
+    public bool IsFilterTransitioning { get; private set; } = false;
+    private bool preFadedForQuickSwitch = false;
     public string fuzzySearchBuffer = "";
     public ulong lastKeystrokeTime = 0;
+    public bool isFuzzySearchDirty = false;
 
     public MainSceneGameListHandler(MainScene mainScene, AppInstance appInstance)
     {
@@ -39,6 +42,29 @@ public partial class MainSceneGameListHandler
         }
     }
 
+    // Immediately fades the current system's content out when the user starts thumbing through
+    // systems with the bumpers, so the stale list doesn't linger until the debounce settles.
+    // TransitionToSystem then skips its own fade-out and only swaps + fades the new system in.
+    public void BeginQuickSwitchFade()
+    {
+        if (_mainScene.gameList == null) return;
+        if (isTransitioningSystem || preFadedForQuickSwitch) return;
+
+        preFadedForQuickSwitch = true;
+
+        float duration = 0.15f;
+        if (_mainScene.HoverOverlay != null) _mainScene.HoverOverlay.ForceCancelPopup();
+
+        Tween fadeOutTween = _mainScene.CreateTween();
+        Color glColorOut = _mainScene.gameList.Modulate; glColorOut.A = 0.0f;
+        fadeOutTween.TweenProperty(_mainScene.gameList, "modulate", glColorOut, duration);
+        if (_mainScene.detailsPanelContainer != null)
+        {
+            Color dpcColorOut = _mainScene.detailsPanelContainer.Modulate; dpcColorOut.A = 0.0f;
+            fadeOutTween.Parallel().TweenProperty(_mainScene.detailsPanelContainer, "modulate", dpcColorOut, duration);
+        }
+    }
+
     public async void TransitionToSystem(int targetIndex)
     {
         if (isTransitioningSystem)
@@ -50,20 +76,15 @@ public partial class MainSceneGameListHandler
         
         float duration = 0.2f;
 
+        // Skip the fade-out when quick-switching already faded the content out.
+        if (!preFadedForQuickSwitch)
+        {
         Tween fadeOutTween = _mainScene.CreateTween();
-        
+
         Color glColorOut = _mainScene.gameList.Modulate; glColorOut.A = 0.0f;
         fadeOutTween.TweenProperty(_mainScene.gameList, "modulate", glColorOut, duration);
-        
-        if (_mainScene.platformIcon != null) {
-            Color piColorOut = _mainScene.platformIcon.Modulate; piColorOut.A = 0.0f;
-            fadeOutTween.Parallel().TweenProperty(_mainScene.platformIcon, "modulate", piColorOut, duration);
-        }
 
-        if (_mainScene.platformLabel != null) {
-            Color plColorOut = _mainScene.platformLabel.Modulate; plColorOut.A = 0.0f;
-            fadeOutTween.Parallel().TweenProperty(_mainScene.platformLabel, "modulate", plColorOut, duration);
-        }
+
 
         if (_mainScene.detailsPanelContainer != null) {
             Color dpcColorOut = _mainScene.detailsPanelContainer.Modulate; dpcColorOut.A = 0.0f;
@@ -76,12 +97,13 @@ public partial class MainSceneGameListHandler
         }
             
         await _mainScene.ToSignal(fadeOutTween, Tween.SignalName.Finished);
+        }
+
+        preFadedForQuickSwitch = false;
 
         var glModOut = _mainScene.gameList.Modulate; glModOut.A = 0.0f; _mainScene.gameList.Modulate = glModOut;
 
-        if (_mainScene.platformIcon != null) { var piMod = _mainScene.platformIcon.Modulate; piMod.A = 0.0f; _mainScene.platformIcon.Modulate = piMod; }
 
-        if (_mainScene.platformLabel != null) { var plMod = _mainScene.platformLabel.Modulate; plMod.A = 0.0f; _mainScene.platformLabel.Modulate = plMod; }
 
         if (_mainScene.detailsPanelContainer != null) { var dpcMod = _mainScene.detailsPanelContainer.Modulate; dpcMod.A = 0.0f; _mainScene.detailsPanelContainer.Modulate = dpcMod; }
 
@@ -90,7 +112,7 @@ public partial class MainSceneGameListHandler
             var hoMod = _mainScene.HoverOverlay.Modulate; hoMod.A = 1.0f; _mainScene.HoverOverlay.Modulate = hoMod;
         }
 
-        SelectSystemByIndex(targetIndex);
+        DoSelectSystemByIndex(targetIndex);
 
         await _mainScene.ToSignal(_mainScene.GetTree(), "process_frame");
         await _mainScene.ToSignal(_mainScene.GetTree(), "process_frame"); // Two frames for good measure
@@ -100,15 +122,7 @@ public partial class MainSceneGameListHandler
         Color glColorIn = _mainScene.gameList.Modulate; glColorIn.A = 1.0f;
         fadeInTween.TweenProperty(_mainScene.gameList, "modulate", glColorIn, duration);
         
-        if (_mainScene.platformIcon != null) {
-            Color piColorIn = _mainScene.platformIcon.Modulate; piColorIn.A = 1.0f;
-            fadeInTween.Parallel().TweenProperty(_mainScene.platformIcon, "modulate", piColorIn, duration);
-        }
 
-        if (_mainScene.platformLabel != null) {
-            Color plColorIn = _mainScene.platformLabel.Modulate; plColorIn.A = 1.0f;
-            fadeInTween.Parallel().TweenProperty(_mainScene.platformLabel, "modulate", plColorIn, duration);
-        }
 
         if (_mainScene.detailsPanelContainer != null) {
             Color dpcColorIn = _mainScene.detailsPanelContainer.Modulate; dpcColorIn.A = 1.0f;
@@ -119,37 +133,11 @@ public partial class MainSceneGameListHandler
 
         var glModIn = _mainScene.gameList.Modulate; glModIn.A = 1.0f; _mainScene.gameList.Modulate = glModIn;
 
-        if (_mainScene.platformIcon != null) { var piMod = _mainScene.platformIcon.Modulate; piMod.A = 1.0f; _mainScene.platformIcon.Modulate = piMod; }
 
-        if (_mainScene.platformLabel != null) { var plMod = _mainScene.platformLabel.Modulate; plMod.A = 1.0f; _mainScene.platformLabel.Modulate = plMod; }
 
         if (_mainScene.detailsPanelContainer != null) { var dpcMod = _mainScene.detailsPanelContainer.Modulate; dpcMod.A = 1.0f; _mainScene.detailsPanelContainer.Modulate = dpcMod; }
         
         isTransitioningSystem = false;
-    }
-
-    public void CycleSelectedSystemNext()
-    {
-        if (currentGameSystemIndex == gameSystems.Count - 1)
-        {
-            TransitionToSystem(0);
-        }
-        else
-        {
-            TransitionToSystem(currentGameSystemIndex + 1);
-        }
-    }
-
-    public void CycleSelectedSystemLast()
-    {
-        if (currentGameSystemIndex == 0)
-        {
-            TransitionToSystem(gameSystems.Count - 1);
-        }
-        else
-        {
-            TransitionToSystem(currentGameSystemIndex - 1);
-        }
     }
 
     public void SelectSystemByIndex(int index)
@@ -159,36 +147,33 @@ public partial class MainSceneGameListHandler
             return;
         }
 
+        if (index == currentGameSystemIndex) 
+        {
+            // Just initialize if it's the first run and systems aren't populated yet
+            if (currentlyShownGames == null)
+            {
+                DoSelectSystemByIndex(index);
+            }
+            return;
+        }
+        
+        TransitionToSystem(index);
+    }
+    
+    private void DoSelectSystemByIndex(int index)
+    {
+        if (index < 0 || index >= gameSystems.Count)
+        {
+            return;
+        }
+
         currentGameSystemIndex = index;
         var selectedSystem = gameSystems[index];
         
-        if (_mainScene.platformLabel!= null)
-        {
-            _mainScene.platformLabel.Text = selectedSystem.Name;
-            _mainScene.platformLabel.Visible = false;
-        }
-
-        if (_mainScene.platformIcon != null)
-        {
-            Texture2D texture = null;
-
-            if (!string.IsNullOrEmpty(selectedSystem.IgdbSlug))
-            {
-                texture = FindPlatformIcon(selectedSystem.IgdbSlug, "res://assets/platforms/titles/", new[] { ".svg", ".png" });
-            }
-            
-            if (texture == null && !string.IsNullOrEmpty(selectedSystem.Slug))
-            {
-                texture = FindPlatformIcon(selectedSystem.Slug, "res://assets/platforms/titles/", new[] { ".svg", ".png" });
-            }
-
-            _mainScene.platformIcon.Texture = texture;
-        }
-
         _mainScene.UpdateHeaderLabel();
         OnSystemSelected(selectedSystem);
     }
-    
+
     private Texture2D FindPlatformIcon(string stub, string basePath, string[] extensions)
     {
         foreach (var ext in extensions)
@@ -265,6 +250,55 @@ public partial class MainSceneGameListHandler
             currentlyShownGames = new List<Game>();
             RefreshGameList();
         }
+    }
+
+    // Fades the game list (and details panel) out, re-applies the filter, then fades back in.
+    // Used when toggling between "All Games" and "Installed" so the list swap isn't a hard cut.
+    public async void ApplyFiltersWithFade()
+    {
+        if (_mainScene.gameList == null)
+        {
+            ApplyFiltersAndRefresh();
+            return;
+        }
+
+        IsFilterTransitioning = true;
+        float duration = 0.15f;
+
+        if (_mainScene.HoverOverlay != null) _mainScene.HoverOverlay.ForceCancelPopup();
+
+        Tween fadeOut = _mainScene.CreateTween();
+        Color glOut = _mainScene.gameList.Modulate; glOut.A = 0.0f;
+        fadeOut.TweenProperty(_mainScene.gameList, "modulate", glOut, duration);
+        if (_mainScene.detailsPanelContainer != null)
+        {
+            Color dpcOut = _mainScene.detailsPanelContainer.Modulate; dpcOut.A = 0.0f;
+            fadeOut.Parallel().TweenProperty(_mainScene.detailsPanelContainer, "modulate", dpcOut, duration);
+        }
+        await _mainScene.ToSignal(fadeOut, Tween.SignalName.Finished);
+
+        ApplyFiltersAndRefresh();
+
+        await _mainScene.ToSignal(_mainScene.GetTree(), "process_frame");
+        await _mainScene.ToSignal(_mainScene.GetTree(), "process_frame");
+
+        Tween fadeIn = _mainScene.CreateTween();
+        Color glIn = _mainScene.gameList.Modulate; glIn.A = 1.0f;
+        fadeIn.TweenProperty(_mainScene.gameList, "modulate", glIn, duration);
+        if (_mainScene.detailsPanelContainer != null)
+        {
+            Color dpcIn = _mainScene.detailsPanelContainer.Modulate; dpcIn.A = 1.0f;
+            fadeIn.Parallel().TweenProperty(_mainScene.detailsPanelContainer, "modulate", dpcIn, duration);
+        }
+        await _mainScene.ToSignal(fadeIn, Tween.SignalName.Finished);
+
+        _mainScene.gameList.Modulate = new Color(_mainScene.gameList.Modulate, 1.0f);
+        if (_mainScene.detailsPanelContainer != null)
+        {
+            _mainScene.detailsPanelContainer.Modulate = new Color(_mainScene.detailsPanelContainer.Modulate, 1.0f);
+        }
+
+        IsFilterTransitioning = false;
     }
 
     public void RefreshGameList()
@@ -483,11 +517,13 @@ public partial class MainSceneGameListHandler
                 {
                     var popupItem = new DelegateHoverPopupItem(() => {
                         var vbox = new VBoxContainer();
-                        float targetHeight = entry.Size.Y * 0.9f;
-                        float targetWidth = entry.Size.X;
-                        if (entry.Texture != null && entry.Texture.GetSize().Y > 0)
+                        var viewportSize = _mainScene.GetViewport().GetVisibleRect().Size;
+                        float targetWidth = viewportSize.X * 0.225f; // 22.5% of screen width
+                        float targetHeight = targetWidth;
+                        
+                        if (entry.Texture != null && entry.Texture.GetSize().X > 0)
                         {
-                            targetWidth = targetHeight * (entry.Texture.GetSize().X / entry.Texture.GetSize().Y);
+                            targetHeight = targetWidth * (entry.Texture.GetSize().Y / entry.Texture.GetSize().X);
                         }
 
                         var tex = new TextureRect { 
@@ -496,25 +532,18 @@ public partial class MainSceneGameListHandler
                             StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered, 
                             CustomMinimumSize = new Vector2(targetWidth, targetHeight) 
                         };
-                        var lbl = new Label { 
-                            Text = currentlySelectedGame.Name, 
-                            HorizontalAlignment = HorizontalAlignment.Center, 
-                            AutowrapMode = TextServer.AutowrapMode.WordSmart,
-                            CustomMinimumSize = new Vector2(targetWidth, 0)
-                        };
-                        
-                        var descLbl = new Label {
-                            Text = currentlySelectedGame.Description,
+                        var lbl = new Label {
+                            Text = currentlySelectedGame.Name,
                             HorizontalAlignment = HorizontalAlignment.Center,
                             AutowrapMode = TextServer.AutowrapMode.WordSmart,
                             CustomMinimumSize = new Vector2(targetWidth, 0)
                         };
-                        descLbl.AddThemeFontSizeOverride("font_size", 12);
-                        descLbl.AddThemeColorOverride("font_color", new Color(0.8f, 0.8f, 0.8f, 1.0f));
-                        
+
+                        int titleFontSize = (int)(viewportSize.Y * 0.022f);
+                        lbl.AddThemeFontSizeOverride("font_size", titleFontSize);
+
                         vbox.AddChild(tex);
                         vbox.AddChild(lbl);
-                        vbox.AddChild(descLbl);
                         return vbox;
                     });
                     _mainScene.HoverOverlay.OnItemHovered(entry, popupItem);
@@ -546,6 +575,21 @@ public partial class MainSceneGameListHandler
         if (_mainScene.gameDescription != null)
         {
             _mainScene.gameDescription.Text = game.Description;
+
+            var descScroller = _mainScene.gameDescription.GetNodeOrNull<AutoScrollHelper>("AutoScrollHelper");
+            if (descScroller == null)
+            {
+                descScroller = new AutoScrollHelper {
+                    RichText = _mainScene.gameDescription,
+                    IsVertical = true,
+                    ScrollSpeed = 10f,
+                    StartDelay = 5f,
+                    Name = "AutoScrollHelper"
+                };
+                _mainScene.gameDescription.AddChild(descScroller);
+            }
+            // Start each newly selected game from the top and wait before scrolling.
+            descScroller.Restart();
         }
 
         if (_mainScene.gameMarquee != null)
@@ -594,32 +638,7 @@ public partial class MainSceneGameListHandler
 
             _mainScene.gameCover.Texture = loadedTex;
         }
-        
-        if (_mainScene.backgroundRect != null)
-        {
-            string assetsPath = _appInstance.configManager.AssetsPath;
-            string pathScreenshot = System.IO.Path.Combine(assetsPath, "screenshots", $"{game.Id}.jpg");
-            string pathScreenshotNew = System.IO.Path.Combine(assetsPath, "screenshots", $"{game.Id}_0.jpg");
-            
-            if (Godot.FileAccess.FileExists(pathScreenshotNew))
-            {
-                _mainScene.backgroundRect.Texture = ImageTexture.CreateFromImage(Image.LoadFromFile(pathScreenshotNew));
-                _mainScene.backgroundRect.Modulate = new Color(0.6f, 0.6f, 0.6f, 1.0f);
-            }
-            else if (Godot.FileAccess.FileExists(pathScreenshot))
-            {
-                _mainScene.backgroundRect.Texture = ImageTexture.CreateFromImage(Image.LoadFromFile(pathScreenshot));
-                _mainScene.backgroundRect.Modulate = new Color(0.6f, 0.6f, 0.6f, 1.0f);
-            }
-            else
-            {
-                var blackImage = Image.CreateEmpty(1, 1, false, Image.Format.Rgba8);
-                blackImage.Fill(Colors.Black);
-                _mainScene.backgroundRect.Texture = ImageTexture.CreateFromImage(blackImage);
-                _mainScene.backgroundRect.Modulate = Colors.White;
-            }
-        }
-        
+
         if (_mainScene.gameScreenshotsScroll != null && !_mainScene.gameScreenshotsScroll.HasNode("AutoScrollHelper"))
         {
             var autoScroller = new AutoScrollHelper { ScrollContainer = _mainScene.gameScreenshotsScroll, Name = "AutoScrollHelper" };
@@ -717,24 +736,97 @@ public partial class MainSceneGameListHandler
     private partial class AutoScrollHelper : Node
     {
         public ScrollContainer ScrollContainer;
+        public RichTextLabel RichText;
+        public bool IsVertical = false;
+        public float ScrollSpeed = 50f;
+        public float StartDelay = 0f;
         private float scrollAccumulator;
-        
+        private float delayTimer;
+
+        // Reset to the top and re-arm the start delay (call when the content changes).
+        public void Restart()
+        {
+            delayTimer = StartDelay;
+            scrollAccumulator = 0f;
+            if (RichText != null && RichText.GetVScrollBar() != null)
+            {
+                RichText.GetVScrollBar().Value = 0;
+            }
+            else if (ScrollContainer != null)
+            {
+                ScrollContainer.ScrollVertical = 0;
+                ScrollContainer.ScrollHorizontal = 0;
+            }
+        }
+
         public override void _Process(double delta)
         {
-            if (ScrollContainer != null && ScrollContainer.GetHScrollBar() != null)
+            if (delayTimer > 0f)
             {
-                var maxScroll = ScrollContainer.GetHScrollBar().MaxValue - ScrollContainer.GetHScrollBar().Page;
-                if (maxScroll > 0)
+                delayTimer -= (float)delta;
+                return;
+            }
+
+            if (RichText != null)
+            {
+                var vbar = RichText.GetVScrollBar();
+                if (vbar != null)
                 {
-                    scrollAccumulator += 50f * (float)delta;
-                    if (scrollAccumulator >= 1.0f)
+                    var maxScroll = vbar.MaxValue - vbar.Page;
+                    if (maxScroll > 0)
                     {
-                        ScrollContainer.ScrollHorizontal += (int)scrollAccumulator;
-                        scrollAccumulator -= (int)scrollAccumulator;
+                        // A scrollbar's Value snaps to its step (default 1), so add whole
+                        // pixels at a time; fractional increments would be rounded away and
+                        // the label would never move on its own.
+                        scrollAccumulator += ScrollSpeed * (float)delta;
+                        if (scrollAccumulator >= 1.0f)
+                        {
+                            vbar.Value += (int)scrollAccumulator;
+                            scrollAccumulator -= (int)scrollAccumulator;
+                        }
+                        if (vbar.Value >= maxScroll)
+                        {
+                            vbar.Value = 0;
+                        }
                     }
-                    if (ScrollContainer.ScrollHorizontal >= maxScroll)
+                }
+                return;
+            }
+
+            if (ScrollContainer != null)
+            {
+                if (IsVertical && ScrollContainer.GetVScrollBar() != null)
+                {
+                    var maxScroll = ScrollContainer.GetVScrollBar().MaxValue - ScrollContainer.GetVScrollBar().Page;
+                    if (maxScroll > 0)
                     {
-                        ScrollContainer.ScrollHorizontal = 0;
+                        scrollAccumulator += ScrollSpeed * (float)delta;
+                        if (scrollAccumulator >= 1.0f)
+                        {
+                            ScrollContainer.ScrollVertical += (int)scrollAccumulator;
+                            scrollAccumulator -= (int)scrollAccumulator;
+                        }
+                        if (ScrollContainer.ScrollVertical >= maxScroll)
+                        {
+                            ScrollContainer.ScrollVertical = 0;
+                        }
+                    }
+                }
+                else if (!IsVertical && ScrollContainer.GetHScrollBar() != null)
+                {
+                    var maxScroll = ScrollContainer.GetHScrollBar().MaxValue - ScrollContainer.GetHScrollBar().Page;
+                    if (maxScroll > 0)
+                    {
+                        scrollAccumulator += ScrollSpeed * (float)delta;
+                        if (scrollAccumulator >= 1.0f)
+                        {
+                            ScrollContainer.ScrollHorizontal += (int)scrollAccumulator;
+                            scrollAccumulator -= (int)scrollAccumulator;
+                        }
+                        if (ScrollContainer.ScrollHorizontal >= maxScroll)
+                        {
+                            ScrollContainer.ScrollHorizontal = 0;
+                        }
                     }
                 }
             }

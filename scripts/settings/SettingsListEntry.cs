@@ -41,7 +41,7 @@ public partial class SettingsListEntry : MarginContainer
 
     private Control FindInteractableWidget(Node node)
     {
-        if (node is OptionButton || node is CheckButton || node is SpinBox || node is LineEdit || node is Button)
+        if (node is CarouselButton || node is OptionButton || node is CheckButton || node is SpinBox || node is LineEdit || node is Button)
         {
             return node as Control;
         }
@@ -65,7 +65,16 @@ public partial class SettingsListEntry : MarginContainer
     {
         if (_interactableWidget == null) return;
         
-        if (_interactableWidget is OptionButton optBtn)
+        if (_interactableWidget is CarouselButton carBtn)
+        {
+            if (carBtn.ItemCount == 0 || carBtn.Disabled) return;
+            int newIdx = carBtn.Selected + direction;
+            if (newIdx < 0) newIdx = carBtn.ItemCount - 1;
+            if (newIdx >= carBtn.ItemCount) newIdx = 0;
+            carBtn.Select(newIdx);
+            carBtn.EmitSignal(CarouselButton.SignalName.ItemSelected, newIdx);
+        }
+        else if (_interactableWidget is OptionButton optBtn)
         {
             if (optBtn.ItemCount == 0) return;
             int newIdx = optBtn.Selected + direction;
@@ -88,7 +97,11 @@ public partial class SettingsListEntry : MarginContainer
     {
         if (_interactableWidget == null) return;
 
-        if (_interactableWidget is OptionButton optBtn)
+        if (_interactableWidget is CarouselButton carBtn)
+        {
+            // Do nothing on A press, they use left/right to cycle!
+        }
+        else if (_interactableWidget is OptionButton optBtn)
         {
             // Just cycle it if accepted? Godot 4 doesn't easily expose ShowPopup in C#.
             // Wait, we can get the popup menu.

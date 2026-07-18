@@ -1,0 +1,46 @@
+[gd_scene load_steps=2 format=3 uid="uid://system_carousel_uid"]
+
+[ext_resource type="Script" path="res://scripts/ui/SystemCarousel.cs" id="1_sys_car"]
+
+[node name="SystemCarousel" type="HBoxContainer" node_paths=PackedStringArray("_leftArrow", "_systemIcon", "_systemLabel", "_rightArrow", "_debounceTimer")]
+size_flags_horizontal = 3
+alignment = 1
+script = ExtResource("1_sys_car")
+_leftArrow = NodePath("LeftArrow")
+_systemIcon = NodePath("SystemIcon")
+_systemLabel = NodePath("SystemLabel")
+_rightArrow = NodePath("RightArrow")
+_debounceTimer = NodePath("DebounceTimer")
+
+[node name="LeftArrow" type="Label" parent="."]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
+theme_override_font_sizes/font_size = 48
+text = "< "
+vertical_alignment = 1
+
+[node name="SystemIcon" type="TextureRect" parent="."]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+expand_mode = 1
+stretch_mode = 5
+
+[node name="SystemLabel" type="Label" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 48
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RightArrow" type="Label" parent="."]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
+theme_override_font_sizes/font_size = 48
+text = " >"
+vertical_alignment = 1
+
+[node name="DebounceTimer" type="Timer" parent="."]
+wait_time = 0.5
+one_shot = true

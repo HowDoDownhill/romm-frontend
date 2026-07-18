@@ -22,7 +22,10 @@ public partial class LoginScreen : Control
         appInstance = GetNode<AppInstance>("/root/AppInstance");
         
         loginButton.Pressed += OnLoginButtonPressed;
-        
+
+        var micaMaterial = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
+        MicaBorder.AttachToAll(this, micaMaterial, MicaBorder.DefaultColor);
+
         PopulateFieldsFromConfig();
         AttemptAutoLogin();
     }
