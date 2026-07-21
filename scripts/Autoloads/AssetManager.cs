@@ -258,10 +258,9 @@ public partial class AssetManager : Node
                     {
                         CallDeferred(MethodName.EmitAssetDownloaded, downloadTask.GameId, downloadTask.AssetType);
                     }
-                    else
-                    {
-                        GD.PrintErr($"[AssetManager] Failed to download {downloadTask.AssetType} for game {downloadTask.GameId} from {downloadTask.DownloadUrl}");
-                    }
+                    // A false result is usually just a 404 (the server has no art for this game), which is
+                    // normal and not worth logging. Genuine failures (real HTTP errors, exceptions) are
+                    // already logged with URL/status detail inside DownloadAssetAsync.
                 }
 
                 else

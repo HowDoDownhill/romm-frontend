@@ -1,0 +1,32 @@
+# melonDS default configuration for romm-frontend.
+#
+# The presence of this "portable" directory next to the executable is what puts
+# melonDS into portable mode (see pathInit() in src/frontend/qt_sdl/main.cpp) —
+# without it, melonDS writes to the system config dir and ignores this file.
+#
+# melonDS rewrites this file on exit, so treat these as first-run defaults only.
+# Keep values numeric or boolean: settings_fields writes through the INI updater,
+# which emits bare unquoted values, and an unquoted string is invalid TOML.
+
+[3D]
+# 0 = Software, 1 = OpenGL. melonDS defaults to Software; OpenGL is required for
+# any internal-resolution scaling and is a large quality win on desktop hardware.
+Renderer = 1
+
+[3D.GL]
+ScaleFactor = 2
+
+# Save/savestate locations. These are instance-unique settings, so they live under
+# [Instance0] — see LegacyFile[] in Config.cpp, where SaveFilePath is flagged
+# instance-unique, and Config.cpp:702 which roots those under "Instance"+N.
+#
+# getAssetPath() (EmuInstance.cpp:451) uses this value verbatim rather than routing
+# it through GetLocalFilePath, so a relative path resolves against the process
+# working directory — which the frontend sets to the emulator install dir. That puts
+# saves in <emulator dir>/saves, matching relative_save_path in meta.json.
+#
+# Left empty, melonDS would fall back to baseROMDir and scatter .sav files next to
+# the ROMs, where save sync cannot find them.
+[Instance0]
+SaveFilePath = "saves"
+SavestatePath = "savestates"

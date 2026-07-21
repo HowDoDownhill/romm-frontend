@@ -315,6 +315,13 @@ public class MainSceneSettingsHandler
                     continue;
                 }
 
+                // Skip disabled controls so d-pad navigation passes over greyed-out entries
+                // instead of parking focus on something that can't be actioned.
+                if (c is BaseButton disableableButton && disableableButton.Disabled)
+                {
+                    continue;
+                }
+
                 if (c.FocusMode != Control.FocusModeEnum.None)
                 {
                     list.Add(c);

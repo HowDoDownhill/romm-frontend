@@ -1,0 +1,75 @@
+{
+  "name": "melonDS",
+  "executable_name": {
+    "windows": "melonDS.exe",
+    "macos": "melonDS"
+  },
+  "executable_regex": {
+    "linux": "melonDS-.*-anylinux-x86_64\\.AppImage$"
+  },
+  "emulator_dir_name": {
+    "windows": "melonDS",
+    "linux": "melonDS",
+    "macos": "melonDS"
+  },
+  "launch_args_with_game": "\"{rom_path}\"",
+  "launch_args_without_game": "",
+  "relative_save_path": {
+    "nds": "saves"
+  },
+  "install_recipe": {
+    "windows": {
+      "type": "github_release",
+      "repo": "melonDS-emu/melonDS",
+      "asset_regex": "melonDS-.*-windows-x86_64\\.zip$",
+      "extract": true
+    },
+    "linux": {
+      "type": "github_release",
+      "repo": "pkgforge-dev/melonDS-AppImage-Enhanced",
+      "asset_regex": "melonDS-.*-anylinux-x86_64\\.AppImage$",
+      "extract": false
+    }
+  },
+  "settings_fields": [
+    {
+      "id": "fullscreen",
+      "label": "Start in Fullscreen",
+      "type": "boolean",
+      "default_value_bool": true,
+      "launch_arg_true": "-f",
+      "launch_arg_false": ""
+    },
+    {
+      "id": "renderer",
+      "label": "3D Renderer",
+      "type": "dropdown",
+      "default_value_string": "1",
+      "config_file_relative_path": "portable/melonDS.toml",
+      "config_section": "3D",
+      "config_key": "Renderer",
+      "options": {
+        "OpenGL": "1",
+        "Software": "0"
+      }
+    },
+    {
+      "id": "internal_resolution",
+      "label": "Internal Resolution",
+      "type": "dropdown",
+      "default_value_string": "2",
+      "config_file_relative_path": "portable/melonDS.toml",
+      "config_section": "3D.GL",
+      "config_key": "ScaleFactor",
+      "options": {
+        "Native (1x)": "1",
+        "2x": "2",
+        "3x": "3",
+        "4x": "4",
+        "5x": "5",
+        "6x": "6",
+        "8x": "8"
+      }
+    }
+  ]
+}

@@ -576,16 +576,16 @@
       "default"
     ],
     "controller_assignment": [
-      "XInput#0",
-      "XInput#1",
-      "XInput#2",
-      "XInput#3"
+      null,
+      null,
+      null,
+      null
     ],
     "controller_enabled": [
-      true,
-      true,
-      true,
-      true
+      false,
+      false,
+      false,
+      false
     ],
     "transfer_pak": [
       false,
@@ -609,12 +609,12 @@
   },
   "video": {
     "upscale": 1,
-    "ssaa": true,
-    "integer_scaling": true,
+    "ssaa": false,
+    "integer_scaling": false,
     "fullscreen": true,
     "widescreen": false,
     "vsync": true,
-    "crt": true
+    "crt": false
   },
   "emulation": {
     "overclock": false,
@@ -622,8 +622,9 @@
     "usb": false,
     "rewind": false
   },
-  "rom_dir": "E:\\Projects\\romm-frontend\\roms\\n64",
-  "recent_roms": [
-    "E:\\Projects\\romm-frontend\\roms\\n64\\007 - The World Is Not Enough (USA).z64"
-  ]
+  "ui": {
+    "theme": 0,
+    "rom_dir": "",
+    "recent_roms": []
+  }
 }

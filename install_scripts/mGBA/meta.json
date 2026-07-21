@@ -2,15 +2,17 @@
   "name": "mGBA",
   "executable_name": {
     "windows": "mGBA.exe",
-    "linux": "mgba-qt.AppImage",
     "macos": "mGBA"
+  },
+  "executable_regex": {
+    "linux": "mGBA-.*-appimage-x64\\.appimage$"
   },
   "emulator_dir_name": {
     "windows": "mGBA",
     "linux": "mGBA",
     "macos": "mGBA"
   },
-  "launch_args_with_game": "-f \"{rom_path}\"",
+  "launch_args_with_game": "\"{rom_path}\"",
   "launch_args_without_game": "",
   "install_recipe": {
     "windows": {
@@ -23,11 +25,90 @@
     "linux": {
       "type": "github_release",
       "repo": "mgba-emu/mgba",
-      "asset_regex": ".*AppImage$",
+      "asset_regex": ".*appimage-x64\\.appimage$",
       "extract": false
     }
   },
   "relative_save_path": {
-	"default": "saves"
-  }
+    "default": "saves"
+  },
+  "settings_fields": [
+    {
+      "id": "fullscreen",
+      "label": "Start in Fullscreen",
+      "type": "boolean",
+      "default_value_bool": true,
+      "launch_arg_true": "-f",
+      "launch_arg_false": ""
+    },
+    {
+      "id": "video_scale",
+      "label": "Window Scale",
+      "type": "dropdown",
+      "default_value_string": "3",
+      "config_file_relative_path": "config.ini",
+      "config_section": "ports.qt",
+      "config_key": "videoScale",
+      "options": {
+        "1x": "1",
+        "2x": "2",
+        "3x": "3",
+        "4x": "4",
+        "5x": "5",
+        "6x": "6"
+      }
+    },
+    {
+      "id": "vsync",
+      "label": "VSync",
+      "type": "dropdown",
+      "default_value_string": "0",
+      "config_file_relative_path": "config.ini",
+      "config_section": "ports.qt",
+      "config_key": "videoSync",
+      "options": {
+        "Off": "0",
+        "On": "1"
+      }
+    },
+    {
+      "id": "integer_scaling",
+      "label": "Integer Scaling",
+      "type": "dropdown",
+      "default_value_string": "0",
+      "config_file_relative_path": "config.ini",
+      "config_section": "ports.qt",
+      "config_key": "lockIntegerScaling",
+      "options": {
+        "Off": "0",
+        "On": "1"
+      }
+    },
+    {
+      "id": "interframe_blending",
+      "label": "Interframe Blending",
+      "type": "dropdown",
+      "default_value_string": "0",
+      "config_file_relative_path": "config.ini",
+      "config_section": "ports.qt",
+      "config_key": "interframeBlending",
+      "options": {
+        "Off": "0",
+        "On": "1"
+      }
+    },
+    {
+      "id": "skip_bios",
+      "label": "Skip BIOS Intro",
+      "type": "dropdown",
+      "default_value_string": "0",
+      "config_file_relative_path": "config.ini",
+      "config_section": "ports.qt",
+      "config_key": "skipBios",
+      "options": {
+        "Off": "0",
+        "On": "1"
+      }
+    }
+  ]
 }

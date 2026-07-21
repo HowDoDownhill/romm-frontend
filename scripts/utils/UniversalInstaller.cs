@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.Http;
 using System.Text.Json;
@@ -18,7 +19,7 @@ public static class UniversalInstaller
         sharedHttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("RomM-Frontend/1.0");
     }
 
-    public static async Task<bool> Install(AppInstance appInstance, string emulatorName, EmulatorMeta emulatorMetadata, string currentOperatingSystem)
+    public static async Task<bool> Install(AppInstance appInstance, string emulatorName, EmulatorMeta emulatorMetadata, string currentOperatingSystem, ReleaseOption selectedRelease = null)
     {
         if (emulatorMetadata.InstallRecipe == null || !emulatorMetadata.InstallRecipe.ContainsKey(currentOperatingSystem))
         {
@@ -29,9 +30,13 @@ public static class UniversalInstaller
         var installRecipe = emulatorMetadata.InstallRecipe[currentOperatingSystem];
         string emulatorTargetDirectory = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorMetadata.EmulatorDirName[currentOperatingSystem]);
 
-        string resolvedDownloadUrl = await ResolveDownloadUrl(installRecipe);
+        if (selectedRelease == null)
+        {
+            var availableReleases = await ListReleases(installRecipe);
+            selectedRelease = availableReleases.FirstOrDefault();
+        }
 
-        if (string.IsNullOrEmpty(resolvedDownloadUrl))
+        if (selectedRelease == null || string.IsNullOrEmpty(selectedRelease.DownloadUrl))
         {
             GD.PrintErr("No valid download URL found.");
             return false;
@@ -39,7 +44,7 @@ public static class UniversalInstaller
 
         string temporaryArchiveFilePath = Path.Combine(appInstance.configManager.DownloadsPath, $"{emulatorName}download.archive");
 
-        bool downloadSucceeded = await DownloadFileAsync(resolvedDownloadUrl, temporaryArchiveFilePath);
+        bool downloadSucceeded = await DownloadFileAsync(selectedRelease.DownloadUrl, temporaryArchiveFilePath);
 
         if (!downloadSucceeded)
         {
@@ -74,10 +79,17 @@ public static class UniversalInstaller
                 {
                     if (Directory.Exists(emulatorTargetDirectory))
                     {
-                        Directory.Delete(emulatorTargetDirectory, true);
+                        // Reinstalling over an existing install: clear it out but keep save data,
+                        // which lives inside the emulator directory, then merge the new build in.
+                        ClearDirectoryPreservingPaths(emulatorTargetDirectory, emulatorMetadata.GetPreservePaths());
+                        CopyDirectoryRecursively(matchingExtractedDirectory, emulatorTargetDirectory);
+                        Directory.Delete(matchingExtractedDirectory, true);
                     }
 
-                    Directory.Move(matchingExtractedDirectory, emulatorTargetDirectory);
+                    else
+                    {
+                        Directory.Move(matchingExtractedDirectory, emulatorTargetDirectory);
+                    }
                 }
             }
 
@@ -91,7 +103,27 @@ public static class UniversalInstaller
                 Directory.CreateDirectory(emulatorTargetDirectory);
             }
 
-            string destinationExecutablePath = Path.Combine(emulatorTargetDirectory, emulatorMetadata.ExecutableName[currentOperatingSystem]);
+            string destinationExecutableName = emulatorMetadata.ExecutableName != null && emulatorMetadata.ExecutableName.ContainsKey(currentOperatingSystem)
+                ? emulatorMetadata.ExecutableName[currentOperatingSystem]
+                : selectedRelease.AssetName;
+
+            // Version-stamped executables (e.g. AppImages) keep their release filename; remove any
+            // previously installed versions matching executable_regex so only one remains.
+            if (emulatorMetadata.ExecutableRegex != null && emulatorMetadata.ExecutableRegex.ContainsKey(currentOperatingSystem))
+            {
+                destinationExecutableName = selectedRelease.AssetName;
+                var executablePattern = new Regex(emulatorMetadata.ExecutableRegex[currentOperatingSystem], RegexOptions.IgnoreCase);
+
+                foreach (string existingFilePath in Directory.GetFiles(emulatorTargetDirectory))
+                {
+                    if (executablePattern.IsMatch(Path.GetFileName(existingFilePath)))
+                    {
+                        File.Delete(existingFilePath);
+                    }
+                }
+            }
+
+            string destinationExecutablePath = Path.Combine(emulatorTargetDirectory, destinationExecutableName);
 
             if (File.Exists(destinationExecutablePath))
             {
@@ -111,42 +143,61 @@ public static class UniversalInstaller
         return true;
     }
 
-    private static async Task<string> ResolveDownloadUrl(InstallRecipe installRecipe)
+    public static async Task<List<ReleaseOption>> ListReleases(InstallRecipe installRecipe)
     {
         switch (installRecipe.Type)
         {
             case "github_release":
-                string githubAssetUrl = await FetchGithubReleaseAssetUrl(installRecipe.Repo, installRecipe.AssetRegex);
+                return await ListGithubReleases(installRecipe.Repo, installRecipe.AssetRegex);
 
-                if (string.IsNullOrEmpty(githubAssetUrl))
-                {
-                    GD.PrintErr("Failed to fetch Github release URL.");
-                }
+            case "github_tags":
+                return await ListGithubTagReleases(installRecipe.Repo, installRecipe.TagRegex, installRecipe.UrlTemplate);
 
-                return githubAssetUrl;
+            case "web_scrape":
+                return await ListScrapedReleases(installRecipe);
 
             case "direct_url":
-                return installRecipe.Url;
+                return new List<ReleaseOption>
+                {
+                    new ReleaseOption
+                    {
+                        VersionLabel = "Latest",
+                        AssetName = installRecipe.Url?.Split('/').LastOrDefault(),
+                        DownloadUrl = installRecipe.Url
+                    }
+                };
 
             default:
                 GD.PrintErr($"Unknown install recipe type: {installRecipe.Type}");
-                return null;
+                return new List<ReleaseOption>();
         }
     }
 
-    private static async Task<string> FetchGithubReleaseAssetUrl(string repositorySlug, string assetNameRegexPattern)
+    private static async Task<List<ReleaseOption>> ListGithubReleases(string repositorySlug, string assetNameRegexPattern)
     {
-        string githubApiUrl = $"https://api.github.com/repos/{repositorySlug}/releases/latest";
+        var stableReleaseOptions = new List<ReleaseOption>();
+        var prereleaseOptions = new List<ReleaseOption>();
+        string githubApiUrl = $"https://api.github.com/repos/{repositorySlug}/releases?per_page=30";
 
         try
         {
             var githubApiResponse = await sharedHttpClient.GetStringAsync(githubApiUrl);
             using var githubApiResponseDocument = JsonDocument.Parse(githubApiResponse);
-            var responseRootElement = githubApiResponseDocument.RootElement;
+            var assetNamePattern = new Regex(assetNameRegexPattern, RegexOptions.IgnoreCase);
 
-            if (responseRootElement.TryGetProperty("assets", out var releaseAssets))
+            foreach (var release in githubApiResponseDocument.RootElement.EnumerateArray())
             {
-                var assetNamePattern = new Regex(assetNameRegexPattern, RegexOptions.IgnoreCase);
+                if (release.TryGetProperty("draft", out var draftProperty) && draftProperty.GetBoolean())
+                {
+                    continue;
+                }
+
+                if (!release.TryGetProperty("assets", out var releaseAssets))
+                {
+                    continue;
+                }
+
+                bool isPrerelease = release.TryGetProperty("prerelease", out var prereleaseProperty) && prereleaseProperty.GetBoolean();
 
                 foreach (var releaseAsset in releaseAssets.EnumerateArray())
                 {
@@ -154,7 +205,24 @@ public static class UniversalInstaller
                     {
                         if (assetNamePattern.IsMatch(assetNameProperty.GetString()))
                         {
-                            return downloadUrlProperty.GetString();
+                            string versionLabel = release.TryGetProperty("tag_name", out var tagProperty) ? tagProperty.GetString() : assetNameProperty.GetString();
+                            string publishedDate = "";
+
+                            if (release.TryGetProperty("published_at", out var publishedProperty) && publishedProperty.ValueKind == JsonValueKind.String)
+                            {
+                                publishedDate = publishedProperty.GetString().Split('T')[0];
+                            }
+
+                            var releaseOption = new ReleaseOption
+                            {
+                                VersionLabel = versionLabel,
+                                AssetName = assetNameProperty.GetString(),
+                                DownloadUrl = downloadUrlProperty.GetString(),
+                                PublishedDate = publishedDate
+                            };
+
+                            (isPrerelease ? prereleaseOptions : stableReleaseOptions).Add(releaseOption);
+                            break;
                         }
                     }
                 }
@@ -166,7 +234,142 @@ public static class UniversalInstaller
             GD.PrintErr($"Github API error: {exception.Message}");
         }
 
-        return null;
+        // Prefer stable releases; some repos (e.g. PCSX2) flag every rolling release as a
+        // prerelease, in which case those are the only versions there are.
+        return stableReleaseOptions.Count > 0 ? stableReleaseOptions : prereleaseOptions;
+    }
+
+    private static async Task<List<ReleaseOption>> ListGithubTagReleases(string repositorySlug, string tagRegexPattern, string urlTemplate)
+    {
+        var releaseOptions = new List<ReleaseOption>();
+        string githubApiUrl = $"https://api.github.com/repos/{repositorySlug}/tags?per_page=30";
+
+        try
+        {
+            var githubApiResponse = await sharedHttpClient.GetStringAsync(githubApiUrl);
+            using var githubApiResponseDocument = JsonDocument.Parse(githubApiResponse);
+            var tagPattern = new Regex(tagRegexPattern, RegexOptions.IgnoreCase);
+
+            foreach (var tag in githubApiResponseDocument.RootElement.EnumerateArray())
+            {
+                if (!tag.TryGetProperty("name", out var tagNameProperty))
+                {
+                    continue;
+                }
+
+                var tagMatch = tagPattern.Match(tagNameProperty.GetString());
+
+                if (!tagMatch.Success)
+                {
+                    continue;
+                }
+
+                string version = tagMatch.Groups.Count > 1 && tagMatch.Groups[1].Success ? tagMatch.Groups[1].Value : tagMatch.Value;
+                string downloadUrl = urlTemplate.Replace("{version}", version);
+
+                releaseOptions.Add(new ReleaseOption
+                {
+                    VersionLabel = version,
+                    AssetName = downloadUrl.Split('/').LastOrDefault(),
+                    DownloadUrl = downloadUrl
+                });
+            }
+        }
+
+        catch (Exception exception)
+        {
+            GD.PrintErr($"Github API error: {exception.Message}");
+        }
+
+        return releaseOptions;
+    }
+
+    private static async Task<List<ReleaseOption>> ListScrapedReleases(InstallRecipe installRecipe)
+    {
+        var releaseOptions = new List<ReleaseOption>();
+
+        try
+        {
+            string pageContent = await sharedHttpClient.GetStringAsync(installRecipe.ListUrl);
+
+            if (!string.IsNullOrEmpty(installRecipe.UrlTemplate) && !string.IsNullOrEmpty(installRecipe.VersionRegex))
+            {
+                // Template mode: every distinct version_regex match becomes a release whose
+                // download URL is url_template with {version} substituted.
+                var versionPattern = new Regex(installRecipe.VersionRegex, RegexOptions.IgnoreCase);
+                var seenVersions = new HashSet<string>();
+
+                foreach (Match versionMatch in versionPattern.Matches(pageContent))
+                {
+                    string version = versionMatch.Groups.Count > 1 ? versionMatch.Groups[1].Value : versionMatch.Value;
+
+                    if (!seenVersions.Add(version))
+                    {
+                        continue;
+                    }
+
+                    string downloadUrl = installRecipe.UrlTemplate.Replace("{version}", version);
+
+                    releaseOptions.Add(new ReleaseOption
+                    {
+                        VersionLabel = version,
+                        AssetName = downloadUrl.Split('/').LastOrDefault(),
+                        DownloadUrl = downloadUrl
+                    });
+                }
+            }
+
+            else if (!string.IsNullOrEmpty(installRecipe.LinkRegex))
+            {
+                // Link mode: every distinct link_regex match is itself a download URL; the
+                // optional version_regex extracts a display label from it.
+                var linkPattern = new Regex(installRecipe.LinkRegex, RegexOptions.IgnoreCase);
+                var versionPattern = string.IsNullOrEmpty(installRecipe.VersionRegex) ? null : new Regex(installRecipe.VersionRegex, RegexOptions.IgnoreCase);
+                var seenUrls = new HashSet<string>();
+
+                foreach (Match linkMatch in linkPattern.Matches(pageContent))
+                {
+                    string downloadUrl = linkMatch.Value;
+
+                    if (!seenUrls.Add(downloadUrl))
+                    {
+                        continue;
+                    }
+
+                    string assetName = downloadUrl.Split('/').LastOrDefault();
+                    string versionLabel = assetName;
+
+                    if (versionPattern != null)
+                    {
+                        var versionMatch = versionPattern.Match(downloadUrl);
+
+                        if (versionMatch.Success)
+                        {
+                            versionLabel = versionMatch.Groups.Count > 1 ? versionMatch.Groups[1].Value : versionMatch.Value;
+                        }
+                    }
+
+                    releaseOptions.Add(new ReleaseOption
+                    {
+                        VersionLabel = versionLabel,
+                        AssetName = assetName,
+                        DownloadUrl = downloadUrl
+                    });
+                }
+            }
+
+            else
+            {
+                GD.PrintErr("web_scrape recipe needs link_regex, or version_regex with url_template.");
+            }
+        }
+
+        catch (Exception exception)
+        {
+            GD.PrintErr($"Scrape error for {installRecipe.ListUrl}: {exception.Message}");
+        }
+
+        return releaseOptions;
     }
 
     private static async Task<bool> DownloadFileAsync(string downloadUrl, string destinationFilePath)
@@ -260,6 +463,84 @@ public static class UniversalInstaller
             {
                 GD.PrintErr($"Failed to copy default configurations for {emulatorName}: {exception.Message}");
             }
+        }
+    }
+
+    // Removes everything in a directory except the given relative paths (and the directories
+    // leading to them). Used so uninstalling or reinstalling an emulator never destroys the save
+    // data that emulators keep inside their own install directory.
+    public static void ClearDirectoryPreservingPaths(string directoryPath, List<string> relativePathsToPreserve)
+    {
+        if (!Directory.Exists(directoryPath))
+        {
+            return;
+        }
+
+        string rootFullPath = Path.GetFullPath(directoryPath);
+
+        // Paths to keep entirely (the save targets themselves, subtree and all)...
+        var exactlyPreservedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // ...versus directories that merely lead to one, which must be kept but still cleaned
+        // out so unrelated files inside them are removed.
+        var ancestorsOfPreservedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (string relativePath in relativePathsToPreserve ?? new List<string>())
+        {
+            if (string.IsNullOrWhiteSpace(relativePath))
+            {
+                continue;
+            }
+
+            string preservedFullPath = Path.GetFullPath(Path.Combine(directoryPath, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+
+            if (!Directory.Exists(preservedFullPath) && !File.Exists(preservedFullPath))
+            {
+                continue;
+            }
+
+            exactlyPreservedPaths.Add(preservedFullPath);
+
+            string parentPath = Path.GetDirectoryName(preservedFullPath);
+
+            while (!string.IsNullOrEmpty(parentPath) && !string.Equals(parentPath, rootFullPath, StringComparison.OrdinalIgnoreCase))
+            {
+                ancestorsOfPreservedPaths.Add(parentPath);
+                parentPath = Path.GetDirectoryName(parentPath);
+            }
+        }
+
+        foreach (string filePath in Directory.GetFiles(directoryPath))
+        {
+            if (!exactlyPreservedPaths.Contains(Path.GetFullPath(filePath)))
+            {
+                try { File.Delete(filePath); } catch (Exception exception) { GD.PrintErr($"Failed to delete {filePath}: {exception.Message}"); }
+            }
+        }
+
+        foreach (string subdirectoryPath in Directory.GetDirectories(directoryPath))
+        {
+            string fullSubdirectoryPath = Path.GetFullPath(subdirectoryPath);
+
+            // A preserved target itself: leave the whole subtree untouched, contents included.
+            if (exactlyPreservedPaths.Contains(fullSubdirectoryPath))
+            {
+                continue;
+            }
+
+            if (ancestorsOfPreservedPaths.Contains(fullSubdirectoryPath))
+            {
+                // Only leads to a preserved path: recurse so unrelated siblings inside it still go.
+                ClearDirectoryPreservingPaths(subdirectoryPath, relativePathsToPreserve
+                    .Select(relativePath => Path.GetFullPath(Path.Combine(directoryPath, relativePath.Replace('/', Path.DirectorySeparatorChar))))
+                    .Where(preservedPath => preservedPath.StartsWith(fullSubdirectoryPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                    .Select(preservedPath => preservedPath.Substring(fullSubdirectoryPath.Length + 1))
+                    .ToList());
+
+                continue;
+            }
+
+            try { Directory.Delete(subdirectoryPath, true); } catch (Exception exception) { GD.PrintErr($"Failed to delete {subdirectoryPath}: {exception.Message}"); }
         }
     }
 

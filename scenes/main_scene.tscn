@@ -45,7 +45,7 @@ script = ExtResource("7_18nlu")
 [sub_resource type="Resource" id="Resource_6wevv"]
 script = ExtResource("7_18nlu")
 
-[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "systemCarousel", "gameList", "detailsPanelContainer", "gameMarquee", "gameDescription", "gameScreenshotsScroll", "gameScreenshotsFlow", "gameDownloadProgressBar", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "LaunchEmulatorPopupOption", "SelectBiosPopupOption", "SettingsPopupOption", "RefreshGamesPopupOption", "RefreshCurrentSystemGamesPopupOption", "QuitPopupOption", "RandomGamePopupOption", "downloadProgressPopup", "downloadProgressLabel", "downloadProgressBar", "changelogPopup", "changelogRichTextLabel", "acceptUpdateBtn", "cancelUpdateBtn", "backgroundRect", "mainVBoxContainer", "startMenu", "startMenuContainer", "biosSelectorContainer", "biosSelector", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
+[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "systemCarousel", "gameList", "detailsPanelContainer", "gameMarquee", "gameDescription", "gameScreenshotsScroll", "gameScreenshotsFlow", "gameDownloadProgressBar", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "LaunchEmulatorPopupOption", "UpdateEmulatorPopupOption", "UninstallEmulatorPopupOption", "SelectBiosPopupOption", "SettingsPopupOption", "RefreshGamesPopupOption", "RefreshCurrentSystemGamesPopupOption", "QuitPopupOption", "RandomGamePopupOption", "downloadProgressPopup", "downloadProgressLabel", "downloadProgressBar", "changelogPopup", "changelogRichTextLabel", "acceptUpdateBtn", "cancelUpdateBtn", "backgroundRect", "mainVBoxContainer", "startMenu", "startMenuContainer", "biosSelectorContainer", "biosSelector", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -81,6 +81,8 @@ cancelDownloadBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Pa
 settingsSelectBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/SettingsFooter/SettingsSelectContainer/SettingsSelectButton")
 settingsBackBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/SettingsFooter/SettingsBackContainer/SettingsBackButton")
 LaunchEmulatorPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/LaunchEmulatorButton")
+UpdateEmulatorPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/UpdateEmulatorButton")
+UninstallEmulatorPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/UninstallEmulatorButton")
 SelectBiosPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/SelectBiosButton")
 SettingsPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/SettingsButton")
 RefreshGamesPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/RefreshAllGamesButton")
@@ -656,6 +658,14 @@ theme_override_constants/separation = 5
 layout_mode = 2
 text = "Launch Current Emulator"
 
+[node name="UpdateEmulatorButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=237474760]
+layout_mode = 2
+text = "Update Current Emulator"
+
+[node name="UninstallEmulatorButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=1883426247]
+layout_mode = 2
+text = "Uninstall Current Emulator"
+
 [node name="SelectBiosButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=1276947446]
 layout_mode = 2
 text = "Select Bios For Emulator"
@@ -775,6 +785,7 @@ layout_mode = 2
 size_flags_vertical = 8
 
 [node name="ChangelogContainer" type="MarginContainer" parent="Background" unique_id=664785356]
+visible = false
 custom_minimum_size = Vector2(600, 800)
 layout_mode = 1
 anchors_preset = 8
@@ -818,13 +829,20 @@ size_flags_vertical = 3
 
 [node name="HBoxContainer" type="HBoxContainer" parent="Background/ChangelogContainer/Panel/MarginContainer/VBoxContainer" unique_id=1669800469]
 layout_mode = 2
+size_flags_vertical = 8
 
 [node name="AcceptButton" type="Button" parent="Background/ChangelogContainer/Panel/MarginContainer/VBoxContainer/HBoxContainer" unique_id=898341432]
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_vertical = 8
+theme_override_font_sizes/font_size = 32
 text = "Install"
+expand_icon = true
 
 [node name="CancelButton" type="Button" parent="Background/ChangelogContainer/Panel/MarginContainer/VBoxContainer/HBoxContainer" unique_id=85801708]
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_vertical = 8
+theme_override_font_sizes/font_size = 32
 text = "Close"
+expand_icon = true

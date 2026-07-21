@@ -2,8 +2,10 @@
   "name": "Dolphin",
   "executable_name": {
     "windows": "Dolphin.exe",
-    "linux": "Dolphin_Emulator-2603a-anylinux-x86_64.AppImage",
     "macos": "Dolphin"
+  },
+  "executable_regex": {
+    "linux": "Dolphin_Emulator-.*\\.AppImage$"
   },
   "emulator_dir_name": {
     "windows": "dolphin",
@@ -12,20 +14,22 @@
   },
   "install_recipe": {
     "windows": {
-      "type": "direct_url",
-      "url": "https://dl.dolphin-emu.org/releases/2606/dolphin-2606-x64.7z",
+      "type": "github_tags",
+      "repo": "dolphin-emu/dolphin",
+      "tag_regex": "^([0-9]{4}[a-z]?)$",
+      "url_template": "https://dl.dolphin-emu.org/releases/{version}/dolphin-{version}-x64.7z",
       "extract": true,
       "extract_folder_regex": "dolphin-*"
     },
     "linux": {
       "type": "github_release",
       "repo": "pkgforge-dev/Dolphin-emu-AppImage",
-      "asset_regex": "Dolphin_Emulator-2603a-anylinux-x86_64.AppImage",
+      "asset_regex": "Dolphin_Emulator-.*-anylinux-x86_64\\.AppImage$",
       "extract": false
     }
   },
-  "launch_args_with_game": "-b -u ./ -e \"{rom_path}\"",
-  "launch_args_without_game": "-u ./",
+  "launch_args_with_game": "-b -e \"{rom_path}\"",
+  "launch_args_without_game": "",
   "settings_fields": [
     {
       "id": "fullscreen",
@@ -54,6 +58,10 @@
       "User/GC/EUR/Card A",
       "User/GC/JAP/Card A",
       "User/GC/USA/Card A"
+    ],
+    "wii": [
+      "User/Wii/title/00010000",
+      "User/Wii/title/00010001"
     ]
   },
   "controller_config": {
@@ -85,10 +93,10 @@
       "C-Stick Right": "RightStick_Right"
     },
     "sdl_string_map": {
-      "FaceSouth": "`Button S`",
-      "FaceEast": "`Button E`",
-      "FaceWest": "`Button W`",
-      "FaceNorth": "`Button N`",
+      "FaceSouth": "`Button A`",
+      "FaceEast": "`Button B`",
+      "FaceWest": "`Button X`",
+      "FaceNorth": "`Button Y`",
       "LeftShoulder": "`Shoulder L`",
       "RightShoulder": "`Shoulder R`",
       "LeftTrigger": "`Trigger L`",

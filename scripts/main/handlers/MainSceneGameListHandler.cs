@@ -670,14 +670,14 @@ public partial class MainSceneGameListHandler
 
         void AddToFlow(string path)
         {
-            if (Godot.FileAccess.FileExists(path) && _mainScene.gameScreenshotsFlow != null)
+            if (_mainScene.gameScreenshotsFlow != null)
             {
-                var image = Image.LoadFromFile(path);
-                
-                // CRITICAL FIX: Ensure the image successfully loaded and has valid dimensions before proceeding!
-                if (image == null || image.IsEmpty() || image.GetWidth() == 0 || image.GetHeight() == 0)
+                // Load by content, not extension, and stay silent when there's no usable image —
+                // a missing or mislabeled asset is normal, not an error worth logging.
+                var image = SafeLoadImage(path);
+
+                if (image == null || image.GetWidth() == 0 || image.GetHeight() == 0)
                 {
-                    GD.PrintErr($"[MainSceneGameListHandler] Failed to load image or image is empty: {path}");
                     return;
                 }
 
@@ -868,10 +868,17 @@ public partial class MainSceneGameListHandler
 
         if (isGameDownloadedLocally)
         {
-            if (_appInstance.emulatorManager.IsEmulatorInstalled(_appInstance.emulatorManager.GetMappedEmulator(game.PlatformSlug)))
+            string mappedEmulator = _appInstance.emulatorManager.GetMappedEmulator(game.PlatformSlug);
+
+            if (_appInstance.emulatorManager.IsEmulatorInstalled(mappedEmulator))
             {
                 _mainScene.actionBtn.Text = "Play";
-                _mainScene.actionBtn.Disabled = false; 
+                _mainScene.actionBtn.Disabled = false;
+            }
+            else if (_appInstance.emulatorManager.IsEmulatorInstalling(mappedEmulator))
+            {
+                _mainScene.actionBtn.Text = "Installing Emulator...";
+                _mainScene.actionBtn.Disabled = true;
             }
             else
             {
@@ -997,7 +1004,10 @@ public partial class MainSceneGameListHandler
         }
     }
 
-    public ImageTexture SafeLoadTexture(string path)
+    // Loads an image by sniffing its magic bytes (PNG/JPEG/WebP) rather than trusting the file
+    // extension, so a mislabeled file (e.g. a PNG saved as .jpg) still decodes. Returns null
+    // silently on a missing/unreadable/undecodable file — callers treat "no image" as normal.
+    public Image SafeLoadImage(string path)
     {
         if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path))
         {
@@ -1015,7 +1025,7 @@ public partial class MainSceneGameListHandler
 
             var img = new Image();
             Error err = Error.Failed;
-            
+
             if (fileData[0] == 0x89 && fileData[1] == 0x50 && fileData[2] == 0x4E && fileData[3] == 0x47)
             {
                 err = img.LoadPngFromBuffer(fileData);
@@ -1029,10 +1039,10 @@ public partial class MainSceneGameListHandler
             {
                 err = img.LoadWebpFromBuffer(fileData);
             }
-            
+
             if (err == Error.Ok && img != null && !img.IsEmpty())
             {
-                return ImageTexture.CreateFromImage(img);
+                return img;
             }
         }
         catch (Exception)
@@ -1040,5 +1050,11 @@ public partial class MainSceneGameListHandler
         }
 
         return null;
+    }
+
+    public ImageTexture SafeLoadTexture(string path)
+    {
+        Image img = SafeLoadImage(path);
+        return img != null ? ImageTexture.CreateFromImage(img) : null;
     }
 }

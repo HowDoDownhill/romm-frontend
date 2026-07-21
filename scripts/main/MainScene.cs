@@ -45,6 +45,8 @@ public partial class MainScene : Control
 
     [ExportGroup("PopupOptions")]
     [Export] public Node LaunchEmulatorPopupOption;
+    [Export] public Node UpdateEmulatorPopupOption;
+    [Export] public Node UninstallEmulatorPopupOption;
     [Export] public Node SelectBiosPopupOption;
     [Export] public Node SettingsPopupOption;
     [Export] public Node RefreshGamesPopupOption;
@@ -92,6 +94,7 @@ public partial class MainScene : Control
     public Label fuzzySearchLabel;
 
     public SystemJumpPopup systemJumpPopup;
+    public ReleasePickerPopup releasePickerPopup;
     private ulong leftBumperPressedTime = 0;
     private ulong rightBumperPressedTime = 0;
 
@@ -161,9 +164,13 @@ public partial class MainScene : Control
         HoverOverlay = new HoverPopupOverlay();
         AddChild(HoverOverlay);
 
+        releasePickerPopup = new ReleasePickerPopup();
+        AddChild(releasePickerPopup);
+        releasePickerPopup.ReleaseChosen += OnEmulatorReleaseChosen;
+
         systemJumpPopup = new SystemJumpPopup();
         AddChild(systemJumpPopup);
-        systemJumpPopup.SystemSelected += (index) => 
+        systemJumpPopup.SystemSelected += (index) =>
         {
             systemJumpPopup.Visible = false;
             if (systemCarousel != null)
@@ -186,6 +193,8 @@ public partial class MainScene : Control
             }
 
             if (LaunchEmulatorPopupOption is Button launchBtn) launchBtn.Pressed += PopupHandler.OnLaunchEmulatorPressed;
+            if (UpdateEmulatorPopupOption is Button updateEmulatorBtn) updateEmulatorBtn.Pressed += PopupHandler.OnUpdateEmulatorPressed;
+            if (UninstallEmulatorPopupOption is Button uninstallEmulatorBtn) uninstallEmulatorBtn.Pressed += PopupHandler.OnUninstallEmulatorPressed;
             if (SelectBiosPopupOption is Button biosBtn) biosBtn.Pressed += PopupHandler.OnSelectBiosMenuPressed;
             if (SettingsPopupOption is Button settingsBtn) settingsBtn.Pressed += PopupHandler.OnSettingsMenuPressed;
             if (RefreshGamesPopupOption is Button refreshBtn) refreshBtn.Pressed += PopupHandler.OnRefreshGamesPressed;
@@ -258,6 +267,7 @@ public partial class MainScene : Control
 
             HoverOverlay?.ApplyThemeColor(colors.Panel, colors.Secondary);
             systemJumpPopup?.ApplyTheme(colors.Secondary);
+            releasePickerPopup?.ApplyTheme(colors.Secondary);
         }
     }
 
@@ -280,6 +290,48 @@ public partial class MainScene : Control
 
     private void OnEmulatorInstallationCompleted(string emulatorName, bool wasSuccessful)
     {
+        if (GameListHandler.currentlySelectedGame != null)
+        {
+            GameListHandler.UpdateDetailsPanelButtons(GameListHandler.currentlySelectedGame);
+        }
+    }
+
+    // Opens the release picker for an emulator: shows a loading state while the available
+    // versions are fetched from the emulator's install recipe source, then lists them.
+    public async void OpenReleasePicker(string emulatorName)
+    {
+        if (releasePickerPopup == null) return;
+
+        releasePickerPopup.ShowLoading(emulatorName);
+        releasePickerPopup.Visible = true;
+
+        var releases = await appInstance.emulatorManager.GetAvailableReleases(emulatorName);
+
+        // User may have backed out while the list was being fetched.
+        if (!releasePickerPopup.Visible) return;
+
+        if (releases.Count == 0)
+        {
+            releasePickerPopup.ShowError("No releases found. Check your connection and try again.");
+            return;
+        }
+
+        releasePickerPopup.Populate(emulatorName, releases);
+    }
+
+    private void OnEmulatorReleaseChosen(int index)
+    {
+        if (releasePickerPopup == null || index < 0 || index >= releasePickerPopup.Releases.Count) return;
+
+        var chosenRelease = releasePickerPopup.Releases[index];
+        string emulatorName = releasePickerPopup.EmulatorName;
+        releasePickerPopup.Visible = false;
+        gameList?.GrabFocus();
+
+        // Kick off the install (this flags the emulator as installing synchronously, before the
+        // first await), then refresh the panel so the button reflects the in-progress state.
+        _ = appInstance.emulatorManager.InstallEmulator(emulatorName, chosenRelease);
+
         if (GameListHandler.currentlySelectedGame != null)
         {
             GameListHandler.UpdateDetailsPanelButtons(GameListHandler.currentlySelectedGame);
@@ -386,6 +438,7 @@ public partial class MainScene : Control
                 startMenuRoot.Visible = true;
                 if (startMenuContainer != null) startMenuContainer.Visible = true;
                 if (biosSelectorContainer != null) biosSelectorContainer.Visible = false;
+                PopupHandler.RefreshEmulatorMenuOptions();
                 if (LaunchEmulatorPopupOption is Control launchBtn) launchBtn.GrabFocus();
             }
         }
@@ -407,13 +460,17 @@ public partial class MainScene : Control
     {
         if (GameListHandler.currentlySelectedGame == null) return;
 
+        // Controller "Select" routes here directly, bypassing Godot's disabled-button gate, so
+        // honor the disabled state here too (e.g. while an emulator install or download is running).
+        if (actionBtn != null && actionBtn.Disabled) return;
+
         string emulatorName = appInstance.emulatorManager.GetMappedEmulator(GameListHandler.currentlySelectedGame.PlatformSlug);
 
         if (actionBtn.Text == "Install Emulator")
         {
-            actionBtn.Disabled = true; 
-            _ = appInstance.emulatorManager.InstallEmulator(emulatorName); 
-            return; 
+            actionBtn.Disabled = true;
+            OpenReleasePicker(emulatorName);
+            return;
         }
 
         bool isGameDownloadedLocally = GameListHandler.CheckIfGameIsDownloaded(GameListHandler.currentlySelectedGame);
@@ -575,6 +632,28 @@ public partial class MainScene : Control
             return;
         }
 
+        if (releasePickerPopup != null && releasePickerPopup.Visible)
+        {
+            // Let mouse events reach the popup's buttons; consume everything else so no
+            // input leaks through to the UI behind the popup.
+            if (@event is InputEventMouse) return;
+            releasePickerPopup.HandleInput(@event);
+
+            if (!releasePickerPopup.Visible)
+            {
+                // User backed out without picking a version; restore the action button state.
+                if (GameListHandler.currentlySelectedGame != null)
+                {
+                    GameListHandler.UpdateDetailsPanelButtons(GameListHandler.currentlySelectedGame);
+                }
+
+                gameList?.GrabFocus();
+            }
+
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
         if (systemJumpPopup != null && systemJumpPopup.Visible)
         {
             // Let mouse events reach the popup's buttons; consume everything else so no
@@ -657,7 +736,8 @@ public partial class MainScene : Control
             else if (@event.IsActionPressed("ui_accept") || @event.IsActionPressed("Select"))
             {
                 var focusOwner = GetViewport().GuiGetFocusOwner();
-                if (focusOwner is BaseButton btn)
+                // Emitting Pressed manually bypasses Godot's disabled-button gate, so check it here.
+                if (focusOwner is BaseButton btn && !btn.Disabled)
                 {
                     btn.EmitSignal(BaseButton.SignalName.Pressed);
                     GetViewport().SetInputAsHandled();
@@ -903,6 +983,12 @@ public partial class MainScene : Control
         var hovered = viewport.GuiGetHoveredControl();
         if (hovered == null) return;
 
+        // While a modal popup owns the screen, only controls inside it may take mouse focus —
+        // otherwise incidental mouse motion over the UI behind it steals focus from the popup
+        // entries and controller input goes dead.
+        if (releasePickerPopup != null && releasePickerPopup.Visible && !releasePickerPopup.IsAncestorOf(hovered)) return;
+        if (systemJumpPopup != null && systemJumpPopup.Visible && !systemJumpPopup.IsAncestorOf(hovered)) return;
+
         Control focusable = hovered;
         while (focusable != null && focusable.FocusMode != Control.FocusModeEnum.All)
         {
@@ -931,7 +1017,8 @@ public partial class MainScene : Control
         return (startMenuRoot != null && startMenuRoot.Visible)
             || (settingsMenuContainer != null && settingsMenuContainer.Visible)
             || (downloadsListContainer != null && downloadsListContainer.Visible)
-            || (systemJumpPopup != null && systemJumpPopup.Visible);
+            || (systemJumpPopup != null && systemJumpPopup.Visible)
+            || (releasePickerPopup != null && releasePickerPopup.Visible);
     }
 
     private bool IsMouseOverGameList()

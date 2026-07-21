@@ -1,0 +1,51 @@
+{
+  "name": "PPSSPP",
+  "executable_name": {
+    "windows": "PPSSPPWindows64.exe"
+  },
+  "executable_regex": {
+    "linux": "PPSSPP-v.*-anylinux-x86_64\\.AppImage$"
+  },
+  "emulator_dir_name": {
+    "windows": "ppsspp",
+    "linux": "ppsspp",
+    "macos": "ppsspp"
+  },
+  "launch_env": {
+    "linux": {
+      "XDG_CONFIG_HOME": "{emulator_dir}/memstick"
+    }
+  },
+  "relative_save_path": {
+    "psp": [
+      "memstick/PSP/SAVEDATA",
+      "memstick/ppsspp/PSP/SAVEDATA"
+    ]
+  },
+  "launch_args_with_game": "--pause-menu-exit --escape-exit \"{rom_path}\"",
+  "launch_args_without_game": "",
+  "install_recipe": {
+    "windows": {
+      "type": "github_release",
+      "repo": "hrydgard/ppsspp",
+      "asset_regex": "PPSSPP-v.*-Windows-x64\\.zip$",
+      "extract": true
+    },
+    "linux": {
+      "type": "github_release",
+      "repo": "hrydgard/ppsspp",
+      "asset_regex": "PPSSPP-v.*-anylinux-x86_64\\.AppImage$",
+      "extract": false
+    }
+  },
+  "settings_fields": [
+    {
+      "id": "fullscreen",
+      "label": "Start in Fullscreen",
+      "type": "boolean",
+      "default_value_bool": true,
+      "launch_arg_true": "--fullscreen",
+      "launch_arg_false": "--windowed"
+    }
+  ]
+}

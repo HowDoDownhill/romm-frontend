@@ -124,10 +124,11 @@ The frontend synchronizes your save files bidirectionally with the RomM backend:
 
 The frontend determines which emulator to launch for a system by referencing `emulators/EmulatorMap.json`.
 
-If the file does not exist, the app generates a default mapping for 19 popular systems:
-- **Nintendo**: NGC, Wii (Dolphin), SNES (Snes9x), N64 (Gopher64), NES (Nestopia), GB/GBA (mGBA), NDS (melonDS)
+If the file does not exist, the app generates a default mapping for 21 popular systems:
+- **Nintendo**: NGC, Wii (Dolphin), SNES (Snes9x), N64 (Gopher64), GB/GBC/GBA (mGBA), NDS (melonDS), 3DS (Azahar)
 - **PlayStation**: PSX (DuckStation), PS2 (PCSX2), PS3 (RPCS3), PS4 (shadPS4), PSP (PPSSPP)
 - **Sega**: Sega 32X, Sega CD, SMS, Genesis (Ares), Dreamcast (Flycast)
+- **NES**: also Ares — it scores higher than Nestopia on accuracy tests and is portable on Linux
 
 ### Modifying the Mappings
 

@@ -1,0 +1,75 @@
+{
+  "name": "Azahar",
+  "executable_name": {
+    "windows": "azahar.exe"
+  },
+  "executable_regex": {
+    "linux": "Azahar-.*-anylinux-x86_64\\.AppImage$"
+  },
+  "emulator_dir_name": {
+    "windows": "azahar",
+    "linux": "azahar",
+    "macos": "azahar"
+  },
+  "relative_save_path": {
+    "new-nintendo-3ds": [
+      "user/sdmc",
+      "user/nand"
+    ]
+  },
+  "launch_args_with_game": "{settings} \"{rom_path}\"",
+  "launch_args_without_game": "",
+  "settings_fields": [
+    {
+      "id": "fullscreen",
+      "label": "Start in Fullscreen",
+      "type": "boolean",
+      "default_value_bool": true,
+      "launch_arg_true": "-f",
+      "launch_arg_false": "-w"
+    },
+    {
+      "id": "internal_resolution",
+      "label": "Internal Resolution",
+      "type": "dropdown",
+      "default_value_string": "1",
+      "config_file_relative_path": "user/config/qt-config.ini",
+      "config_section": "Renderer",
+      "config_key": "resolution_factor",
+      "options": {
+        "Native (1x)": "1",
+        "2x": "2",
+        "3x": "3",
+        "4x": "4"
+      }
+    },
+    {
+      "id": "vsync",
+      "label": "VSync",
+      "type": "dropdown",
+      "default_value_string": "true",
+      "config_file_relative_path": "user/config/qt-config.ini",
+      "config_section": "Renderer",
+      "config_key": "use_vsync",
+      "options": {
+        "On": "true",
+        "Off": "false"
+      }
+    }
+  ],
+  "install_recipe": {
+    "windows": {
+      "type": "github_release",
+      "repo": "azahar-emu/azahar",
+      "asset_regex": "azahar-windows-msvc-.*\\.zip$",
+      "extract": true,
+      "extract_folder_regex": "azahar-windows-*"
+    },
+    "linux": {
+      "type": "github_release",
+      "repo": "pkgforge-dev/Azahar-AppImage-Enhanced",
+      "asset_regex": "Azahar-.*-anylinux-x86_64\\.AppImage$",
+      "extract": false
+    }
+  }
+}

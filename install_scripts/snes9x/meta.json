@@ -2,8 +2,10 @@
   "name": "snes9x",
   "executable_name": {
     "windows": "snes9x-x64.exe",
-    "linux": "snes9x-gtk",
     "macos": "snes9x"
+  },
+  "executable_regex": {
+    "linux": "Snes9x.*-anylinux-x86_64\\.AppImage$"
   },
   "emulator_dir_name": {
     "windows": "snes9x",
@@ -12,6 +14,11 @@
   },
   "launch_args_with_game": "\"{rom_path}\"",
   "launch_args_without_game": "",
+  "launch_env": {
+    "linux": {
+      "XDG_CONFIG_HOME": "{emulator_dir}/config"
+    }
+  },
   "install_recipe": {
     "windows": {
       "type": "github_release",
@@ -21,12 +28,12 @@
     },
     "linux": {
       "type": "github_release",
-      "repo": "snes9xgit/snes9x",
-      "asset_regex": ".*linux\\.zip$",
-      "extract": true
-    },
-	"relative_save_path": {
-		"default": "saves"
-	}
+      "repo": "pkgforge-dev/Snes9x-AppImage-Enhanced",
+      "asset_regex": "Snes9x.*-anylinux-x86_64\\.AppImage$",
+      "extract": false
+    }
+  },
+  "relative_save_path": {
+    "default": "Saves"
   }
 }

@@ -37,6 +37,82 @@ public class MainScenePopupHandler
         _mainScene.gameList?.GrabFocus();
     }
 
+    // Resolves the emulator mapped to the system currently shown in the carousel, matching how
+    // the other start-menu emulator actions pick their target.
+    private string GetCurrentSystemEmulator()
+    {
+        if (_mainScene.GameListHandler.gameSystems == null || _mainScene.GameListHandler.currentGameSystemIndex < 0 || _mainScene.GameListHandler.currentGameSystemIndex >= _mainScene.GameListHandler.gameSystems.Count)
+        {
+            return null;
+        }
+
+        var system = _mainScene.GameListHandler.gameSystems[_mainScene.GameListHandler.currentGameSystemIndex];
+        return _appInstance.emulatorManager.GetMappedEmulator(system.Slug);
+    }
+
+    // Called when the start menu opens: Update/Uninstall only apply to an emulator that is
+    // actually installed, and neither should be available mid-install.
+    public void RefreshEmulatorMenuOptions()
+    {
+        string mappedEmulator = GetCurrentSystemEmulator();
+        bool isInstalled = !string.IsNullOrEmpty(mappedEmulator) && _appInstance.emulatorManager.IsEmulatorInstalled(mappedEmulator);
+        bool isInstalling = !string.IsNullOrEmpty(mappedEmulator) && _appInstance.emulatorManager.IsEmulatorInstalling(mappedEmulator);
+
+        if (_mainScene.UpdateEmulatorPopupOption is Button updateBtn)
+        {
+            updateBtn.Disabled = !isInstalled || isInstalling;
+            updateBtn.Text = isInstalling ? "Installing Emulator..." : "Update Emulator";
+        }
+
+        if (_mainScene.UninstallEmulatorPopupOption is Button uninstallBtn)
+        {
+            uninstallBtn.Disabled = !isInstalled || isInstalling;
+        }
+    }
+
+    // Opens the release picker so the user can install a different version over the current one.
+    public void OnUpdateEmulatorPressed()
+    {
+        string mappedEmulator = GetCurrentSystemEmulator();
+
+        if (string.IsNullOrEmpty(mappedEmulator) || _appInstance.emulatorManager.IsEmulatorInstalling(mappedEmulator))
+        {
+            return;
+        }
+
+        if (_mainScene.startMenuRoot != null)
+        {
+            _mainScene.startMenuRoot.Visible = false;
+        }
+
+        _mainScene.OpenReleasePicker(mappedEmulator);
+    }
+
+    // Removes the installed emulator's files. Save data inside the emulator directory is kept.
+    public void OnUninstallEmulatorPressed()
+    {
+        string mappedEmulator = GetCurrentSystemEmulator();
+
+        if (string.IsNullOrEmpty(mappedEmulator) || !_appInstance.emulatorManager.IsEmulatorInstalled(mappedEmulator))
+        {
+            return;
+        }
+
+        _appInstance.emulatorManager.UninstallEmulator(mappedEmulator);
+
+        if (_mainScene.startMenuRoot != null)
+        {
+            _mainScene.startMenuRoot.Visible = false;
+        }
+
+        if (_mainScene.GameListHandler.currentlySelectedGame != null)
+        {
+            _mainScene.GameListHandler.UpdateDetailsPanelButtons(_mainScene.GameListHandler.currentlySelectedGame);
+        }
+
+        _mainScene.gameList?.GrabFocus();
+    }
+
     public void OnSelectBiosMenuPressed()
     {
         if (_mainScene.startMenuContainer != null)

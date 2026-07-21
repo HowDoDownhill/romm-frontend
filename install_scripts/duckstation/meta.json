@@ -41,8 +41,8 @@
       "type": "dropdown",
       "default_value_string": "1",
       "config_file_relative_path": "settings.ini",
-      "config_section": "Enhancements",
-      "config_key": "InternalResolutionScale",
+      "config_section": "GPU",
+      "config_key": "ResolutionScale",
       "options": {
         "Native (1x)": "1",
         "720p (2x)": "2",
@@ -57,22 +57,22 @@
       "id": "aspect_ratio",
       "label": "Aspect Ratio",
       "type": "dropdown",
-      "default_value_string": "0",
+      "default_value_string": "Auto (Game Native)",
       "config_file_relative_path": "settings.ini",
       "config_section": "Display",
       "config_key": "AspectRatio",
       "options": {
-        "Auto (Game Native)": "0",
-        "Standard (4:3)": "1",
-        "Widescreen (16:9)": "2",
-        "Stretch to Window": "5"
+        "Auto (Game Native)": "Auto (Game Native)",
+        "Standard (4:3)": "4:3",
+        "Widescreen (16:9)": "16:9",
+        "Stretch to Window": "Stretch To Fill"
       }
     },
     {
       "id": "per_game_memcard",
       "label": "Per-Game Memory Card",
       "type": "hidden",
-      "default_value_string": "2",
+      "default_value_string": "PerGameTitle",
       "config_file_relative_path": "settings.ini",
       "config_section": "MemoryCards",
       "config_key": "Card1Type"
@@ -90,5 +90,48 @@
         "On": "true"
       }
     }
-  ]
+  ],
+  "controller_config": {
+    "max_controllers": 2,
+    "config_file_relative_path": "settings.ini",
+    "format": "ini",
+    "controller_sections": [
+      {
+        "section_template": "Pad{port}",
+        "port_start": 1,
+        "type_key": "Type",
+        "type_connected": "AnalogController",
+        "type_disconnected": "None",
+        "mappings": {
+          "Up": "SDL-{sdl_index}/DPadUp",
+          "Right": "SDL-{sdl_index}/DPadRight",
+          "Down": "SDL-{sdl_index}/DPadDown",
+          "Left": "SDL-{sdl_index}/DPadLeft",
+          "Triangle": "SDL-{sdl_index}/FaceNorth",
+          "Circle": "SDL-{sdl_index}/FaceEast",
+          "Cross": "SDL-{sdl_index}/FaceSouth",
+          "Square": "SDL-{sdl_index}/FaceWest",
+          "Select": "SDL-{sdl_index}/Back",
+          "Start": "SDL-{sdl_index}/Start",
+          "Analog": "SDL-{sdl_index}/Guide",
+          "L1": "SDL-{sdl_index}/LeftShoulder",
+          "R1": "SDL-{sdl_index}/RightShoulder",
+          "L2": "SDL-{sdl_index}/+LeftTrigger",
+          "R2": "SDL-{sdl_index}/+RightTrigger",
+          "L3": "SDL-{sdl_index}/LeftStick",
+          "R3": "SDL-{sdl_index}/RightStick",
+          "LUp": "SDL-{sdl_index}/-LeftY",
+          "LDown": "SDL-{sdl_index}/+LeftY",
+          "LLeft": "SDL-{sdl_index}/-LeftX",
+          "LRight": "SDL-{sdl_index}/+LeftX",
+          "RUp": "SDL-{sdl_index}/-RightY",
+          "RDown": "SDL-{sdl_index}/+RightY",
+          "RLeft": "SDL-{sdl_index}/-RightX",
+          "RRight": "SDL-{sdl_index}/+RightX",
+          "LargeMotor": "SDL-{sdl_index}/LargeMotor",
+          "SmallMotor": "SDL-{sdl_index}/SmallMotor"
+        }
+      }
+    ]
+  }
 }

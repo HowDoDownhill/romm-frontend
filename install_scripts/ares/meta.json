@@ -4,13 +4,25 @@
     "windows": "ares.exe",
     "macos": "ares.app/Contents/MacOS/ares"
   },
+  "executable_regex": {
+    "linux": "ares-.*-anylinux-x86_64\\.AppImage$"
+  },
   "emulator_dir_name": {
     "windows": "ares",
+    "linux": "ares",
     "macos": "ares"
   },
-  "relative_save_path": {
-    "default": "Saves"
+  "emulator_bios_path": {
+    "windows": "bios",
+    "linux": "bios",
+    "macos": "bios"
   },
+  "relative_save_path": {
+    "default": "saves"
+  },
+  "preserve_on_reinstall": [
+    "settings.bml"
+  ],
   "install_recipe": {
     "windows": {
       "type": "github_release",
@@ -18,6 +30,12 @@
       "asset_regex": ".*windows-x64\\.zip$",
       "extract": true,
       "extract_folder_regex": "ares-*"
+    },
+    "linux": {
+      "type": "github_release",
+      "repo": "pkgforge-dev/ares-emu-appimage",
+      "asset_regex": "ares-.*-anylinux-x86_64\\.AppImage$",
+      "extract": false
     },
     "macos": {
       "type": "github_release",
@@ -27,8 +45,15 @@
       "extract_folder_regex": "ares-*"
     }
   },
-  "launch_args_with_game": "\"{rom_path}\"",
-  "launch_args_without_game": "",
+  "launch_args_with_game": "{system} --no-file-prompt --settings-file settings.bml --setting Paths/Saves=saves/ --setting MegaCD/Firmware/BIOS.US=bios/bios_CD_U.bin --setting MegaCD/Firmware/BIOS.Japan=bios/bios_CD_J.bin --setting MegaCD/Firmware/BIOS.Europe=bios/bios_CD_E.bin \"{rom_path}\"",
+  "launch_args_without_game": "--settings-file settings.bml --setting Paths/Saves=saves/",
+  "system_flags": {
+    "nes": "--system \"Famicom\"",
+    "genesis": "--system \"Mega Drive\"",
+    "segacd": "--system \"Mega CD\"",
+    "sms": "--system \"Master System\"",
+    "sega32": "--system \"Mega 32X\""
+  },
   "settings_fields": [
     {
       "id": "fullscreen",
@@ -37,6 +62,78 @@
       "default_value_bool": true,
       "launch_arg_true": "--fullscreen",
       "launch_arg_false": ""
+    },
+    {
+      "id": "video_output",
+      "label": "Scaling Mode",
+      "type": "dropdown",
+      "default_value_string": "Scale",
+      "options": {
+        "Scale to Fit": "Scale",
+        "Integer Scale": "Integer",
+        "Stretch to Fill": "Stretch"
+      },
+      "launch_arg_format": "--setting Video/Output={value}"
+    },
+    {
+      "id": "aspect_correction",
+      "label": "Aspect Correction",
+      "type": "dropdown",
+      "default_value_string": "Standard",
+      "options": {
+        "Standard": "Standard",
+        "None (Square Pixels)": "None",
+        "Anamorphic (16:9)": "Anamorphic"
+      },
+      "launch_arg_format": "--setting Video/AspectCorrectionMode={value}"
+    },
+    {
+      "id": "color_emulation",
+      "label": "Color Emulation",
+      "type": "boolean",
+      "default_value_bool": true,
+      "launch_arg_true": "--setting Video/ColorEmulation=true",
+      "launch_arg_false": "--setting Video/ColorEmulation=false"
+    },
+    {
+      "id": "interframe_blending",
+      "label": "Interframe Blending",
+      "type": "boolean",
+      "default_value_bool": false,
+      "launch_arg_true": "--setting Video/InterframeBlending=true",
+      "launch_arg_false": "--setting Video/InterframeBlending=false"
+    },
+    {
+      "id": "overscan",
+      "label": "Show Overscan Borders",
+      "type": "boolean",
+      "default_value_bool": false,
+      "launch_arg_true": "--setting Video/Overscan=true",
+      "launch_arg_false": "--setting Video/Overscan=false"
+    },
+    {
+      "id": "fast_boot",
+      "label": "Fast Boot (Skip BIOS Intro)",
+      "type": "boolean",
+      "default_value_bool": true,
+      "launch_arg_true": "--setting Boot/Fast=true",
+      "launch_arg_false": "--setting Boot/Fast=false"
+    },
+    {
+      "id": "megadrive_tmss",
+      "label": "Mega Drive TMSS Boot Screen",
+      "type": "boolean",
+      "default_value_bool": false,
+      "launch_arg_true": "--setting MegaDrive/TMSS=true",
+      "launch_arg_false": "--setting MegaDrive/TMSS=false"
+    },
+    {
+      "id": "auto_save_memory",
+      "label": "Auto-Save Memory",
+      "type": "boolean",
+      "default_value_bool": true,
+      "launch_arg_true": "--setting General/AutoSaveMemory=true",
+      "launch_arg_false": "--setting General/AutoSaveMemory=false"
     }
   ]
 }

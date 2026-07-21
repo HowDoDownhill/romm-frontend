@@ -2,31 +2,92 @@
   "name": "flycast",
   "executable_name": {
     "windows": "flycast.exe",
-    "linux": "flycast.AppImage",
     "macos": "flycast"
+  },
+  "executable_regex": {
+    "linux": "flycast-x86_64\\.AppImage$"
   },
   "emulator_dir_name": {
     "windows": "flycast",
     "linux": "flycast",
     "macos": "flycast"
   },
-  "launch_args_with_game": "-portable \"{rom_path}\"",
-  "launch_args_without_game": "-portable",
+  "emulator_bios_path": {
+    "windows": "data",
+    "linux": "data/flycast",
+    "macos": "data"
+  },
+  "relative_save_path": {
+    "dc": "data"
+  },
+  "launch_env": {
+    "linux": {
+      "XDG_CONFIG_HOME": "{emulator_dir}/config",
+      "XDG_DATA_HOME": "{emulator_dir}/data"
+    }
+  },
+  "launch_args_with_game": "-config config:PerGameVmu=yes \"{rom_path}\"",
+  "launch_args_without_game": "",
   "install_recipe": {
     "windows": {
       "type": "github_release",
       "repo": "flyinghead/flycast",
       "asset_regex": ".*win64.*\\.zip$",
-      "extract": true,
-      "post_install_create_files": [
-        "emu.cfg"
-      ]
+      "extract": true
     },
     "linux": {
       "type": "github_release",
       "repo": "flyinghead/flycast",
-      "asset_regex": ".*AppImage$",
+      "asset_regex": "flycast-x86_64\\.AppImage$",
       "extract": false
     }
-  }
+  },
+  "settings_fields": [
+    {
+      "id": "internal_resolution",
+      "label": "Internal Resolution",
+      "type": "dropdown",
+      "default_value_string": "480",
+      "options": {
+        "Native (480p)": "480",
+        "960p (2x)": "960",
+        "1440p (3x)": "1440",
+        "1080p": "1080",
+        "2160p (4K)": "2160"
+      },
+      "launch_arg_format": "-config config:rend.Resolution={value}"
+    },
+    {
+      "id": "widescreen",
+      "label": "Widescreen (16:9)",
+      "type": "boolean",
+      "default_value_bool": false,
+      "launch_arg_true": "-config config:rend.WideScreen=yes",
+      "launch_arg_false": "-config config:rend.WideScreen=no"
+    },
+    {
+      "id": "vsync",
+      "label": "VSync",
+      "type": "boolean",
+      "default_value_bool": true,
+      "launch_arg_true": "-config config:rend.vsync=yes",
+      "launch_arg_false": "-config config:rend.vsync=no"
+    },
+    {
+      "id": "show_fps",
+      "label": "Show FPS Counter",
+      "type": "boolean",
+      "default_value_bool": false,
+      "launch_arg_true": "-config config:rend.ShowFPS=yes",
+      "launch_arg_false": "-config config:rend.ShowFPS=no"
+    },
+    {
+      "id": "mipmaps",
+      "label": "Use Mipmaps",
+      "type": "boolean",
+      "default_value_bool": true,
+      "launch_arg_true": "-config config:rend.UseMipmaps=yes",
+      "launch_arg_false": "-config config:rend.UseMipmaps=no"
+    }
+  ]
 }

@@ -100,6 +100,58 @@ public partial class ConfigManager : Node
         }
     }
 
+    // A path that is always resolved relative to the executable's own folder. Used for
+    // directories that ship with the app or are ephemeral caches, so a build stays
+    // relocatable: move it to another PC/OS and it recomputes its own paths.
+    private string DeriveDefaultPath(string subdirectory) => $"{ApplicationRootDirectory}/{subdirectory}/";
+
+    // User-relocatable directory: honor a stored override only if it actually exists on
+    // disk, otherwise fall back to the derived default. This makes stale absolute paths
+    // (from a moved folder or a different machine/OS) self-heal instead of breaking.
+    private string ResolveRelocatablePath(string key, string subdirectory)
+    {
+        string derivedDefault = DeriveDefaultPath(subdirectory);
+        if (configurationFile.HasSectionKey("Paths", key))
+        {
+            string storedPath = (string)configurationFile.GetValue("Paths", key, derivedDefault);
+            if (!string.IsNullOrWhiteSpace(storedPath) && DirAccess.DirExistsAbsolute(storedPath))
+            {
+                return storedPath;
+            }
+        }
+        return derivedDefault;
+    }
+
+    // Resolves every path property. App-layout dirs are always derived from the executable
+    // location; user-relocatable dirs use a valid stored override or fall back to the default.
+    private void ResolveAllPaths()
+    {
+        // App layout — shipped with the app or ephemeral cache; always next to the exe.
+        DownloadsPath = DeriveDefaultPath("downloads");
+        InstallScriptsPath = DeriveDefaultPath("install_scripts");
+        ToolsPath = DeriveDefaultPath("tools");
+        AssetsPath = DeriveDefaultPath("assets");
+
+        // User-relocatable — a user may point these at a separate/large drive.
+        RomsPath = ResolveRelocatablePath("RomsPath", "roms");
+        BiosPath = ResolveRelocatablePath("BiosPath", "bios");
+        EmulatorsPath = ResolveRelocatablePath("EmulatorsPath", "emulators");
+    }
+
+    // Persist a relocatable path only when it's an actual override (differs from the
+    // executable-relative default). Otherwise remove any stale key so defaults stay derived.
+    private void WriteRelocatablePathValue(string key, string currentValue, string subdirectory)
+    {
+        if (currentValue != DeriveDefaultPath(subdirectory))
+        {
+            configurationFile.SetValue("Paths", key, currentValue);
+        }
+        else if (configurationFile.HasSectionKey("Paths", key))
+        {
+            configurationFile.EraseSectionKey("Paths", key);
+        }
+    }
+
     private void LoadConfiguration()
     {
         Error loadError = configurationFile.Load(configurationFilePath);
@@ -110,13 +162,7 @@ public partial class ConfigManager : Node
             return;
         }
 
-        RomsPath = (string)configurationFile.GetValue("Paths", "RomsRomsPath", $"{ApplicationRootDirectory}/roms/");
-        BiosPath = (string)configurationFile.GetValue("Paths", "BiosPath", $"{ApplicationRootDirectory}/bios/");
-        EmulatorsPath = (string)configurationFile.GetValue("Paths", "EmulatorsPath", $"{ApplicationRootDirectory}/emulators/");
-        DownloadsPath = (string)configurationFile.GetValue("Paths", "DownloadsPath", $"{ApplicationRootDirectory}/downloads/");
-        InstallScriptsPath = (string)configurationFile.GetValue("Paths", "InstallScriptsPath", $"{ApplicationRootDirectory}/install_scripts/");
-        ToolsPath = (string)configurationFile.GetValue("Paths", "ToolsPath", $"{ApplicationRootDirectory}/tools/");
-        AssetsPath = (string)configurationFile.GetValue("Paths", "AssetsPath", $"{ApplicationRootDirectory}/assets/");
+        ResolveAllPaths();
         RomMHost = (string)configurationFile.GetValue("RomM", "Host", "");
         RomMUsername = (string)configurationFile.GetValue("RomM", "Username", "");
         RomMPassword = (string)configurationFile.GetValue("RomM", "Password", "");
@@ -166,13 +212,7 @@ public partial class ConfigManager : Node
 
     private void SetDefaultConfiguration()
     {
-        RomsPath = $"{ApplicationRootDirectory}/roms/";
-        BiosPath = $"{ApplicationRootDirectory}/bios/";
-        EmulatorsPath = $"{ApplicationRootDirectory}/emulators/";
-        DownloadsPath = $"{ApplicationRootDirectory}/downloads/";
-        InstallScriptsPath = $"{ApplicationRootDirectory}/install_scripts/";
-        ToolsPath = $"{ApplicationRootDirectory}/tools/";
-        AssetsPath = $"{ApplicationRootDirectory}/assets/";
+        ResolveAllPaths();
         RomMHost = "";
         RomMUsername = "";
         RomMPassword = "";
@@ -192,13 +232,20 @@ public partial class ConfigManager : Node
 
     private void WriteAllConfigurationValues()
     {
-        configurationFile.SetValue("Paths", "RomsPath", RomsPath);
-        configurationFile.SetValue("Paths", "BiosPath", BiosPath);
-        configurationFile.SetValue("Paths", "EmulatorsPath", EmulatorsPath);
-        configurationFile.SetValue("Paths", "DownloadsPath", DownloadsPath);
-        configurationFile.SetValue("Paths", "InstallScriptsPath", InstallScriptsPath);
-        configurationFile.SetValue("Paths", "ToolsPath", ToolsPath);
-        configurationFile.SetValue("Paths", "AssetsPath", AssetsPath);
+        // Only user-relocatable paths are persisted, and only when overridden. App-layout
+        // dirs (downloads/install_scripts/tools/assets) are derived from the executable
+        // location at load time and intentionally not stored, so builds stay relocatable.
+        WriteRelocatablePathValue("RomsPath", RomsPath, "roms");
+        WriteRelocatablePathValue("BiosPath", BiosPath, "bios");
+        WriteRelocatablePathValue("EmulatorsPath", EmulatorsPath, "emulators");
+        // Scrub app-layout keys that older versions baked in, so stale absolute paths don't linger.
+        foreach (string deprecatedPathKey in new[] { "DownloadsPath", "InstallScriptsPath", "ToolsPath", "AssetsPath" })
+        {
+            if (configurationFile.HasSectionKey("Paths", deprecatedPathKey))
+            {
+                configurationFile.EraseSectionKey("Paths", deprecatedPathKey);
+            }
+        }
         configurationFile.SetValue("RomM", "Host", RomMHost);
         configurationFile.SetValue("RomM", "Username", RomMUsername);
         configurationFile.SetValue("RomM", "Password", RomMPassword);

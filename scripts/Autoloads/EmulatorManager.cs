@@ -20,11 +20,14 @@ public interface IConfigurationUpdater
 
 public class IniConfigurationUpdater : IConfigurationUpdater
 {
+    // Deliberate catch-all for INI-shaped formats: .ini (PCSX2, DuckStation, mGBA),
+    // .cfg (flycast's emu.cfg) and .toml (melonDS), which all use [Section] + key = value.
+    // Any format with a dedicated updater must be excluded here — this one is checked
+    // last, but an explicit exclusion keeps it correct regardless of ordering.
     public bool CanHandle(string filePath)
     {
-        return filePath.EndsWith(".ini", StringComparison.OrdinalIgnoreCase) ||
-               filePath.EndsWith(".cfg", StringComparison.OrdinalIgnoreCase) ||
-               !filePath.EndsWith(".json", StringComparison.OrdinalIgnoreCase);
+        return !filePath.EndsWith(".json", StringComparison.OrdinalIgnoreCase) &&
+               !filePath.EndsWith(".bml", StringComparison.OrdinalIgnoreCase);
     }
 
     public void UpdateValue(string configurationFilePath, string targetSection, string targetKey, string stringValue, object rawValue)
@@ -102,6 +105,28 @@ public class IniConfigurationUpdater : IConfigurationUpdater
         }
 
         System.IO.File.WriteAllLines(configurationFilePath, updatedConfigurationLines);
+    }
+}
+
+// Azahar (and other Citra-lineage emulators) store each setting in qt-config.ini
+// alongside a companion "<key>\default" boolean. On read, if "<key>\default" is true the
+// stored value is IGNORED in favour of the built-in default (see QtConfig::ReadSetting in
+// azahar's config.cpp). So writing only "<key>" is silently discarded whenever the
+// companion is true. This updater writes the value AND sets "<key>\default = false",
+// which is exactly what Azahar itself does when a user changes a setting.
+public class QtConfigurationUpdater : IConfigurationUpdater
+{
+    private readonly IniConfigurationUpdater iniUpdater = new IniConfigurationUpdater();
+
+    public bool CanHandle(string filePath)
+    {
+        return Path.GetFileName(filePath).Equals("qt-config.ini", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public void UpdateValue(string configurationFilePath, string targetSection, string targetKey, string stringValue, object rawValue)
+    {
+        iniUpdater.UpdateValue(configurationFilePath, targetSection, targetKey, stringValue, rawValue);
+        iniUpdater.UpdateValue(configurationFilePath, targetSection, targetKey + "\\default", "false", "false");
     }
 }
 
@@ -399,6 +424,12 @@ public class EmulatorMeta
     [JsonPropertyName("executable_name")]
     public Dictionary<string, string> ExecutableName { get; set; }
 
+    // Optional per-OS regex matched against files in the emulator directory when the literal
+    // executable_name is absent — lets version-stamped executables (e.g. AppImages) resolve
+    // regardless of which release was installed.
+    [JsonPropertyName("executable_regex")]
+    public Dictionary<string, string> ExecutableRegex { get; set; }
+
     [JsonPropertyName("emulator_dir_name")]
     public Dictionary<string, string> EmulatorDirName { get; set; }
 
@@ -408,11 +439,33 @@ public class EmulatorMeta
     [JsonPropertyName("relative_save_path")]
     public Dictionary<string, JsonElement> RelativeSavePath { get; set; }
 
+    // Extra install-relative paths to keep across reinstall/uninstall that are NOT save
+    // data — e.g. ares' settings.bml, which holds the user's controller mapping. Kept
+    // separate from relative_save_path because that list also drives save sync, and these
+    // paths must never be uploaded to RomM as game saves.
+    [JsonPropertyName("preserve_on_reinstall")]
+    public List<string> PreserveOnReinstall { get; set; }
+
     [JsonPropertyName("launch_args_with_game")]
     public string LaunchArgsWithGame { get; set; }
 
     [JsonPropertyName("launch_args_without_game")]
     public string LaunchArgsWithoutGame { get; set; }
+
+    // Per-OS environment variables applied to the emulator process. Some emulators
+    // hardcode a user config location (e.g. snes9x-gtk resolves XDG_CONFIG_HOME or
+    // $HOME/.config) with no portable mode and no CLI override — env vars are the only
+    // way to keep their config and saves inside the install directory. Values support
+    // the {emulator_dir} placeholder.
+    [JsonPropertyName("launch_env")]
+    public Dictionary<string, Dictionary<string, string>> LaunchEnv { get; set; }
+
+    // Per-platform launch fragment substituted for the {system} placeholder, keyed by
+    // system slug. Needed when one emulator serves several platforms from a single meta
+    // (e.g. ares) and must be told which system a ROM is — auto-detection by file
+    // extension is ambiguous for shared formats like .bin/.cue (Genesis vs disc systems).
+    [JsonPropertyName("system_flags")]
+    public Dictionary<string, string> SystemFlags { get; set; }
 
     [JsonPropertyName("install_recipe")]
     public Dictionary<string, InstallRecipe> InstallRecipe { get; set; }
@@ -422,6 +475,62 @@ public class EmulatorMeta
 
     [JsonPropertyName("controller_config")]
     public ControllerConfig ControllerConfig { get; set; }
+
+    // Every emulator keeps its saves inside its own install directory (memory cards, save
+    // folders), so uninstalling or reinstalling must know which sub-paths to leave alone.
+    // Flattens relative_save_path, whose values are either a single string or a list of them.
+    public List<string> GetSaveRelativePaths()
+    {
+        var savePaths = new List<string>();
+
+        if (RelativeSavePath == null)
+        {
+            return savePaths;
+        }
+
+        foreach (var savePathEntry in RelativeSavePath.Values)
+        {
+            if (savePathEntry.ValueKind == JsonValueKind.String)
+            {
+                savePaths.Add(savePathEntry.GetString());
+            }
+
+            else if (savePathEntry.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var savePathElement in savePathEntry.EnumerateArray())
+                {
+                    if (savePathElement.ValueKind == JsonValueKind.String)
+                    {
+                        savePaths.Add(savePathElement.GetString());
+                    }
+                }
+            }
+        }
+
+        return savePaths;
+    }
+
+    // Paths to leave intact when clearing the install directory (reinstall/uninstall):
+    // save data plus any preserve_on_reinstall entries (config the user shouldn't lose,
+    // but which isn't game-save data). Save sync deliberately uses GetSaveRelativePaths()
+    // instead, so preserved config never gets uploaded to RomM.
+    public List<string> GetPreservePaths()
+    {
+        var preservePaths = GetSaveRelativePaths();
+
+        if (PreserveOnReinstall != null)
+        {
+            foreach (var preservePath in PreserveOnReinstall)
+            {
+                if (!string.IsNullOrEmpty(preservePath))
+                {
+                    preservePaths.Add(preservePath);
+                }
+            }
+        }
+
+        return preservePaths;
+    }
 }
 
 public class EmulatorSettingField
@@ -444,14 +553,19 @@ public class EmulatorSettingField
     [JsonPropertyName("launch_arg_format")]
     public string LaunchArgFormat { get; set; }
 
+    // Each of the three config-target fields may be either a plain string (same file /
+    // section / key on every OS) or an object keyed by OS name, e.g.
+    //   "config_file_relative_path": { "windows": "snes9x.conf", "linux": "config/snes9x/snes9x.conf" }
+    // because some emulators use different config files or key names per platform. Resolve
+    // them per-OS via the Resolve* helpers rather than reading these directly.
     [JsonPropertyName("config_file_relative_path")]
-    public string ConfigFileRelativePath { get; set; }
+    public JsonElement ConfigFileRelativePath { get; set; }
 
     [JsonPropertyName("config_section")]
-    public string ConfigSection { get; set; }
+    public JsonElement ConfigSection { get; set; }
 
     [JsonPropertyName("config_key")]
-    public string ConfigKey { get; set; }
+    public JsonElement ConfigKey { get; set; }
 
     [JsonPropertyName("options")]
     public Dictionary<string, string> Options { get; set; }
@@ -461,6 +575,32 @@ public class EmulatorSettingField
 
     [JsonPropertyName("default_value_string")]
     public string DefaultValueString { get; set; }
+
+    public string ResolveConfigFileRelativePath(string operatingSystem) => ResolveOsScopedValue(ConfigFileRelativePath, operatingSystem);
+
+    public string ResolveConfigSection(string operatingSystem) => ResolveOsScopedValue(ConfigSection, operatingSystem);
+
+    public string ResolveConfigKey(string operatingSystem) => ResolveOsScopedValue(ConfigKey, operatingSystem);
+
+    // A config-target field is either a bare string (applies to every OS) or an object
+    // whose keys are OS names. Returns the string for this OS, or null when unset or when
+    // the object has no entry for this OS.
+    private static string ResolveOsScopedValue(JsonElement fieldValue, string operatingSystem)
+    {
+        if (fieldValue.ValueKind == JsonValueKind.String)
+        {
+            return fieldValue.GetString();
+        }
+
+        if (fieldValue.ValueKind == JsonValueKind.Object
+            && fieldValue.TryGetProperty(operatingSystem, out JsonElement osScopedValue)
+            && osScopedValue.ValueKind == JsonValueKind.String)
+        {
+            return osScopedValue.GetString();
+        }
+
+        return null;
+    }
 }
 
 public class InstallRecipe
@@ -482,6 +622,39 @@ public class InstallRecipe
 
     [JsonPropertyName("extract_folder_regex")]
     public string ExtractFolderRegex { get; set; }
+
+    // web_scrape recipes: fetch list_url (HTML or JSON) and either collect download links
+    // matching link_regex, or expand url_template for each version_regex match.
+    [JsonPropertyName("list_url")]
+    public string ListUrl { get; set; }
+
+    [JsonPropertyName("link_regex")]
+    public string LinkRegex { get; set; }
+
+    [JsonPropertyName("version_regex")]
+    public string VersionRegex { get; set; }
+
+    [JsonPropertyName("url_template")]
+    public string UrlTemplate { get; set; }
+
+    // github_tags recipes: list the repo's git tags, keep those matching tag_regex (capture
+    // group 1 = version), and build each download URL from url_template. For projects that tag
+    // on GitHub but host binaries elsewhere (e.g. Dolphin's CDN).
+    [JsonPropertyName("tag_regex")]
+    public string TagRegex { get; set; }
+}
+
+// One installable release of an emulator, resolved at runtime from the install recipe's
+// source (GitHub releases, a scraped download page, or a single direct URL).
+public class ReleaseOption
+{
+    public string VersionLabel { get; set; }
+
+    public string AssetName { get; set; }
+
+    public string DownloadUrl { get; set; }
+
+    public string PublishedDate { get; set; }
 }
 
 public class ControllerConfig
@@ -556,6 +729,7 @@ public partial class EmulatorManager : Node
     private string executableMapFilePath;
 
     private Dictionary<string, List<string>> systemToEmulatorMap = new Dictionary<string, List<string>>();
+    private readonly HashSet<string> installingEmulators = new HashSet<string>();
     private Process activeEmulatorProcess = null;
     private Game activeGame = null;
     private DateTime activeSessionStart;
@@ -622,6 +796,53 @@ public partial class EmulatorManager : Node
             {
                 GD.PrintErr($"Failed to load emulator map after regeneration: {ex.Message}");
             }
+        }
+
+        MergeMissingDefaultMappings();
+    }
+
+    // The on-disk map is only written once, at first run, so platforms added to the
+    // defaults later would never reach an existing install — and because systems with
+    // no mapping are filtered out of the game list entirely, those platforms silently
+    // disappear from the UI rather than failing visibly.
+    //
+    // Union in any default keys the file lacks. Existing keys are never touched, so
+    // user edits and PreferredEmulators overrides both survive.
+    private void MergeMissingDefaultMappings()
+    {
+        if (systemToEmulatorMap == null)
+        {
+            systemToEmulatorMap = new Dictionary<string, List<string>>();
+        }
+
+        var addedSystemSlugs = new List<string>();
+
+        foreach (var defaultMapping in BuildDefaultEmulatorMap())
+        {
+            if (!systemToEmulatorMap.ContainsKey(defaultMapping.Key))
+            {
+                systemToEmulatorMap[defaultMapping.Key] = defaultMapping.Value;
+                addedSystemSlugs.Add(defaultMapping.Key);
+            }
+        }
+
+        if (addedSystemSlugs.Count == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            string serializedMapJson = JsonSerializer.Serialize(systemToEmulatorMap, RommJsonContext.Default.Options);
+            using var emulatorMapFile = FileAccess.Open(emulatorMapFilePath, FileAccess.ModeFlags.Write);
+            emulatorMapFile.StoreString(serializedMapJson);
+            GD.Print($"Added missing default emulator mappings: {string.Join(", ", addedSystemSlugs)}");
+        }
+
+        catch (Exception exception)
+        {
+            // Non-fatal: the in-memory map already has the new entries for this session.
+            GD.PrintErr($"Failed to persist merged emulator map: {exception.Message}");
         }
     }
 
@@ -746,15 +967,17 @@ public partial class EmulatorManager : Node
         if (emulatorMetadata != null && emulatorMetadata.SettingsFields != null)
         {
             EmulatorSettingField targetSettingField = emulatorMetadata.SettingsFields.Find(field => field.Id == settingId);
+            string currentOperatingSystem = OS.GetName().ToLower();
+            string configFileRelativePath = targetSettingField?.ResolveConfigFileRelativePath(currentOperatingSystem);
+            string configSection = targetSettingField?.ResolveConfigSection(currentOperatingSystem);
+            string configKey = targetSettingField?.ResolveConfigKey(currentOperatingSystem);
 
-            if (targetSettingField != null && !string.IsNullOrEmpty(targetSettingField.ConfigFileRelativePath) && !string.IsNullOrEmpty(targetSettingField.ConfigSection) && !string.IsNullOrEmpty(targetSettingField.ConfigKey))
+            if (targetSettingField != null && !string.IsNullOrEmpty(configFileRelativePath) && !string.IsNullOrEmpty(configSection) && !string.IsNullOrEmpty(configKey))
             {
-                string currentOperatingSystem = OS.GetName().ToLower();
-
                 if (emulatorMetadata.EmulatorDirName != null && emulatorMetadata.EmulatorDirName.ContainsKey(currentOperatingSystem))
                 {
                     string targetEmulatorInstallDirectory = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorMetadata.EmulatorDirName[currentOperatingSystem]);
-                    string configurationFilePath = Path.Combine(targetEmulatorInstallDirectory, targetSettingField.ConfigFileRelativePath);
+                    string configurationFilePath = Path.Combine(targetEmulatorInstallDirectory, configFileRelativePath);
 
                     string stringValue = "";
 
@@ -786,20 +1009,25 @@ public partial class EmulatorManager : Node
                         }
                     }
                     
+                    // IniConfigurationUpdater is a catch-all and must stay last, or it
+                    // claims formats that have a dedicated updater (e.g. ares' settings.bml,
+                    // which is indentation-based and would be corrupted by INI-style writes).
                     var updaters = new IConfigurationUpdater[]
                     {
                         new JsonConfigurationUpdater(),
 
-                        new IniConfigurationUpdater(),
+                        new BmlConfigurationUpdater(),
 
-                        new BmlConfigurationUpdater()
+                        new QtConfigurationUpdater(),
+
+                        new IniConfigurationUpdater()
                     };
 
                     foreach (var updater in updaters)
                     {
                         if (updater.CanHandle(configurationFilePath))
                         {
-                            updater.UpdateValue(configurationFilePath, targetSettingField.ConfigSection, targetSettingField.ConfigKey, stringValue, settingValue);
+                            updater.UpdateValue(configurationFilePath, configSection, configKey, stringValue, settingValue);
                             break;
                         }
                     }
@@ -850,6 +1078,39 @@ public partial class EmulatorManager : Node
         }
     }
 
+    // Resolves the emulator's executable inside its install directory. Tries the literal
+    // executable_name first, then falls back to executable_regex so version-stamped release
+    // filenames (e.g. AppImages) resolve no matter which version was installed.
+    public string ResolveExecutablePath(EmulatorMeta emulatorMetadata, string currentOperatingSystem, string emulatorInstallDirectory)
+    {
+        string literalExecutableName = emulatorMetadata.ExecutableName != null && emulatorMetadata.ExecutableName.ContainsKey(currentOperatingSystem)
+            ? emulatorMetadata.ExecutableName[currentOperatingSystem]
+            : null;
+
+        if (!string.IsNullOrEmpty(literalExecutableName))
+        {
+            string literalExecutablePath = Path.GetFullPath(Path.Combine(emulatorInstallDirectory, literalExecutableName));
+
+            if (System.IO.File.Exists(literalExecutablePath))
+            {
+                return literalExecutablePath;
+            }
+        }
+
+        if (emulatorMetadata.ExecutableRegex != null && emulatorMetadata.ExecutableRegex.ContainsKey(currentOperatingSystem) && System.IO.Directory.Exists(emulatorInstallDirectory))
+        {
+            var executablePattern = new System.Text.RegularExpressions.Regex(emulatorMetadata.ExecutableRegex[currentOperatingSystem], System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            string matchingFilePath = System.IO.Directory.GetFiles(emulatorInstallDirectory).FirstOrDefault(filePath => executablePattern.IsMatch(Path.GetFileName(filePath)));
+
+            if (matchingFilePath != null)
+            {
+                return Path.GetFullPath(matchingFilePath);
+            }
+        }
+
+        return string.IsNullOrEmpty(literalExecutableName) ? null : Path.GetFullPath(Path.Combine(emulatorInstallDirectory, literalExecutableName));
+    }
+
     public bool IsEmulatorInstalled(string emulatorName)
     {
         if (string.IsNullOrEmpty(emulatorName))
@@ -866,20 +1127,93 @@ public partial class EmulatorManager : Node
 
         string currentOperatingSystem = OS.GetName().ToLower();
 
-        if (emulatorMetadata.EmulatorDirName == null || emulatorMetadata.ExecutableName == null ||
-            !emulatorMetadata.EmulatorDirName.ContainsKey(currentOperatingSystem) || !emulatorMetadata.ExecutableName.ContainsKey(currentOperatingSystem))
+        bool hasExecutableEntry = (emulatorMetadata.ExecutableName != null && emulatorMetadata.ExecutableName.ContainsKey(currentOperatingSystem)) ||
+                                  (emulatorMetadata.ExecutableRegex != null && emulatorMetadata.ExecutableRegex.ContainsKey(currentOperatingSystem));
+
+        if (emulatorMetadata.EmulatorDirName == null || !emulatorMetadata.EmulatorDirName.ContainsKey(currentOperatingSystem) || !hasExecutableEntry)
         {
             return false;
         }
 
         string emulatorInstallDirectory = appInstance.configManager.EmulatorsPath.PathJoin(emulatorName);
-        string executableRelativePath = emulatorMetadata.ExecutableName[currentOperatingSystem];
-        string fullExecutablePath = Path.GetFullPath(Path.Combine(emulatorInstallDirectory, executableRelativePath));
+        string fullExecutablePath = ResolveExecutablePath(emulatorMetadata, currentOperatingSystem, emulatorInstallDirectory);
 
-        return FileAccess.FileExists(fullExecutablePath);
+        return fullExecutablePath != null && System.IO.File.Exists(fullExecutablePath);
     }
 
-    public async Task InstallEmulator(string emulatorName)
+    public async Task<List<ReleaseOption>> GetAvailableReleases(string emulatorName)
+    {
+        var emulatorMetadata = LoadEmulatorMetadataFromDisk(emulatorName);
+        string currentOperatingSystem = OS.GetName().ToLower();
+
+        if (emulatorMetadata?.InstallRecipe == null || !emulatorMetadata.InstallRecipe.ContainsKey(currentOperatingSystem))
+        {
+            GD.PrintErr($"No install recipe found for {emulatorName} on {currentOperatingSystem}.");
+            return new List<ReleaseOption>();
+        }
+
+        return await UniversalInstaller.ListReleases(emulatorMetadata.InstallRecipe[currentOperatingSystem]);
+    }
+
+    // True while an install for this emulator is in flight, so the UI can lock out repeat
+    // "Install Emulator" presses and show an in-progress state.
+    public bool IsEmulatorInstalling(string emulatorName)
+    {
+        return !string.IsNullOrEmpty(emulatorName) && installingEmulators.Contains(emulatorName);
+    }
+
+    // Removes an installed emulator's files while keeping its save data (memory cards and save
+    // folders live inside the emulator directory, so a plain directory delete would destroy them).
+    public bool UninstallEmulator(string emulatorName)
+    {
+        if (string.IsNullOrEmpty(emulatorName))
+        {
+            return false;
+        }
+
+        if (IsEmulatorInstalling(emulatorName))
+        {
+            GD.PrintErr($"Cannot uninstall {emulatorName} while it is being installed.");
+            return false;
+        }
+
+        if (IsEmulatorRunning)
+        {
+            GD.PrintErr($"Cannot uninstall {emulatorName} while an emulator is running.");
+            return false;
+        }
+
+        var emulatorMetadata = LoadEmulatorMetadataFromDisk(emulatorName);
+
+        if (emulatorMetadata == null)
+        {
+            GD.PrintErr($"Emulator recipe not found for: {emulatorName}");
+            return false;
+        }
+
+        string emulatorInstallDirectory = appInstance.configManager.EmulatorsPath.PathJoin(emulatorName);
+
+        if (!System.IO.Directory.Exists(emulatorInstallDirectory))
+        {
+            GD.Print($"{emulatorName} is not installed.");
+            return false;
+        }
+
+        try
+        {
+            UniversalInstaller.ClearDirectoryPreservingPaths(emulatorInstallDirectory, emulatorMetadata.GetPreservePaths());
+            GD.Print($"Uninstalled {emulatorName} (save data preserved).");
+            return true;
+        }
+
+        catch (Exception exception)
+        {
+            GD.PrintErr($"Failed to uninstall {emulatorName}: {exception.Message}");
+            return false;
+        }
+    }
+
+    public async Task InstallEmulator(string emulatorName, ReleaseOption selectedRelease = null)
     {
         var emulatorMetadata = LoadEmulatorMetadataFromDisk(emulatorName);
 
@@ -890,11 +1224,18 @@ public partial class EmulatorManager : Node
             return;
         }
 
+        // Guard against concurrent installs of the same emulator (e.g. rapid button presses).
+        if (!installingEmulators.Add(emulatorName))
+        {
+            GD.Print($"{emulatorName} is already being installed.");
+            return;
+        }
+
         string currentOperatingSystem = OS.GetName().ToLower();
 
         try
         {
-            bool installationSucceeded = await UniversalInstaller.Install(appInstance, emulatorName, emulatorMetadata, currentOperatingSystem);
+            bool installationSucceeded = await UniversalInstaller.Install(appInstance, emulatorName, emulatorMetadata, currentOperatingSystem, selectedRelease);
 
             if (installationSucceeded)
             {
@@ -906,12 +1247,14 @@ public partial class EmulatorManager : Node
                 GD.PrintErr($"Failed to install {emulatorName}.");
             }
 
+            installingEmulators.Remove(emulatorName);
             EmitSignal(SignalName.EmulatorInstallationCompleted, emulatorName, installationSucceeded);
         }
 
         catch (Exception exception)
         {
             GD.PrintErr($"Exception during install: {exception.Message}");
+            installingEmulators.Remove(emulatorName);
             EmitSignal(SignalName.EmulatorInstallationCompleted, emulatorName, false);
         }
     }
@@ -976,14 +1319,71 @@ public partial class EmulatorManager : Node
         return launchArguments;
     }
 
+    // Injects the launch-arg portion of settings_fields into the command line. If the
+    // template contains a {settings} placeholder, the settings are substituted there;
+    // otherwise they are appended at the end. The placeholder matters for emulators that
+    // require the ROM path to be the LAST argument (e.g. Azahar): those put {settings}
+    // before {rom_path} so appended settings can't push the ROM out of final position.
     private string AppendDynamicSettingsToArguments(string launchArguments, string emulatorName, EmulatorMeta emulatorMetadata)
     {
-        if (emulatorMetadata.SettingsFields == null)
+        string settingsArguments = BuildDynamicSettingsArguments(emulatorName, emulatorMetadata);
+
+        if (launchArguments != null && launchArguments.Contains("{settings}"))
+        {
+            if (string.IsNullOrEmpty(settingsArguments))
+            {
+                // Drop the placeholder plus exactly one adjacent space so we don't leave a
+                // gap — but never touch other whitespace, since a ROM path may contain
+                // consecutive spaces.
+                return launchArguments.Replace("{settings} ", "").Replace(" {settings}", "").Replace("{settings}", "");
+            }
+
+            return launchArguments.Replace("{settings}", settingsArguments);
+        }
+
+        if (string.IsNullOrEmpty(settingsArguments))
         {
             return launchArguments;
         }
 
+        return launchArguments + " " + settingsArguments;
+    }
+
+    // Substitutes the {system} placeholder with the per-slug fragment from system_flags
+    // (e.g. "--system \"Mega Drive\"" for ares). Absent placeholder or unmapped slug leaves
+    // the command line unchanged, matching the {settings} cleanup so no stray gap remains.
+    private string ResolveSystemPlaceholder(string launchArguments, EmulatorMeta emulatorMetadata, string systemSlug)
+    {
+        if (launchArguments == null || !launchArguments.Contains("{system}"))
+        {
+            return launchArguments;
+        }
+
+        string systemFragment = "";
+
+        if (emulatorMetadata.SystemFlags != null && !string.IsNullOrEmpty(systemSlug)
+            && emulatorMetadata.SystemFlags.TryGetValue(systemSlug, out string mappedFragment))
+        {
+            systemFragment = mappedFragment;
+        }
+
+        if (string.IsNullOrEmpty(systemFragment))
+        {
+            return launchArguments.Replace("{system} ", "").Replace(" {system}", "").Replace("{system}", "");
+        }
+
+        return launchArguments.Replace("{system}", systemFragment);
+    }
+
+    private string BuildDynamicSettingsArguments(string emulatorName, EmulatorMeta emulatorMetadata)
+    {
+        if (emulatorMetadata.SettingsFields == null)
+        {
+            return "";
+        }
+
         var savedUserSettings = LoadEmulatorSettings(emulatorName);
+        var settingsArgumentParts = new List<string>();
 
         foreach (var settingField in emulatorMetadata.SettingsFields)
         {
@@ -1010,12 +1410,12 @@ public partial class EmulatorManager : Node
 
                 if (booleanSettingValue && !string.IsNullOrEmpty(settingField.LaunchArgTrue))
                 {
-                    launchArguments += " " + settingField.LaunchArgTrue;
+                    settingsArgumentParts.Add(settingField.LaunchArgTrue);
                 }
 
                 else if (!booleanSettingValue && !string.IsNullOrEmpty(settingField.LaunchArgFalse))
                 {
-                    launchArguments += " " + settingField.LaunchArgFalse;
+                    settingsArgumentParts.Add(settingField.LaunchArgFalse);
                 }
             }
 
@@ -1030,12 +1430,12 @@ public partial class EmulatorManager : Node
 
                 if (!string.IsNullOrEmpty(stringSettingValue) && !string.IsNullOrEmpty(settingField.LaunchArgFormat))
                 {
-                    launchArguments += " " + settingField.LaunchArgFormat.Replace("{value}", stringSettingValue);
+                    settingsArgumentParts.Add(settingField.LaunchArgFormat.Replace("{value}", stringSettingValue));
                 }
             }
         }
 
-        return launchArguments;
+        return string.Join(" ", settingsArgumentParts);
     }
 
     private string ApplyBiosArgumentsAndCopyFiles(string launchArguments, string firmwarePath, string emulatorInstallDirectory, EmulatorMeta emulatorMetadata, string currentOperatingSystem)
@@ -1063,7 +1463,7 @@ public partial class EmulatorManager : Node
         return launchArguments;
     }
 
-    private Process BuildAndStartEmulatorProcess(string executablePath, string launchArguments, string workingDirectory)
+    private Process BuildAndStartEmulatorProcess(string executablePath, string launchArguments, string workingDirectory, EmulatorMeta emulatorMetadata = null)
     {
         ProcessStartInfo processStartInfo = new ProcessStartInfo
         {
@@ -1074,7 +1474,31 @@ public partial class EmulatorManager : Node
             UseShellExecute = false
         };
 
+        ApplyLaunchEnvironment(processStartInfo, emulatorMetadata, workingDirectory);
+
         return Process.Start(processStartInfo);
+    }
+
+    // Requires UseShellExecute = false, which is already set above.
+    private void ApplyLaunchEnvironment(ProcessStartInfo processStartInfo, EmulatorMeta emulatorMetadata, string emulatorInstallDirectory)
+    {
+        if (emulatorMetadata?.LaunchEnv == null)
+        {
+            return;
+        }
+
+        string currentOperatingSystem = OS.GetName().ToLower();
+
+        if (!emulatorMetadata.LaunchEnv.TryGetValue(currentOperatingSystem, out var environmentVariables) || environmentVariables == null)
+        {
+            return;
+        }
+
+        foreach (var environmentVariable in environmentVariables)
+        {
+            string resolvedValue = environmentVariable.Value.Replace("{emulator_dir}", emulatorInstallDirectory);
+            processStartInfo.Environment[environmentVariable.Key] = resolvedValue;
+        }
     }
 
     public async void LaunchEmulatorWithGame(Game game)
@@ -1118,15 +1542,14 @@ public partial class EmulatorManager : Node
             }
 
 
-            if (emulatorMetadata.ExecutableName == null || !emulatorMetadata.ExecutableName.ContainsKey(currentOperatingSystem))
+            string emulatorInstallDirectory = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorMetadata.EmulatorDirName[currentOperatingSystem]);
+            string fullExecutablePath = ResolveExecutablePath(emulatorMetadata, currentOperatingSystem, emulatorInstallDirectory);
+
+            if (string.IsNullOrEmpty(fullExecutablePath))
             {
-                GD.PrintErr("ExecutableName is missing or does not contain key for the current OS.");
+                GD.PrintErr("No executable_name or executable_regex entry for the current OS.");
                 return;
             }
-
-            string emulatorInstallDirectory = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorMetadata.EmulatorDirName[currentOperatingSystem]);
-            string executableRelativePath = emulatorMetadata.ExecutableName[currentOperatingSystem];
-            string fullExecutablePath = Path.Combine(emulatorInstallDirectory, executableRelativePath);
 
             if (game.Files == null || game.Files.Count == 0)
             {
@@ -1146,6 +1569,7 @@ public partial class EmulatorManager : Node
             }
 
             launchArguments = launchArguments.Replace("{rom_path}", fullRomPath);
+            launchArguments = ResolveSystemPlaceholder(launchArguments, emulatorMetadata, game.System.Slug);
 
             string firmwarePath = ResolveFirmwarePath(game.System);
             launchArguments = ApplyBiosArgumentsAndCopyFiles(launchArguments, firmwarePath, emulatorInstallDirectory, emulatorMetadata, currentOperatingSystem);
@@ -1155,7 +1579,11 @@ public partial class EmulatorManager : Node
             {
                 foreach (var settingField in emulatorMetadata.SettingsFields)
                 {
-                    if (settingField.Type == "hidden" && !string.IsNullOrEmpty(settingField.ConfigFileRelativePath) && !string.IsNullOrEmpty(settingField.ConfigSection) && !string.IsNullOrEmpty(settingField.ConfigKey))
+                    string hiddenConfigRelativePath = settingField.ResolveConfigFileRelativePath(currentOperatingSystem);
+                    string hiddenConfigSection = settingField.ResolveConfigSection(currentOperatingSystem);
+                    string hiddenConfigKey = settingField.ResolveConfigKey(currentOperatingSystem);
+
+                    if (settingField.Type == "hidden" && !string.IsNullOrEmpty(hiddenConfigRelativePath) && !string.IsNullOrEmpty(hiddenConfigSection) && !string.IsNullOrEmpty(hiddenConfigKey))
                     {
                         string stringValue = settingField.DefaultValueString;
 
@@ -1164,14 +1592,15 @@ public partial class EmulatorManager : Node
                             stringValue = stringValue.Replace("{game_id}", game.Id.ToString());
                         }
 
-                        string configFilePath = Path.Combine(emulatorInstallDirectory, settingField.ConfigFileRelativePath);
-                        var updaters = new IConfigurationUpdater[] { new JsonConfigurationUpdater(), new IniConfigurationUpdater(), new BmlConfigurationUpdater() };
+                        string configFilePath = Path.Combine(emulatorInstallDirectory, hiddenConfigRelativePath);
+                        // Ini is the catch-all and must stay last; see the matching list above.
+                        var updaters = new IConfigurationUpdater[] { new JsonConfigurationUpdater(), new BmlConfigurationUpdater(), new QtConfigurationUpdater(), new IniConfigurationUpdater() };
 
                         foreach (var updater in updaters)
                         {
                             if (updater.CanHandle(configFilePath))
                             {
-                                updater.UpdateValue(configFilePath, settingField.ConfigSection, settingField.ConfigKey, stringValue, stringValue);
+                                updater.UpdateValue(configFilePath, hiddenConfigSection, hiddenConfigKey, stringValue, stringValue);
                                 break;
                             }
                         }
@@ -1184,12 +1613,14 @@ public partial class EmulatorManager : Node
 
             DateTime sessionStart = DateTime.UtcNow;
 
+            GD.Print($"Launching {mappedEmulatorName} for {game.System.Slug}:\n  exe:  {fullExecutablePath}\n  args: {launchArguments}");
+
             if (appInstance.saveSyncManager != null)
             {
                 await appInstance.saveSyncManager.SyncBeforeLaunch(game);
             }
 
-            Process emulatorProcess = BuildAndStartEmulatorProcess(fullExecutablePath, launchArguments, emulatorInstallDirectory);
+            Process emulatorProcess = BuildAndStartEmulatorProcess(fullExecutablePath, launchArguments, emulatorInstallDirectory, emulatorMetadata);
 
             if (emulatorProcess != null)
             {
@@ -1271,18 +1702,23 @@ public partial class EmulatorManager : Node
         {
             string currentOperatingSystem = OS.GetName().ToLower();
 
-            if (emulatorMetadata.EmulatorDirName == null || emulatorMetadata.ExecutableName == null ||
-                !emulatorMetadata.EmulatorDirName.ContainsKey(currentOperatingSystem) || !emulatorMetadata.ExecutableName.ContainsKey(currentOperatingSystem))
+            if (emulatorMetadata.EmulatorDirName == null || !emulatorMetadata.EmulatorDirName.ContainsKey(currentOperatingSystem))
             {
                 GD.PrintErr($"Incomplete meta.json for {emulatorName} on OS: {currentOperatingSystem}");
                 return;
             }
 
             string emulatorInstallDirectory = appInstance.configManager.EmulatorsPath + emulatorMetadata.EmulatorDirName[currentOperatingSystem];
-            string executableRelativePath = emulatorMetadata.ExecutableName[currentOperatingSystem];
-            string fullExecutablePath = Path.Join(emulatorInstallDirectory, executableRelativePath);
+            string fullExecutablePath = ResolveExecutablePath(emulatorMetadata, currentOperatingSystem, emulatorInstallDirectory);
+
+            if (string.IsNullOrEmpty(fullExecutablePath))
+            {
+                GD.PrintErr($"Incomplete meta.json for {emulatorName} on OS: {currentOperatingSystem}");
+                return;
+            }
 
             string launchArguments = emulatorMetadata.LaunchArgsWithoutGame;
+            launchArguments = ResolveSystemPlaceholder(launchArguments, emulatorMetadata, currentGameSystem?.Slug);
 
             if (currentGameSystem != null)
             {
@@ -1292,7 +1728,7 @@ public partial class EmulatorManager : Node
 
             launchArguments = AppendDynamicSettingsToArguments(launchArguments, emulatorName, emulatorMetadata);
 
-            Process emulatorProcess = BuildAndStartEmulatorProcess(fullExecutablePath, launchArguments, emulatorInstallDirectory);
+            Process emulatorProcess = BuildAndStartEmulatorProcess(fullExecutablePath, launchArguments, emulatorInstallDirectory, emulatorMetadata);
 
             if (emulatorProcess != null)
             {
@@ -1310,18 +1746,22 @@ public partial class EmulatorManager : Node
         }
     }
 
-    private void GenerateDefaultMaps()
+    // Single source of truth for the built-in platform mappings, shared by
+    // GenerateDefaultMaps (first run) and MergeMissingDefaultMappings (upgrades).
+    private static Dictionary<string, List<string>> BuildDefaultEmulatorMap()
     {
-        var defaultPlatformToEmulatorMap = new Dictionary<string, List<string>>
+        return new Dictionary<string, List<string>>
         {
             {"ngc", new List<string>{"dolphin"}},
             {"wii", new List<string>{"dolphin"}},
             {"snes", new List<string>{"snes9x"}},
             {"n64", new List<string>{"gopher64"}},
-            {"nes", new List<string>{"nestopia"}},
+            {"nes", new List<string>{"ares"}},
             {"gb", new List<string>{"mGBA"}},
+            {"gbc", new List<string>{"mGBA"}},
             {"gba", new List<string>{"mGBA"}},
             {"nds", new List<string>{"melonDS"}},
+            {"new-nintendo-3ds", new List<string>{"azahar"}},
             {"psx", new List<string>{"duckstation"}},
             {"ps2", new List<string>{"pcsx2"}},
             {"ps3", new List<string>{"rpcs3"}},
@@ -1333,6 +1773,11 @@ public partial class EmulatorManager : Node
             {"genesis", new List<string>{"ares"}},
             {"dc", new List<string>{"flycast"}}
         };
+    }
+
+    private void GenerateDefaultMaps()
+    {
+        var defaultPlatformToEmulatorMap = BuildDefaultEmulatorMap();
 
         try
         {
@@ -1372,6 +1817,16 @@ public partial class EmulatorManager : Node
         string configFilePath = Path.Combine(emulatorInstallDirectory, controllerConfig.ConfigFileRelativePath);
 
         GD.Print($"Applying controller mappings: {availableControllerCount} of {controllerConfig.MaxControllers} max controllers");
+
+        // If no controllers were detected, do NOT rewrite the config: several scripts ship
+        // static player-1 bindings (e.g. PCSX2, DuckStation on SDL-0) and the writers would
+        // otherwise stamp port 1 as "disconnected", wiping those bindings. Leaving the config
+        // untouched preserves whatever was shipped.
+        if (availableControllerCount == 0)
+        {
+            GD.Print("No controllers detected; leaving shipped controller config untouched.");
+            return;
+        }
 
         if (controllerConfig.Format == "ini" && controllerConfig.ControllerSections != null)
         {
