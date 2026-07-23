@@ -4,8 +4,8 @@ using System.Collections.Generic;
 
 public class MainSceneInputHandler
 {
-    private MainScene _mainScene;
-    private AppInstance _appInstance;
+    private MainScene mainScene;
+    private AppInstance appInstance;
 
     public bool isListeningForInput = false;
     public Action<string> inputListenCallback;
@@ -13,7 +13,7 @@ public class MainSceneInputHandler
     public bool isListeningForEmulatorCloseHotkeys = false;
     public int expectedEmulatorCloseHotkeysCount = 0;
     public Godot.Collections.Array collectedEmulatorCloseHotkeys = new Godot.Collections.Array();
-    private static readonly PackedScene _settingsListEntryScene = GD.Load<PackedScene>("res://scenes/settings_list/settings_list_entry.tscn");
+    private static readonly PackedScene settingsListEntryScene = GD.Load<PackedScene>("res://scenes/settings_list/settings_list_entry.tscn");
 
     public static readonly string[] StandardSdlInputs = new string[]
     {
@@ -29,24 +29,24 @@ public class MainSceneInputHandler
 
     public MainSceneInputHandler(MainScene mainScene, AppInstance appInstance)
     {
-        _mainScene = mainScene;
-        _appInstance = appInstance;
+        this.mainScene = mainScene;
+        this.appInstance = appInstance;
     }
 
     public void UpdateEmulatorCloseHotkeysBtnText()
     {
-        if (_mainScene.emulatorCloseHotkeysBtn != null)
+        if (mainScene.emulatorCloseHotkeysBtn != null)
         {
-            var currentKeys = _appInstance.configManager.EmulatorCloseHotkeys;
+            var currentKeys = appInstance.configManager.EmulatorCloseHotkeys;
             var keyNames = new List<string>();
-            for (int i = 0; i < _appInstance.configManager.EmulatorCloseHotkeyCount; i++)
+            for (int i = 0; i < appInstance.configManager.EmulatorCloseHotkeyCount; i++)
             {
                 if (i < currentKeys.Count)
                 {
                     keyNames.Add(((JoyButton)currentKeys[i].AsInt32()).ToString());
                 }
             }
-            _mainScene.emulatorCloseHotkeysBtn.Text = $"Record Hotkeys [{string.Join(", ", keyNames)}]";
+            mainScene.emulatorCloseHotkeysBtn.Text = $"Record Hotkeys [{string.Join(", ", keyNames)}]";
         }
     }
 
@@ -56,11 +56,6 @@ public class MainSceneInputHandler
         {
             switch (joyBtn.ButtonIndex)
             {
-                // Godot names the face buttons Xbox-style, but the canonical vocabulary
-                // here (StandardSdlInputs, and every emulator's sdl_string_map) is
-                // positional. JoyButton.A/B/X/Y are South/East/West/North respectively;
-                // returning "A".."Y" instead produced values no sdl_string_map contains,
-                // which resolved to empty bindings and left face buttons dead.
                 case JoyButton.A: return "FaceSouth";
                 case JoyButton.B: return "FaceEast";
                 case JoyButton.X: return "FaceWest";
@@ -122,8 +117,8 @@ public class MainSceneInputHandler
 
         int maxControllers = meta.ControllerConfig.MaxControllers > 0 ? meta.ControllerConfig.MaxControllers : 1;
 
-        var allMappings = _appInstance.configManager.PlatformInputMappings.ContainsKey(systemSlug) 
-            ? _appInstance.configManager.PlatformInputMappings[systemSlug] 
+        var allMappings = appInstance.configManager.PlatformInputMappings.ContainsKey(systemSlug)
+            ? appInstance.configManager.PlatformInputMappings[systemSlug]
             : new Dictionary<int, Dictionary<string, string>>();
 
         for (int playerIndex = 0; playerIndex < maxControllers; playerIndex++)
@@ -153,7 +148,7 @@ public class MainSceneInputHandler
                 Button mappingBtn = new Button();
                 string mappedInput = currentMappings.ContainsKey(buttonName) ? currentMappings[buttonName] : defaultSdl;
                 mappingBtn.Text = string.IsNullOrEmpty(mappedInput) ? "Unmapped" : mappedInput;
-                
+
                 mappingBtn.Pressed += () =>
                 {
                     mappingBtn.Text = "Listening...";
@@ -161,14 +156,14 @@ public class MainSceneInputHandler
                     inputListenCallback = (string detectedInput) =>
                     {
                         mappingBtn.Text = detectedInput;
-                        _appInstance.configManager.SavePlatformInputMapping(systemSlug, currentPlayerIndex, buttonName, detectedInput);
+                        appInstance.configManager.SavePlatformInputMapping(systemSlug, currentPlayerIndex, buttonName, detectedInput);
                         mappingBtn.GrabFocus();
                     };
                 };
 
                 row.AddChild(mappingBtn);
-                
-                var entry = _settingsListEntryScene.Instantiate<MarginContainer>();
+
+                var entry = settingsListEntryScene.Instantiate<MarginContainer>();
                 entry.AddChild(row);
                 playerBox.AddChild(entry);
             }

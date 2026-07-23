@@ -7,22 +7,22 @@ public partial class SettingsSectionNavEntry : MarginContainer
 
     public string SectionName { get; private set; }
     
-    private Label _label;
-    private PanelContainer _backgroundPanel;
-    private StyleBoxFlat _backgroundStyle;
+    private Label sectionNameLabel;
+    private PanelContainer backgroundPanel;
+    private StyleBoxFlat backgroundStyle;
 
     public override void _Ready()
     {
         FocusMode = FocusModeEnum.All;
         
-        _backgroundPanel = GetNode<PanelContainer>("PanelContainer");
-        _label = GetNode<Label>("PanelContainer/MarginContainer/Label");
-        if (!string.IsNullOrEmpty(SectionName)) _label.Text = SectionName;
+        backgroundPanel = GetNode<PanelContainer>("PanelContainer");
+        sectionNameLabel = GetNode<Label>("PanelContainer/MarginContainer/Label");
+        if (!string.IsNullOrEmpty(SectionName)) sectionNameLabel.Text = SectionName;
 
-        _backgroundStyle = new StyleBoxFlat();
-        _backgroundStyle.BgColor = new Color(0, 0, 0, 0);
-        _backgroundStyle.DrawCenter = false;
-        _backgroundPanel.AddThemeStyleboxOverride("panel", _backgroundStyle);
+        backgroundStyle = new StyleBoxFlat();
+        backgroundStyle.BgColor = new Color(0, 0, 0, 0);
+        backgroundStyle.DrawCenter = false;
+        backgroundPanel.AddThemeStyleboxOverride("panel", backgroundStyle);
 
         GuiInput += OnGuiInput;
         FocusEntered += OnFocusEntered;
@@ -53,24 +53,24 @@ public partial class SettingsSectionNavEntry : MarginContainer
     public void Setup(string sectionName)
     {
         SectionName = sectionName;
-        if (_label != null) _label.Text = sectionName;
+        if (sectionNameLabel != null) sectionNameLabel.Text = sectionName;
     }
 
     public void Highlight()
     {
-        if (_backgroundStyle != null)
+        if (backgroundStyle != null)
         {
-            _backgroundStyle.BgColor = new Color(1f, 1f, 1f, 0.5f);
-            _backgroundStyle.DrawCenter = true;
+            backgroundStyle.BgColor = new Color(1f, 1f, 1f, 0.5f);
+            backgroundStyle.DrawCenter = true;
         }
     }
 
     public void Unhighlight()
     {
-        if (_backgroundStyle != null)
+        if (backgroundStyle != null)
         {
-            _backgroundStyle.BgColor = new Color(0, 0, 0, 0);
-            _backgroundStyle.DrawCenter = false;
+            backgroundStyle.BgColor = new Color(0, 0, 0, 0);
+            backgroundStyle.DrawCenter = false;
         }
     }
 }

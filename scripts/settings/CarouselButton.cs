@@ -3,20 +3,20 @@ using System.Collections.Generic;
 
 public partial class CarouselButton : HBoxContainer
 {
-    private Label _label;
+    private Label valueLabel;
     public List<KeyValuePair<string, Variant>> Options = new List<KeyValuePair<string, Variant>>();
     
     public int Selected { get; private set; } = -1;
     public int ItemCount => Options.Count;
     
-    private bool _disabled = false;
+    private bool disabled = false;
     public bool Disabled 
     { 
-        get => _disabled; 
+        get => disabled; 
         set 
         { 
-            _disabled = value;
-            Modulate = _disabled ? new Color(1, 1, 1, 0.5f) : new Color(1, 1, 1, 1);
+            disabled = value;
+            Modulate = disabled ? new Color(1, 1, 1, 0.5f) : new Color(1, 1, 1, 1);
         } 
     }
 
@@ -33,11 +33,11 @@ public partial class CarouselButton : HBoxContainer
         leftArrow.AddThemeFontSizeOverride("font_size", 20);
         AddChild(leftArrow);
 
-        _label = new Label();
-        _label.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        _label.HorizontalAlignment = HorizontalAlignment.Center;
-        _label.AddThemeFontSizeOverride("font_size", 20);
-        AddChild(_label);
+        valueLabel = new Label();
+        valueLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        valueLabel.HorizontalAlignment = HorizontalAlignment.Center;
+        valueLabel.AddThemeFontSizeOverride("font_size", 20);
+        AddChild(valueLabel);
 
         var rightArrow = new Label();
         rightArrow.Text = " >";
@@ -85,9 +85,9 @@ public partial class CarouselButton : HBoxContainer
         if (index >= 0 && index < Options.Count)
         {
             Selected = index;
-            if (_label != null)
+            if (valueLabel != null)
             {
-                _label.Text = Options[index].Key;
+                valueLabel.Text = Options[index].Key;
             }
         }
     }

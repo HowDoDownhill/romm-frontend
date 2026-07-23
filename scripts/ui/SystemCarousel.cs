@@ -3,11 +3,11 @@ using System.Collections.Generic;
 
 public partial class SystemCarousel : HBoxContainer
 {
-    [Export] private Label _leftArrow;
-    [Export] private TextureRect _systemIcon;
-    [Export] private Label _systemLabel;
-    [Export] private Label _rightArrow;
-    [Export] private Timer _debounceTimer;
+    [Export] private Label leftArrow;
+    [Export] private TextureRect systemIcon;
+    [Export] private Label systemLabel;
+    [Export] private Label rightArrow;
+    [Export] private Timer debounceTimer;
 
     public List<GameSystem> Systems { get; private set; } = new List<GameSystem>();
     public int SelectedIndex { get; private set; } = -1;
@@ -18,22 +18,20 @@ public partial class SystemCarousel : HBoxContainer
     [Signal]
     public delegate void JumpRequestedEventHandler();
 
-    // Emitted when the user cycles systems via the arrows, so the list can fade out immediately
-    // (matching the controller bumper) rather than waiting for the debounce to settle.
     [Signal]
     public delegate void CycledEventHandler();
 
     public override void _Ready()
     {
-        if (_debounceTimer != null)
+        if (debounceTimer != null)
         {
-            _debounceTimer.Timeout += OnDebounceTimerTimeout;
+            debounceTimer.Timeout += OnDebounceTimerTimeout;
         }
 
-        MakeClickable(_leftArrow, ev => HandleArrowClick(ev, false));
-        MakeClickable(_rightArrow, ev => HandleArrowClick(ev, true));
-        MakeClickable(_systemIcon, HandleLogoClick);
-        MakeClickable(_systemLabel, HandleLogoClick);
+        MakeClickable(leftArrow, ev => HandleArrowClick(ev, false));
+        MakeClickable(rightArrow, ev => HandleArrowClick(ev, true));
+        MakeClickable(systemIcon, HandleLogoClick);
+        MakeClickable(systemLabel, HandleLogoClick);
     }
 
     private void MakeClickable(Control control, Control.GuiInputEventHandler onGuiInput)
@@ -101,7 +99,7 @@ public partial class SystemCarousel : HBoxContainer
         {
             SelectedIndex = index;
             UpdateVisuals();
-            _debounceTimer.Stop(); // Cancel any pending timers since we are setting silently
+            debounceTimer.Stop();
         }
     }
 
@@ -111,23 +109,23 @@ public partial class SystemCarousel : HBoxContainer
         {
             SelectedIndex = index;
             UpdateVisuals();
-            _debounceTimer.Start();
+            debounceTimer.Start();
         }
     }
 
     public void UpdateVisuals()
     {
         if (SelectedIndex < 0 || SelectedIndex >= Systems.Count) return;
-        
+
         var system = Systems[SelectedIndex];
-        _systemLabel.Text = system.Name;
-        
+        systemLabel.Text = system.Name;
+
         Texture2D texture = null;
         if (!string.IsNullOrEmpty(system.IgdbSlug))
         {
             texture = FindPlatformIcon(system.IgdbSlug, "res://assets/platforms/titles/", new[] { ".svg", ".png" });
         }
-        
+
         if (texture == null && !string.IsNullOrEmpty(system.Slug))
         {
             texture = FindPlatformIcon(system.Slug, "res://assets/platforms/titles/", new[] { ".svg", ".png" });
@@ -135,17 +133,17 @@ public partial class SystemCarousel : HBoxContainer
 
         if (texture != null)
         {
-            _systemIcon.Texture = texture;
-            _systemIcon.Visible = true;
-            _systemLabel.Text = "";
-            _systemLabel.Visible = false;
+            systemIcon.Texture = texture;
+            systemIcon.Visible = true;
+            systemLabel.Text = "";
+            systemLabel.Visible = false;
         }
         else
         {
-            _systemIcon.Texture = null;
-            _systemIcon.Visible = false;
-            _systemLabel.Text = system.Name;
-            _systemLabel.Visible = true;
+            systemIcon.Texture = null;
+            systemIcon.Visible = false;
+            systemLabel.Text = system.Name;
+            systemLabel.Visible = true;
         }
     }
 
@@ -169,18 +167,18 @@ public partial class SystemCarousel : HBoxContainer
 
     public void SetOverrideText(string text)
     {
-        _debounceTimer.Stop();
-        _leftArrow.Visible = false;
-        _rightArrow.Visible = false;
-        _systemIcon.Visible = false;
-        _systemLabel.Text = text;
-        _systemLabel.Visible = true;
+        debounceTimer.Stop();
+        leftArrow.Visible = false;
+        rightArrow.Visible = false;
+        systemIcon.Visible = false;
+        systemLabel.Text = text;
+        systemLabel.Visible = true;
     }
 
     public void ClearOverride()
     {
-        _leftArrow.Visible = true;
-        _rightArrow.Visible = true;
+        leftArrow.Visible = true;
+        rightArrow.Visible = true;
         UpdateVisuals();
     }
 }

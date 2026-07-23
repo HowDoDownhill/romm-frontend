@@ -59,7 +59,7 @@ public class SyncOperationSchema
     public int RomId { get; set; }
 
     [JsonPropertyName("action")]
-    public string Action { get; set; } // "upload", "download", "conflict", "no_op"
+    public string Action { get; set; }
 
     [JsonPropertyName("file_name")]
     public string FileName { get; set; }

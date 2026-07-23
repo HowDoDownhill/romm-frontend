@@ -5,15 +5,15 @@ using System.Linq;
 
 public partial class MainSceneGameListHandler
 {
-    private MainScene _mainScene;
-    private AppInstance _appInstance;
+    private MainScene mainScene;
+    private AppInstance appInstance;
 
     public List<GameSystem> gameSystems = new List<GameSystem>();
     public Dictionary<int, List<Game>> games { get; set; } = new Dictionary<int, List<Game>>();
     public List<Game> currentlyShownGames = null;
     public bool showOnlyInstalledGames = false;
     public int currentGameSystemIndex;
-    public Game currentlySelectedGame; 
+    public Game currentlySelectedGame;
     public bool isTransitioningSystem = false;
     public bool IsFilterTransitioning { get; private set; } = false;
     private bool preFadedForQuickSwitch = false;
@@ -23,10 +23,10 @@ public partial class MainSceneGameListHandler
 
     public MainSceneGameListHandler(MainScene mainScene, AppInstance appInstance)
     {
-        _mainScene = mainScene;
-        _appInstance = appInstance;
-        _appInstance.downloadManager.DownloadProgressUpdated += OnDownloadProgressUpdated;
-        _appInstance.assetManager.AssetDownloaded += OnAssetDownloaded;
+        this.mainScene = mainScene;
+        this.appInstance = appInstance;
+        appInstance.downloadManager.DownloadProgressUpdated += OnDownloadProgressUpdated;
+        appInstance.assetManager.AssetDownloaded += OnAssetDownloaded;
     }
 
     private void OnAssetDownloaded(int gameId, string assetType)
@@ -42,25 +42,22 @@ public partial class MainSceneGameListHandler
         }
     }
 
-    // Immediately fades the current system's content out when the user starts thumbing through
-    // systems with the bumpers, so the stale list doesn't linger until the debounce settles.
-    // TransitionToSystem then skips its own fade-out and only swaps + fades the new system in.
     public void BeginQuickSwitchFade()
     {
-        if (_mainScene.gameList == null) return;
+        if (mainScene.gameList == null) return;
         if (isTransitioningSystem || preFadedForQuickSwitch) return;
 
         preFadedForQuickSwitch = true;
 
         float duration = 0.15f;
 
-        Tween fadeOutTween = _mainScene.CreateTween();
-        Color glColorOut = _mainScene.gameList.Modulate; glColorOut.A = 0.0f;
-        fadeOutTween.TweenProperty(_mainScene.gameList, "modulate", glColorOut, duration);
-        if (_mainScene.detailsPanelContainer != null)
+        Tween fadeOutTween = mainScene.CreateTween();
+        Color glColorOut = mainScene.gameList.Modulate; glColorOut.A = 0.0f;
+        fadeOutTween.TweenProperty(mainScene.gameList, "modulate", glColorOut, duration);
+        if (mainScene.detailsPanelContainer != null)
         {
-            Color dpcColorOut = _mainScene.detailsPanelContainer.Modulate; dpcColorOut.A = 0.0f;
-            fadeOutTween.Parallel().TweenProperty(_mainScene.detailsPanelContainer, "modulate", dpcColorOut, duration);
+            Color dpcColorOut = mainScene.detailsPanelContainer.Modulate; dpcColorOut.A = 0.0f;
+            fadeOutTween.Parallel().TweenProperty(mainScene.detailsPanelContainer, "modulate", dpcColorOut, duration);
         }
     }
 
@@ -72,60 +69,51 @@ public partial class MainSceneGameListHandler
         }
 
         isTransitioningSystem = true;
-        
+
         float duration = 0.2f;
 
-        // Skip the fade-out when quick-switching already faded the content out.
         if (!preFadedForQuickSwitch)
         {
-        Tween fadeOutTween = _mainScene.CreateTween();
+        Tween fadeOutTween = mainScene.CreateTween();
 
-        Color glColorOut = _mainScene.gameList.Modulate; glColorOut.A = 0.0f;
-        fadeOutTween.TweenProperty(_mainScene.gameList, "modulate", glColorOut, duration);
+        Color glColorOut = mainScene.gameList.Modulate; glColorOut.A = 0.0f;
+        fadeOutTween.TweenProperty(mainScene.gameList, "modulate", glColorOut, duration);
 
-
-
-        if (_mainScene.detailsPanelContainer != null) {
-            Color dpcColorOut = _mainScene.detailsPanelContainer.Modulate; dpcColorOut.A = 0.0f;
-            fadeOutTween.Parallel().TweenProperty(_mainScene.detailsPanelContainer, "modulate", dpcColorOut, duration);
+        if (mainScene.detailsPanelContainer != null) {
+            Color dpcColorOut = mainScene.detailsPanelContainer.Modulate; dpcColorOut.A = 0.0f;
+            fadeOutTween.Parallel().TweenProperty(mainScene.detailsPanelContainer, "modulate", dpcColorOut, duration);
         }
 
-        await _mainScene.ToSignal(fadeOutTween, Tween.SignalName.Finished);
+        await mainScene.ToSignal(fadeOutTween, Tween.SignalName.Finished);
         }
 
         preFadedForQuickSwitch = false;
 
-        var glModOut = _mainScene.gameList.Modulate; glModOut.A = 0.0f; _mainScene.gameList.Modulate = glModOut;
+        var glModOut = mainScene.gameList.Modulate; glModOut.A = 0.0f; mainScene.gameList.Modulate = glModOut;
 
-
-
-        if (_mainScene.detailsPanelContainer != null) { var dpcMod = _mainScene.detailsPanelContainer.Modulate; dpcMod.A = 0.0f; _mainScene.detailsPanelContainer.Modulate = dpcMod; }
+        if (mainScene.detailsPanelContainer != null) { var dpcMod = mainScene.detailsPanelContainer.Modulate; dpcMod.A = 0.0f; mainScene.detailsPanelContainer.Modulate = dpcMod; }
 
         DoSelectSystemByIndex(targetIndex);
 
-        await _mainScene.ToSignal(_mainScene.GetTree(), "process_frame");
-        await _mainScene.ToSignal(_mainScene.GetTree(), "process_frame"); // Two frames for good measure
+        await mainScene.ToSignal(mainScene.GetTree(), "process_frame");
+        await mainScene.ToSignal(mainScene.GetTree(), "process_frame");
 
-        Tween fadeInTween = _mainScene.CreateTween();
-        
-        Color glColorIn = _mainScene.gameList.Modulate; glColorIn.A = 1.0f;
-        fadeInTween.TweenProperty(_mainScene.gameList, "modulate", glColorIn, duration);
-        
+        Tween fadeInTween = mainScene.CreateTween();
 
+        Color glColorIn = mainScene.gameList.Modulate; glColorIn.A = 1.0f;
+        fadeInTween.TweenProperty(mainScene.gameList, "modulate", glColorIn, duration);
 
-        if (_mainScene.detailsPanelContainer != null) {
-            Color dpcColorIn = _mainScene.detailsPanelContainer.Modulate; dpcColorIn.A = 1.0f;
-            fadeInTween.Parallel().TweenProperty(_mainScene.detailsPanelContainer, "modulate", dpcColorIn, duration);
+        if (mainScene.detailsPanelContainer != null) {
+            Color dpcColorIn = mainScene.detailsPanelContainer.Modulate; dpcColorIn.A = 1.0f;
+            fadeInTween.Parallel().TweenProperty(mainScene.detailsPanelContainer, "modulate", dpcColorIn, duration);
         }
 
-        await _mainScene.ToSignal(fadeInTween, Tween.SignalName.Finished);
+        await mainScene.ToSignal(fadeInTween, Tween.SignalName.Finished);
 
-        var glModIn = _mainScene.gameList.Modulate; glModIn.A = 1.0f; _mainScene.gameList.Modulate = glModIn;
+        var glModIn = mainScene.gameList.Modulate; glModIn.A = 1.0f; mainScene.gameList.Modulate = glModIn;
 
+        if (mainScene.detailsPanelContainer != null) { var dpcMod = mainScene.detailsPanelContainer.Modulate; dpcMod.A = 1.0f; mainScene.detailsPanelContainer.Modulate = dpcMod; }
 
-
-        if (_mainScene.detailsPanelContainer != null) { var dpcMod = _mainScene.detailsPanelContainer.Modulate; dpcMod.A = 1.0f; _mainScene.detailsPanelContainer.Modulate = dpcMod; }
-        
         isTransitioningSystem = false;
     }
 
@@ -136,19 +124,18 @@ public partial class MainSceneGameListHandler
             return;
         }
 
-        if (index == currentGameSystemIndex) 
+        if (index == currentGameSystemIndex)
         {
-            // Just initialize if it's the first run and systems aren't populated yet
             if (currentlyShownGames == null)
             {
                 DoSelectSystemByIndex(index);
             }
             return;
         }
-        
+
         TransitionToSystem(index);
     }
-    
+
     private void DoSelectSystemByIndex(int index)
     {
         if (index < 0 || index >= gameSystems.Count)
@@ -159,13 +146,11 @@ public partial class MainSceneGameListHandler
         currentGameSystemIndex = index;
         var selectedSystem = gameSystems[index];
 
-        _mainScene.UpdateHeaderLabel();
+        mainScene.UpdateHeaderLabel();
 
-        // The "Match System" theme is derived from the selected platform, so it has to be re-applied
-        // whenever that changes. Static themes ignore this.
-        if (ConfigManager.IsSystemTheme(_appInstance.configManager.AppTheme))
+        if (ConfigManager.IsSystemTheme(appInstance.configManager.AppTheme))
         {
-            _mainScene.ApplyTheme();
+            mainScene.ApplyTheme();
         }
 
         OnSystemSelected(selectedSystem);
@@ -185,10 +170,10 @@ public partial class MainSceneGameListHandler
 
         return null;
     }
-    
+
     public void OnSystemSelected(GameSystem system)
     {
-        if (_mainScene.gameList == null)
+        if (mainScene.gameList == null)
         {
             return;
         }
@@ -201,20 +186,20 @@ public partial class MainSceneGameListHandler
         {
             OnGameSelected(0L);
 
-            if (_mainScene.downloadsListContainer != null && !_mainScene.downloadsListContainer.Visible && 
-                (_mainScene.settingsMenuContainer == null || !_mainScene.settingsMenuContainer.Visible))
+            if (mainScene.downloadsListContainer != null && !mainScene.downloadsListContainer.Visible &&
+                (mainScene.settingsMenuContainer == null || !mainScene.settingsMenuContainer.Visible))
             {
-                _mainScene.gameList.GrabFocus();
+                mainScene.gameList.GrabFocus();
             }
-        
-            _mainScene.UpdateHeaderLabel();
+
+            mainScene.UpdateHeaderLabel();
         }
         else
         {
             GD.Print($"No games found in cache for system {system.Name}");
         }
     }
-    
+
     public void ApplyFiltersAndRefresh()
     {
         if (currentGameSystemIndex < 0 || currentGameSystemIndex >= gameSystems.Count)
@@ -223,10 +208,10 @@ public partial class MainSceneGameListHandler
         }
 
         var system = gameSystems[currentGameSystemIndex];
-        
+
         if (games.TryGetValue(system.Id, out List<Game> cachedGames))
         {
-            if (_appInstance.configManager.HideGamesWithoutBoxArt)
+            if (appInstance.configManager.HideGamesWithoutBoxArt)
             {
                 currentlyShownGames = cachedGames.Where(g => !string.IsNullOrEmpty(g.PathCover3d) || !string.IsNullOrEmpty(g.PathCoverLarge) || !string.IsNullOrEmpty(g.CoverArtUrl)).ToList();
             }
@@ -249,11 +234,9 @@ public partial class MainSceneGameListHandler
         }
     }
 
-    // Fades the game list (and details panel) out, re-applies the filter, then fades back in.
-    // Used when toggling between "All Games" and "Installed" so the list swap isn't a hard cut.
     public async void ApplyFiltersWithFade()
     {
-        if (_mainScene.gameList == null)
+        if (mainScene.gameList == null)
         {
             ApplyFiltersAndRefresh();
             return;
@@ -262,47 +245,40 @@ public partial class MainSceneGameListHandler
         IsFilterTransitioning = true;
         float duration = 0.15f;
 
-        Tween fadeOut = _mainScene.CreateTween();
-        Color glOut = _mainScene.gameList.Modulate; glOut.A = 0.0f;
-        fadeOut.TweenProperty(_mainScene.gameList, "modulate", glOut, duration);
-        if (_mainScene.detailsPanelContainer != null)
+        Tween fadeOut = mainScene.CreateTween();
+        Color glOut = mainScene.gameList.Modulate; glOut.A = 0.0f;
+        fadeOut.TweenProperty(mainScene.gameList, "modulate", glOut, duration);
+        if (mainScene.detailsPanelContainer != null)
         {
-            Color dpcOut = _mainScene.detailsPanelContainer.Modulate; dpcOut.A = 0.0f;
-            fadeOut.Parallel().TweenProperty(_mainScene.detailsPanelContainer, "modulate", dpcOut, duration);
+            Color dpcOut = mainScene.detailsPanelContainer.Modulate; dpcOut.A = 0.0f;
+            fadeOut.Parallel().TweenProperty(mainScene.detailsPanelContainer, "modulate", dpcOut, duration);
         }
-        await _mainScene.ToSignal(fadeOut, Tween.SignalName.Finished);
+        await mainScene.ToSignal(fadeOut, Tween.SignalName.Finished);
 
         ApplyFiltersAndRefresh();
 
-        await _mainScene.ToSignal(_mainScene.GetTree(), "process_frame");
-        await _mainScene.ToSignal(_mainScene.GetTree(), "process_frame");
+        await mainScene.ToSignal(mainScene.GetTree(), "process_frame");
+        await mainScene.ToSignal(mainScene.GetTree(), "process_frame");
 
-        Tween fadeIn = _mainScene.CreateTween();
-        Color glIn = _mainScene.gameList.Modulate; glIn.A = 1.0f;
-        fadeIn.TweenProperty(_mainScene.gameList, "modulate", glIn, duration);
-        if (_mainScene.detailsPanelContainer != null)
+        Tween fadeIn = mainScene.CreateTween();
+        Color glIn = mainScene.gameList.Modulate; glIn.A = 1.0f;
+        fadeIn.TweenProperty(mainScene.gameList, "modulate", glIn, duration);
+        if (mainScene.detailsPanelContainer != null)
         {
-            Color dpcIn = _mainScene.detailsPanelContainer.Modulate; dpcIn.A = 1.0f;
-            fadeIn.Parallel().TweenProperty(_mainScene.detailsPanelContainer, "modulate", dpcIn, duration);
+            Color dpcIn = mainScene.detailsPanelContainer.Modulate; dpcIn.A = 1.0f;
+            fadeIn.Parallel().TweenProperty(mainScene.detailsPanelContainer, "modulate", dpcIn, duration);
         }
-        await _mainScene.ToSignal(fadeIn, Tween.SignalName.Finished);
+        await mainScene.ToSignal(fadeIn, Tween.SignalName.Finished);
 
-        _mainScene.gameList.Modulate = new Color(_mainScene.gameList.Modulate, 1.0f);
-        if (_mainScene.detailsPanelContainer != null)
+        mainScene.gameList.Modulate = new Color(mainScene.gameList.Modulate, 1.0f);
+        if (mainScene.detailsPanelContainer != null)
         {
-            _mainScene.detailsPanelContainer.Modulate = new Color(_mainScene.detailsPanelContainer.Modulate, 1.0f);
+            mainScene.detailsPanelContainer.Modulate = new Color(mainScene.detailsPanelContainer.Modulate, 1.0f);
         }
 
         IsFilterTransitioning = false;
     }
 
-    // Cover art is decoded on the main thread at roughly 5ms per entry. The carousel reveals ~25
-    // entries at once when a list is built, which stalled the frame for ~130ms right between the
-    // fade-out and fade-in of a system switch. Loads are spread over frames instead; each entry
-    // keeps its placeholder until its turn comes.
-    // Budgeted by time rather than by a fixed count: a single cover decode measured ~5ms here but
-    // varies with image size and disk, and a fixed count would blow the frame budget on slower
-    // machines. One load always runs so the queue cannot stall.
     private const double ImageLoadBudgetMs = 4.0;
     private readonly List<GameCard> pendingImageLoads = new List<GameCard>();
     private readonly Dictionary<GameCard, Action> imageLoaders = new Dictionary<GameCard, Action>();
@@ -316,7 +292,6 @@ public partial class MainSceneGameListHandler
         pendingImageLoads.Add(entry);
     }
 
-    // Driven from MainScene._Process.
     public void ProcessPendingImageLoads()
     {
         var frameBudget = System.Diagnostics.Stopwatch.StartNew();
@@ -341,17 +316,8 @@ public partial class MainSceneGameListHandler
         }
     }
 
-    // Picks the highest card on screen rather than the oldest request, so the list fills downward
-    // instead of outward from the selected game.
-    //
-    // Ordering has to happen here rather than at request time for two reasons: the carousel queues
-    // entries in child-index order, which is unrelated to vertical position, and it assigns each
-    // child's Position *after* flipping Visible -- so at the moment a load is requested the card
-    // has not been placed yet.
     private GameCard TakeTopmostPending()
     {
-        // Entries freed by a rebuild, or scrolled back out of the preload window before their turn
-        // came up, are dropped without spending any of the frame budget.
         pendingImageLoads.RemoveAll(candidate => !GodotObject.IsInstanceValid(candidate) || !candidate.Visible);
 
         if (pendingImageLoads.Count == 0)
@@ -375,22 +341,19 @@ public partial class MainSceneGameListHandler
 
     public void RefreshGameList()
     {
-        if (_mainScene.gameList == null)
+        if (mainScene.gameList == null)
         {
             return;
         }
 
-        // Drop any pending asset downloads from the previous list; the new visible entries will
-        // re-request what they need. Prevents stale-system art blocking the incoming system's art.
-        _appInstance.assetManager.ClearPendingAssetDownloads();
+        appInstance.assetManager.ClearPendingAssetDownloads();
 
-        // The entries these referred to are about to be freed.
         pendingImageLoads.Clear();
         imageLoaders.Clear();
 
-        foreach (Node child in _mainScene.gameList.GetChildren())
+        foreach (Node child in mainScene.gameList.GetChildren())
         {
-            _mainScene.gameList.RemoveChild(child);
+            mainScene.gameList.RemoveChild(child);
             child.QueueFree();
         }
 
@@ -409,18 +372,16 @@ public partial class MainSceneGameListHandler
         for (int i = 0; i < currentlyShownGames.Count; i++)
         {
             var game = currentlyShownGames[i];
-            
-            if (_mainScene.gameListEntryScene == null)
+
+            if (mainScene.gameListEntryScene == null)
             {
                 continue;
             }
 
-            // The focus border, fallback title and installed marker are part of the card scene now,
-            // so building an entry is just assigning content.
-            GameCard entry = _mainScene.gameListEntryScene.Instantiate<GameCard>();
+            GameCard entry = mainScene.gameListEntryScene.Instantiate<GameCard>();
             entry.FocusMode = Control.FocusModeEnum.All;
             entry.Title = game.Name;
-            entry.SetCover(_mainScene.placeholderTexture, true);
+            entry.SetCover(mainScene.placeholderTexture, true);
 
             bool textureLoaded = false;
 
@@ -428,15 +389,12 @@ public partial class MainSceneGameListHandler
             {
                 if (textureLoaded) return;
 
-                string assetsPath = _appInstance.configManager.AssetsPath;
+                string assetsPath = appInstance.configManager.AssetsPath;
                 string path3d = System.IO.Path.Combine(assetsPath, "covers_3d", $"{game.Id}.png");
                 string path2d = System.IO.Path.Combine(assetsPath, "covers_2d", $"{game.Id}.png");
 
                 ImageTexture loadedTex = SafeLoadTexture(path2d) ?? SafeLoadTexture(path3d);
 
-                // Probe the fallback extensions only once the 2d/3d covers have missed. These three
-                // FileExists calls used to run for every entry, including the common case where a
-                // 2d cover exists and the result was thrown away.
                 if (loadedTex == null)
                 {
                     foreach (var ext in new[] { ".png", ".jpg", ".webp" })
@@ -457,33 +415,29 @@ public partial class MainSceneGameListHandler
                 }
                 else
                 {
-                    _appInstance.assetManager.RequestGameAssets(game);
+                    appInstance.assetManager.RequestGameAssets(game);
                 }
 
                 entry.SetInstalledIcon(CheckIfGameIsDownloaded(game) ? systemControllerIcon : null);
 
-                // Reveal on the attempt, not on success: a game with no art anywhere would never
-                // reach a successful load and its card would stay invisible for good.
                 entry.Reveal();
 
-                if (textureLoaded && _mainScene.gameList.HasMethod("UpdateLayout"))
+                if (textureLoaded && mainScene.gameList.HasMethod("UpdateLayout"))
                 {
-                    bool isAnimating = (bool)_mainScene.gameList.Get("IsAnimating");
+                    bool isAnimating = (bool)mainScene.gameList.Get("IsAnimating");
                     if (!isAnimating)
                     {
-                        _mainScene.gameList.CallDeferred("UpdateLayout", false);
+                        mainScene.gameList.CallDeferred("UpdateLayout", false);
                     }
                 }
             }
 
             void TryUnloadImage()
             {
-                // Prune this game's not-yet-started asset downloads now that it's off screen, so a
-                // fast scroll doesn't leave a long backlog of art for games nobody's looking at.
-                _appInstance.assetManager.CancelGameAssets(game.Id);
+                appInstance.assetManager.CancelGameAssets(game.Id);
 
                 if (!textureLoaded) return;
-                entry.SetCover(_mainScene.placeholderTexture, true);
+                entry.SetCover(mainScene.placeholderTexture, true);
                 textureLoaded = false;
             }
 
@@ -501,25 +455,22 @@ public partial class MainSceneGameListHandler
                 if (downloadedGameId == game.Id && (assetType == "box3d" || assetType == "box2d"))
                 {
                     textureLoaded = false;
-                    // The popup refresh now happens inside TryLoadImage once the texture actually
-                    // exists; refreshing here would snapshot the placeholder, since the load is
-                    // only queued at this point rather than performed.
                     if (entry.Visible) RequestImageLoad(entry);
                 }
             };
-            _appInstance.assetManager.AssetDownloaded += onAssetDownloaded;
+            appInstance.assetManager.AssetDownloaded += onAssetDownloaded;
 
             entry.TreeExiting += () =>
             {
-                _appInstance.assetManager.AssetDownloaded -= onAssetDownloaded;
-                _appInstance.assetManager.CancelGameAssets(game.Id);
+                appInstance.assetManager.AssetDownloaded -= onAssetDownloaded;
+                appInstance.assetManager.CancelGameAssets(game.Id);
                 imageLoaders.Remove(entry);
             };
 
-            _mainScene.gameList.AddChild(entry);
+            mainScene.gameList.AddChild(entry);
         }
 
-        if (_mainScene.gameList.HasMethod("Refresh"))
+        if (mainScene.gameList.HasMethod("Refresh"))
         {
             int targetIndex = 0;
             if (currentlySelectedGame != null)
@@ -528,13 +479,13 @@ public partial class MainSceneGameListHandler
                 if (targetIndex == -1) targetIndex = 0;
             }
 
-            _mainScene.gameList.Set("SelectedIndex", targetIndex);
-            _mainScene.gameList.Call("Refresh");
+            mainScene.gameList.Set("SelectedIndex", targetIndex);
+            mainScene.gameList.Call("Refresh");
         }
 
-        if (_mainScene.detailsPanelContainer != null)
+        if (mainScene.detailsPanelContainer != null)
         {
-            _mainScene.detailsPanelContainer.Visible = currentlyShownGames.Count > 0;
+            mainScene.detailsPanelContainer.Visible = currentlyShownGames.Count > 0;
         }
     }
 
@@ -546,7 +497,7 @@ public partial class MainSceneGameListHandler
         }
 
         string fileName = game.Files[0].FileName;
-        string fullPath = _appInstance.configManager.RomsPath.PathJoin(game.System.Slug).PathJoin(fileName);
+        string fullPath = appInstance.configManager.RomsPath.PathJoin(game.System.Slug).PathJoin(fileName);
         return Godot.FileAccess.FileExists(fullPath);
     }
 
@@ -560,11 +511,11 @@ public partial class MainSceneGameListHandler
         currentlySelectedGame = currentlyShownGames[(int)index];
         ShowGameDetails(currentlySelectedGame);
 
-        await _mainScene.ToSignal(_mainScene.GetTree(), "process_frame");
+        await mainScene.ToSignal(mainScene.GetTree(), "process_frame");
 
-        if (_mainScene.gameList != null)
+        if (mainScene.gameList != null)
         {
-            var children = _mainScene.gameList.GetChildren();
+            var children = mainScene.gameList.GetChildren();
             for (int i = 0; i < children.Count; i++)
             {
                 var entry = children[i] as GameCard;
@@ -573,7 +524,6 @@ public partial class MainSceneGameListHandler
                     continue;
                 }
 
-                // Selection is now just a state on the card itself.
                 entry.Selected = (i == (int)index);
             }
         }
@@ -581,9 +531,9 @@ public partial class MainSceneGameListHandler
 
     public void ShowGameDetails(Game game)
     {
-        _appInstance.assetManager.RequestGameAssets(game);
-        
-        if (_mainScene.detailsPanelContainer == null)
+        appInstance.assetManager.RequestGameAssets(game);
+
+        if (mainScene.detailsPanelContainer == null)
         {
             return;
         }
@@ -593,56 +543,55 @@ public partial class MainSceneGameListHandler
 
     private void UpdateGameDetailsUI(Game game)
     {
-        if (_mainScene.gameTitle != null) 
+        if (mainScene.gameTitle != null)
         {
-            _mainScene.gameTitle.Text = game.Name;
-            _mainScene.gameTitle.Visible = true;
+            mainScene.gameTitle.Text = game.Name;
+            mainScene.gameTitle.Visible = true;
         }
 
-        if (_mainScene.gameDescription != null)
+        if (mainScene.gameDescription != null)
         {
-            _mainScene.gameDescription.Text = game.Description;
+            mainScene.gameDescription.Text = game.Description;
 
-            var descScroller = _mainScene.gameDescription.GetNodeOrNull<AutoScrollHelper>("AutoScrollHelper");
+            var descScroller = mainScene.gameDescription.GetNodeOrNull<AutoScrollHelper>("AutoScrollHelper");
             if (descScroller == null)
             {
                 descScroller = new AutoScrollHelper {
-                    RichText = _mainScene.gameDescription,
+                    RichText = mainScene.gameDescription,
                     IsVertical = true,
                     ScrollSpeed = 10f,
                     StartDelay = 5f,
                     Name = "AutoScrollHelper"
                 };
-                _mainScene.gameDescription.AddChild(descScroller);
+                mainScene.gameDescription.AddChild(descScroller);
             }
-            // Start each newly selected game from the top and wait before scrolling.
             descScroller.Restart();
         }
 
-        if (_mainScene.gameMarquee != null)
+        if (mainScene.gameMarquee != null)
         {
-            _mainScene.gameMarquee.Visible = false;
-            string assetsPath = _appInstance.configManager.AssetsPath;
+            mainScene.gameMarquee.Visible = false;
+            string assetsPath = appInstance.configManager.AssetsPath;
             string pathMarquee = System.IO.Path.Combine(assetsPath, "marquees", $"{game.Id}.png");
-            
+
             ImageTexture marqueeTex = SafeLoadTexture(pathMarquee);
 
             if (marqueeTex != null)
             {
-                _mainScene.gameMarquee.Texture = marqueeTex;
-                _mainScene.gameMarquee.Visible = true;
+                mainScene.gameMarquee.Texture = marqueeTex;
+                mainScene.gameMarquee.Visible = true;
 
-                if (_mainScene.gameTitle != null) _mainScene.gameTitle.Visible = false;
+                if (mainScene.gameTitle != null) mainScene.gameTitle.Visible = false;
             }
             else
             {
-                if (_mainScene.gameTitle != null) _mainScene.gameTitle.Visible = true;
+                if (mainScene.gameTitle != null) mainScene.gameTitle.Visible = true;
             }
         }
 
-        if (_mainScene.gameCover != null)
+        if (mainScene.gameCover != null)
         {
-            string assetsPath = _appInstance.configManager.AssetsPath;
+            string assetsPath = appInstance.configManager.AssetsPath;
             string path3d = System.IO.Path.Combine(assetsPath, "covers_3d", $"{game.Id}.png");
             string path2d = System.IO.Path.Combine(assetsPath, "covers_2d", $"{game.Id}.png");
             string pathFallback = "";
@@ -663,32 +612,30 @@ public partial class MainSceneGameListHandler
             if (loadedTex == null && !string.IsNullOrEmpty(path3d)) loadedTex = SafeLoadTexture(path3d);
             if (loadedTex == null && !string.IsNullOrEmpty(pathFallback)) loadedTex = SafeLoadTexture(pathFallback);
 
-            _mainScene.gameCover.Texture = loadedTex;
+            mainScene.gameCover.Texture = loadedTex;
         }
 
-        if (_mainScene.gameScreenshotsScroll != null && !_mainScene.gameScreenshotsScroll.HasNode("AutoScrollHelper"))
+        if (mainScene.gameScreenshotsScroll != null && !mainScene.gameScreenshotsScroll.HasNode("AutoScrollHelper"))
         {
-            var autoScroller = new AutoScrollHelper { ScrollContainer = _mainScene.gameScreenshotsScroll, Name = "AutoScrollHelper" };
-            _mainScene.gameScreenshotsScroll.AddChild(autoScroller);
+            var autoScroller = new AutoScrollHelper { ScrollContainer = mainScene.gameScreenshotsScroll, Name = "AutoScrollHelper" };
+            mainScene.gameScreenshotsScroll.AddChild(autoScroller);
         }
 
-        if (_mainScene.gameScreenshotsFlow != null)
+        if (mainScene.gameScreenshotsFlow != null)
         {
-            foreach(Node child in _mainScene.gameScreenshotsFlow.GetChildren()) 
+            foreach(Node child in mainScene.gameScreenshotsFlow.GetChildren())
             {
-                _mainScene.gameScreenshotsFlow.RemoveChild(child);
+                mainScene.gameScreenshotsFlow.RemoveChild(child);
                 child.QueueFree();
             }
         }
 
-        string currentAssetsPath = _appInstance.configManager.AssetsPath;
+        string currentAssetsPath = appInstance.configManager.AssetsPath;
 
         void AddToFlow(string path)
         {
-            if (_mainScene.gameScreenshotsFlow != null)
+            if (mainScene.gameScreenshotsFlow != null)
             {
-                // Load by content, not extension, and stay silent when there's no usable image —
-                // a missing or mislabeled asset is normal, not an error worth logging.
                 var image = SafeLoadImage(path);
 
                 if (image == null || image.GetWidth() == 0 || image.GetHeight() == 0)
@@ -698,21 +645,19 @@ public partial class MainSceneGameListHandler
 
                 float ratio = (float)image.GetWidth() / image.GetHeight();
                 var tex = ImageTexture.CreateFromImage(image);
-                
-                // We manually compute the height to maintain aspect ratio based on a fixed width.
-                // This guarantees the GridContainer knows exactly how tall each image should be.
+
                 float targetWidth = 115.0f;
                 float targetHeight = targetWidth / ratio;
 
-                var texRect = new TextureRect { 
-                    Texture = tex, 
-                    ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, 
+                var texRect = new TextureRect {
+                    Texture = tex,
+                    ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
                     StretchMode = TextureRect.StretchModeEnum.Scale,
                     CustomMinimumSize = new Vector2(targetWidth, targetHeight),
                     SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter
                 };
-                
-                _mainScene.gameScreenshotsFlow.AddChild(texRect);
+
+                mainScene.gameScreenshotsFlow.AddChild(texRect);
             }
         }
 
@@ -728,7 +673,7 @@ public partial class MainSceneGameListHandler
 
         string oldScreenshotPath = System.IO.Path.Combine(currentAssetsPath, "screenshots", $"{game.Id}.jpg");
         AddToFlow(oldScreenshotPath);
-        
+
         for (int i = 0; i < 5; i++)
         {
             AddToFlow(System.IO.Path.Combine(currentAssetsPath, "screenshots", $"{game.Id}_{i}.jpg"));
@@ -737,11 +682,11 @@ public partial class MainSceneGameListHandler
         bool isDownloading = false;
         if (game.Files != null && game.Files.Any())
         {
-            isDownloading = _appInstance.downloadManager.IsDownloading(game.Files[0].FileName);
+            isDownloading = appInstance.downloadManager.IsDownloading(game.Files[0].FileName);
         }
-        if (_mainScene.gameDownloadProgressBar != null)
+        if (mainScene.gameDownloadProgressBar != null)
         {
-            _mainScene.gameDownloadProgressBar.Visible = isDownloading;
+            mainScene.gameDownloadProgressBar.Visible = isDownloading;
         }
 
         UpdateDetailsPanelButtons(game);
@@ -751,15 +696,15 @@ public partial class MainSceneGameListHandler
     {
         if (currentlySelectedGame != null && currentlySelectedGame.Id.ToString() == gameId)
         {
-            if (_mainScene.gameDownloadProgressBar != null)
+            if (mainScene.gameDownloadProgressBar != null)
             {
-                _mainScene.gameDownloadProgressBar.Visible = true;
-                _mainScene.gameDownloadProgressBar.MaxValue = totalBytes;
-                _mainScene.gameDownloadProgressBar.Value = currentBytes;
+                mainScene.gameDownloadProgressBar.Visible = true;
+                mainScene.gameDownloadProgressBar.MaxValue = totalBytes;
+                mainScene.gameDownloadProgressBar.Value = currentBytes;
             }
         }
     }
-    
+
     private partial class AutoScrollHelper : Node
     {
         public ScrollContainer ScrollContainer;
@@ -770,7 +715,6 @@ public partial class MainSceneGameListHandler
         private float scrollAccumulator;
         private float delayTimer;
 
-        // Reset to the top and re-arm the start delay (call when the content changes).
         public void Restart()
         {
             delayTimer = StartDelay;
@@ -802,9 +746,6 @@ public partial class MainSceneGameListHandler
                     var maxScroll = vbar.MaxValue - vbar.Page;
                     if (maxScroll > 0)
                     {
-                        // A scrollbar's Value snaps to its step (default 1), so add whole
-                        // pixels at a time; fractional increments would be rounded away and
-                        // the label would never move on its own.
                         scrollAccumulator += ScrollSpeed * (float)delta;
                         if (scrollAccumulator >= 1.0f)
                         {
@@ -859,17 +800,17 @@ public partial class MainSceneGameListHandler
             }
         }
     }
-    
+
     public void UpdateDetailsPanelButtons(Game game)
     {
         bool isGameDownloadedLocally = CheckIfGameIsDownloaded(game);
 
-        if (_mainScene.installedIcon != null)
+        if (mainScene.installedIcon != null)
         {
-            _mainScene.installedIcon.Visible = isGameDownloadedLocally;
+            mainScene.installedIcon.Visible = isGameDownloadedLocally;
         }
 
-        if (_mainScene.actionBtn == null)
+        if (mainScene.actionBtn == null)
         {
             return;
         }
@@ -878,57 +819,57 @@ public partial class MainSceneGameListHandler
 
         if (game.Files != null && game.Files.Any())
         {
-            isDownloading = _appInstance.downloadManager.IsDownloading(game.Files[0].FileName);
+            isDownloading = appInstance.downloadManager.IsDownloading(game.Files[0].FileName);
         }
 
         if (isGameDownloadedLocally)
         {
-            string mappedEmulator = _appInstance.emulatorManager.GetMappedEmulator(game.PlatformSlug);
+            string mappedEmulator = appInstance.emulatorManager.GetMappedEmulator(game.PlatformSlug);
 
-            if (_appInstance.emulatorManager.IsEmulatorInstalled(mappedEmulator))
+            if (appInstance.emulatorManager.IsEmulatorInstalled(mappedEmulator))
             {
-                _mainScene.actionBtn.Text = "Play";
-                _mainScene.actionBtn.Disabled = false;
+                mainScene.actionBtn.Text = "Play";
+                mainScene.actionBtn.Disabled = false;
             }
-            else if (_appInstance.emulatorManager.IsEmulatorInstalling(mappedEmulator))
+            else if (appInstance.emulatorManager.IsEmulatorInstalling(mappedEmulator))
             {
-                _mainScene.actionBtn.Text = "Installing Emulator...";
-                _mainScene.actionBtn.Disabled = true;
+                mainScene.actionBtn.Text = "Installing Emulator...";
+                mainScene.actionBtn.Disabled = true;
             }
             else
             {
-                _mainScene.actionBtn.Text = "Install Emulator";
-                _mainScene.actionBtn.Disabled = false;
+                mainScene.actionBtn.Text = "Install Emulator";
+                mainScene.actionBtn.Disabled = false;
             }
         }
         else
         {
             if (isDownloading)
             {
-                _mainScene.actionBtn.Text = "Downloading...";
-                _mainScene.actionBtn.Disabled = true;
+                mainScene.actionBtn.Text = "Downloading...";
+                mainScene.actionBtn.Disabled = true;
             }
             else
             {
-                _mainScene.actionBtn.Text = "Download";
-                _mainScene.actionBtn.Disabled = false;
+                mainScene.actionBtn.Text = "Download";
+                mainScene.actionBtn.Disabled = false;
             }
         }
 
-        if (_mainScene.deleteBtn != null)
+        if (mainScene.deleteBtn != null)
         {
-            _mainScene.deleteBtn.Disabled = !isGameDownloadedLocally;
+            mainScene.deleteBtn.Disabled = !isGameDownloadedLocally;
         }
     }
 
     public void OnJumpSectionRequested(int direction)
     {
-        if (currentlyShownGames == null || currentlyShownGames.Count == 0 || _mainScene.gameList == null)
+        if (currentlyShownGames == null || currentlyShownGames.Count == 0 || mainScene.gameList == null)
         {
             return;
         }
 
-        int currentIndex = (int)_mainScene.gameList.Get("SelectedIndex");
+        int currentIndex = (int)mainScene.gameList.Get("SelectedIndex");
 
         if (currentIndex < 0 || currentIndex >= currentlyShownGames.Count)
         {
@@ -950,16 +891,16 @@ public partial class MainSceneGameListHandler
                     break;
                 }
             }
-            
+
             if (string.IsNullOrEmpty(sortName)) return '#';
 
             char first = char.ToUpper(sortName[0]);
             return char.IsLetter(first) ? first : '#';
         }
-        
+
         char currentLetter = GetSectionChar(currentlyShownGames[currentIndex].Name);
         int targetIndex = currentIndex;
-        
+
         if (direction > 0)
         {
             for (int i = currentIndex + 1; i < currentlyShownGames.Count; i++)
@@ -984,7 +925,7 @@ public partial class MainSceneGameListHandler
                     break;
                 }
             }
-            
+
             if (targetLetter != '\0')
             {
                 for (int i = 0; i <= currentIndex; i++)
@@ -996,7 +937,7 @@ public partial class MainSceneGameListHandler
                     }
                 }
             }
-            else 
+            else
             {
                 targetIndex = 0;
             }
@@ -1004,8 +945,8 @@ public partial class MainSceneGameListHandler
 
         if (targetIndex != currentIndex)
         {
-            _mainScene.gameList.Set("SelectedIndex", targetIndex);
-            _mainScene.gameList.Call("UpdateLayout", true);
+            mainScene.gameList.Set("SelectedIndex", targetIndex);
+            mainScene.gameList.Call("UpdateLayout", true);
             OnGameSelected(targetIndex);
         }
     }
@@ -1014,14 +955,11 @@ public partial class MainSceneGameListHandler
     {
         List<RomFile> romFiles = game.Files;
         foreach (RomFile file in romFiles)
-        { 
+        {
             System.IO.File.Delete(file.FullPath);
         }
     }
 
-    // Loads an image by sniffing its magic bytes (PNG/JPEG/WebP) rather than trusting the file
-    // extension, so a mislabeled file (e.g. a PNG saved as .jpg) still decodes. Returns null
-    // silently on a missing/unreadable/undecodable file — callers treat "no image" as normal.
     public Image SafeLoadImage(string path)
     {
         if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path))

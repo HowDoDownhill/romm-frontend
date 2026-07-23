@@ -6,14 +6,10 @@ public partial class SystemJumpPopup : Control
     private GridContainer gridContainer;
     private List<GameSystem> systems;
 
-    // The frosted panel itself, exposed so PopupAnimator can scale it without scaling the backdrop.
     public PanelContainer Panel { get; private set; }
 
-    // True while the close animation is playing. Input is ignored during it so a second press
-    // cannot select an entry from a popup that is already on its way out.
     public bool IsClosing { get; private set; }
 
-    // Highlight color for the focused/hovered system entry. Overridden per-theme via ApplyTheme.
     private Color focusColor = new Color(1, 1, 1, 0.6f);
 
     [Signal]
@@ -22,9 +18,6 @@ public partial class SystemJumpPopup : Control
     public override void _Ready()
     {
         Visible = false;
-        // Not TopLevel: stays in the normal draw flow (added last, so it renders on top) where Godot
-        // auto-copies the back buffer for the mica shader. TopLevel + a manual BackBufferCopy did not
-        // feed the screen texture under the gl_compatibility renderer, so the frost never blurred.
         ZIndex = 200;
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
 
@@ -38,12 +31,9 @@ public partial class SystemJumpPopup : Control
 
         Panel = new PanelContainer();
         var panel = Panel;
-        // Shared mica frosted-glass material (same as the panels) so it matches exactly.
         panel.Material = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
         var style = new StyleBoxFlat
         {
-            // The mica shader replaces the fill color with the blurred screen + theme tint; this
-            // stylebox only defines the rounded shape. Keep it opaque so the whole panel is covered.
             BgColor = new Color(0, 0, 0, 1f),
             CornerRadiusTopLeft = 12,
             CornerRadiusTopRight = 12,
@@ -105,7 +95,7 @@ public partial class SystemJumpPopup : Control
             label.AddThemeFontSizeOverride("font_size", 16);
             vbox.AddChild(label);
 
-            entryBtn.Pressed += () => 
+            entryBtn.Pressed += () =>
             {
                 EmitSignal(SignalName.SystemSelected, index);
             };
@@ -125,7 +115,6 @@ public partial class SystemJumpPopup : Control
         entryBtn.AddThemeStyleboxOverride("pressed", focusStyle);
     }
 
-    // Called by MainScene.ApplyTheme so the entry highlight matches the active theme accent.
     public void ApplyTheme(Color accentColor)
     {
         accentColor.A = 0.65f;
@@ -172,8 +161,6 @@ public partial class SystemJumpPopup : Control
         }
     }
 
-    // Driven by MainScene._Input while the popup is open (all input is routed here so nothing
-    // leaks to the UI behind it). A selects, B closes, dpad navigates the grid.
     public void HandleInput(InputEvent @event)
     {
         if (IsClosing) return;

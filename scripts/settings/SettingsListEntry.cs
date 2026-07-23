@@ -2,40 +2,38 @@ using Godot;
 
 public partial class SettingsListEntry : MarginContainer
 {
-    private StyleBoxFlat _backgroundStyle;
-    private Control _interactableWidget;
+    private StyleBoxFlat backgroundStyle;
+    private Control interactableWidget;
 
     public override void _Ready()
     {
         FocusMode = FocusModeEnum.All;
-        
-        _backgroundStyle = new StyleBoxFlat();
-        _backgroundStyle.BgColor = new Color(0, 0, 0, 0);
-        _backgroundStyle.DrawCenter = false;
-        
+
+        backgroundStyle = new StyleBoxFlat();
+        backgroundStyle.BgColor = new Color(0, 0, 0, 0);
+        backgroundStyle.DrawCenter = false;
+
         var panel = GetNodeOrNull<PanelContainer>("PanelContainer");
         if (panel != null)
         {
-            panel.AddThemeStyleboxOverride("panel", _backgroundStyle);
+            panel.AddThemeStyleboxOverride("panel", backgroundStyle);
         }
 
         GuiInput += OnGuiInput;
         FocusEntered += OnFocusEntered;
         FocusExited += OnFocusExited;
-        
+
         Unhighlight();
-        
+
         CallDeferred(nameof(FindWidget));
     }
 
     private void FindWidget()
     {
-        _interactableWidget = FindInteractableWidget(this);
-        if (_interactableWidget != null)
+        interactableWidget = FindInteractableWidget(this);
+        if (interactableWidget != null)
         {
-            _interactableWidget.FocusMode = FocusModeEnum.None;
-            // LineEdit still needs mouse clicks to focus text, but OptionButton can still be clicked if mouse filter is Pass.
-            // Let's leave mouse filter as is. We just want keyboard/gamepad focus to hit the entry.
+            interactableWidget.FocusMode = FocusModeEnum.None;
         }
     }
 
@@ -63,9 +61,9 @@ public partial class SettingsListEntry : MarginContainer
 
     public void CycleWidget(int direction)
     {
-        if (_interactableWidget == null) return;
-        
-        if (_interactableWidget is CarouselButton carBtn)
+        if (interactableWidget == null) return;
+
+        if (interactableWidget is CarouselButton carBtn)
         {
             if (carBtn.ItemCount == 0 || carBtn.Disabled) return;
             int newIdx = carBtn.Selected + direction;
@@ -74,7 +72,7 @@ public partial class SettingsListEntry : MarginContainer
             carBtn.Select(newIdx);
             carBtn.EmitSignal(CarouselButton.SignalName.ItemSelected, newIdx);
         }
-        else if (_interactableWidget is OptionButton optBtn)
+        else if (interactableWidget is OptionButton optBtn)
         {
             if (optBtn.ItemCount == 0) return;
             int newIdx = optBtn.Selected + direction;
@@ -83,7 +81,7 @@ public partial class SettingsListEntry : MarginContainer
             optBtn.Select(newIdx);
             optBtn.EmitSignal(OptionButton.SignalName.ItemSelected, newIdx);
         }
-        else if (_interactableWidget is SpinBox spinBox)
+        else if (interactableWidget is SpinBox spinBox)
         {
             double step = spinBox.Step > 0 ? spinBox.Step : 1;
             double newValue = spinBox.Value + (direction * step);
@@ -95,16 +93,13 @@ public partial class SettingsListEntry : MarginContainer
 
     public void InteractWithWidget()
     {
-        if (_interactableWidget == null) return;
+        if (interactableWidget == null) return;
 
-        if (_interactableWidget is CarouselButton carBtn)
+        if (interactableWidget is CarouselButton carBtn)
         {
-            // Do nothing on A press, they use left/right to cycle!
         }
-        else if (_interactableWidget is OptionButton optBtn)
+        else if (interactableWidget is OptionButton optBtn)
         {
-            // Just cycle it if accepted? Godot 4 doesn't easily expose ShowPopup in C#.
-            // Wait, we can get the popup menu.
             var popup = optBtn.GetPopup();
             if (popup != null)
             {
@@ -112,7 +107,7 @@ public partial class SettingsListEntry : MarginContainer
                 popup.Show();
             }
         }
-        else if (_interactableWidget is BaseButton btn)
+        else if (interactableWidget is BaseButton btn)
         {
             if (btn.ToggleMode)
             {
@@ -138,19 +133,19 @@ public partial class SettingsListEntry : MarginContainer
 
     public void Highlight()
     {
-        if (_backgroundStyle != null)
+        if (backgroundStyle != null)
         {
-            _backgroundStyle.BgColor = new Color(1f, 1f, 1f, 0.5f);
-            _backgroundStyle.DrawCenter = true;
+            backgroundStyle.BgColor = new Color(1f, 1f, 1f, 0.5f);
+            backgroundStyle.DrawCenter = true;
         }
     }
 
     public void Unhighlight()
     {
-        if (_backgroundStyle != null)
+        if (backgroundStyle != null)
         {
-            _backgroundStyle.BgColor = new Color(0, 0, 0, 0);
-            _backgroundStyle.DrawCenter = false;
+            backgroundStyle.BgColor = new Color(0, 0, 0, 0);
+            backgroundStyle.DrawCenter = false;
         }
     }
 }

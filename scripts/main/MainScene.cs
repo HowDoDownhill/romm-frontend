@@ -4,14 +4,14 @@ using System.Collections.Generic;
 
 public partial class MainScene : Control
 {
-    [ExportGroup("Header")] 
+    [ExportGroup("Header")]
     [Export] public MarginContainer headerContainer;
     [Export] public SystemCarousel systemCarousel;
 
-    [ExportGroup("GameList")] 
+    [ExportGroup("GameList")]
     [Export] public Control gameList;
     [Export] public PackedScene gameListEntryScene;
-    
+
     [ExportGroup("DetailsPanel")]
     [Export] public VBoxContainer detailsPanelContainer;
     [Export] public TextureRect gameCover;
@@ -31,7 +31,7 @@ public partial class MainScene : Control
     [Export] public Control gameListFooter;
     [Export] public Control downloadsFooter;
     [Export] public Control settingsFooter;
-    
+
     [Export] public Button actionBtn;
     [Export] public Button deleteBtn;
     [Export] public Button optionsBtn;
@@ -58,7 +58,7 @@ public partial class MainScene : Control
     [Export] public Control downloadProgressPopup;
     [Export] public Label downloadProgressLabel;
     [Export] public ProgressBar downloadProgressBar;
-    
+
     [Export] public Control changelogPopup;
     [Export] public RichTextLabel changelogRichTextLabel;
     [Export] public Button acceptUpdateBtn;
@@ -88,7 +88,6 @@ public partial class MainScene : Control
     public MainSceneDownloadHandler DownloadHandler { get; private set; }
     public MainSceneUpdaterHandler UpdaterHandler { get; private set; }
     public MainScenePopupHandler PopupHandler { get; private set; }
-    
 
     public PanelContainer fuzzySearchPopup;
     public Label fuzzySearchLabel;
@@ -108,15 +107,12 @@ public partial class MainScene : Control
         SettingsHandler = new MainSceneSettingsHandler(this, appInstance);
         SectionHandler = new MainSceneSectionHandler(this);
         PopupHandler = new MainScenePopupHandler(this, appInstance);
-        
+
         fuzzySearchPopup = new PanelContainer();
         fuzzySearchPopup.Visible = false;
-        // Shared mica frosted-glass material (same as the panels). In the normal draw flow, so
-        // Godot auto-copies the back buffer for the shader.
         fuzzySearchPopup.Material = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
         var fuzzyStyle = new StyleBoxFlat
         {
-            // The mica shader replaces the fill; this stylebox only defines the rounded shape.
             BgColor = new Color(0, 0, 0, 1f),
             CornerRadiusTopLeft = 12,
             CornerRadiusTopRight = 12,
@@ -133,8 +129,6 @@ public partial class MainScene : Control
         fuzzySearchLabel.AddThemeFontSizeOverride("font_size", 24);
         margin.AddChild(fuzzySearchLabel);
         fuzzySearchPopup.AddChild(margin);
-        // Center on screen; grow both ways from the center anchor so it stays centered as the
-        // content-sized panel resizes with the search text.
         fuzzySearchPopup.SetAnchorsPreset(Control.LayoutPreset.Center);
         fuzzySearchPopup.GrowHorizontal = Control.GrowDirection.Both;
         fuzzySearchPopup.GrowVertical = Control.GrowDirection.Both;
@@ -155,13 +149,10 @@ public partial class MainScene : Control
                 }
             };
 
-            // Clicking the platform logo opens the system jump grid (same as holding a bumper).
             systemCarousel.JumpRequested += OpenSystemJumpPopup;
 
-            // Clicking the arrows fades the current system out immediately, like the bumpers do.
             systemCarousel.Cycled += GameListHandler.BeginQuickSwitchFade;
         }
-
 
         releasePickerPopup = new ReleasePickerPopup();
         AddChild(releasePickerPopup);
@@ -203,7 +194,7 @@ public partial class MainScene : Control
         }
 
         GetCache();
-        
+
         if (settingsMenuContainer != null)
         {
             settingsMenuContainer.Visible = false;
@@ -213,16 +204,16 @@ public partial class MainScene : Control
         if (acceptUpdateBtn != null)
         {
             acceptUpdateBtn.Pressed += UpdaterHandler.OnAcceptUpdatePressed;
-            acceptUpdateBtn.Icon = MakeControllerGlyph("Select"); // A = Install
+            acceptUpdateBtn.Icon = MakeControllerGlyph("Select");
         }
         if (cancelUpdateBtn != null)
         {
             cancelUpdateBtn.Pressed += UpdaterHandler.OnCancelUpdatePressed;
-            cancelUpdateBtn.Icon = MakeControllerGlyph("Back"); // B = Close
+            cancelUpdateBtn.Icon = MakeControllerGlyph("Back");
         }
 
         GameListHandler.SelectSystemByIndex(0);
-        
+
         if (gameList != null)
         {
             gameList.Connect("ItemSelected", Callable.From<long>(GameListHandler.OnGameSelected));
@@ -235,7 +226,6 @@ public partial class MainScene : Control
         UpdaterHandler.InitUpdater();
         ApplyTheme();
 
-        // Give every frosted panel a native StyleBoxFlat outline so overlapping panels are separable.
         var micaMaterial = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
         MicaBorder.AttachToAll(this, micaMaterial, MicaBorder.DefaultColor);
     }
@@ -247,8 +237,6 @@ public partial class MainScene : Control
             var bgMaterial = GD.Load<ShaderMaterial>("res://assets/materials/moving_background.tres");
             if (bgMaterial != null)
             {
-                // Each background style is its own shader; swap it before setting parameters so the
-                // values land on the shader that is actually going to render them.
                 var bgShader = GD.Load<Shader>(ConfigManager.BackgroundShaderPath(appInstance.configManager.AppBackground));
                 if (bgShader != null && bgMaterial.Shader != bgShader)
                 {
@@ -263,8 +251,6 @@ public partial class MainScene : Control
             var panelMaterial = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
             if (panelMaterial != null)
             {
-                // Tint the mica frost with the theme's darkest palette color so panels feel themed
-                // rather than generic black. The Panel color still supplies the tint strength (alpha).
                 Color tint = GetDarkestColor(colors.Bg, colors.Primary, colors.Secondary);
                 tint.A = colors.Panel.A;
                 panelMaterial.SetShaderParameter("mix_color", tint);
@@ -275,9 +261,6 @@ public partial class MainScene : Control
         }
     }
 
-    // Resolves the active palette. "Match System" derives one from the selected platform's logo and
-    // falls back to Default when that platform has no usable colour -- a lot of logos are plain
-    // white silhouettes, and an all-grey background reads as broken rather than as a choice.
     private bool TryResolveThemeColors(out (Color Bg, Color Primary, Color Secondary, Color Panel) colors)
     {
         string currentTheme = appInstance.configManager.AppTheme;
@@ -307,7 +290,6 @@ public partial class MainScene : Control
         }
     }
 
-    // Returns the darkest of the given colors by perceived luminance (alpha ignored).
     private static Color GetDarkestColor(params Color[] candidates)
     {
         Color darkest = candidates[0];
@@ -332,8 +314,6 @@ public partial class MainScene : Control
         }
     }
 
-    // Opens the release picker for an emulator: shows a loading state while the available
-    // versions are fetched from the emulator's install recipe source, then lists them.
     public async void OpenReleasePicker(string emulatorName)
     {
         if (releasePickerPopup == null) return;
@@ -343,7 +323,6 @@ public partial class MainScene : Control
 
         var releases = await appInstance.emulatorManager.GetAvailableReleases(emulatorName);
 
-        // User may have backed out while the list was being fetched.
         if (!releasePickerPopup.Visible) return;
 
         if (releases.Count == 0)
@@ -364,8 +343,6 @@ public partial class MainScene : Control
         releasePickerPopup.Visible = false;
         gameList?.GrabFocus();
 
-        // Kick off the install (this flags the emulator as installing synchronously, before the
-        // first await), then refresh the panel so the button reflects the in-progress state.
         _ = appInstance.emulatorManager.InstallEmulator(emulatorName, chosenRelease);
 
         if (GameListHandler.currentlySelectedGame != null)
@@ -442,8 +419,6 @@ public partial class MainScene : Control
         btn.Icon = MakeControllerGlyph(iconPath);
     }
 
-    // Builds a controller-glyph texture for the given input action. It only renders when a
-    // controller is the active input, so in keyboard/mouse mode buttons show just their label.
     private ControllerIconTexture MakeControllerGlyph(string actionPath)
     {
         var iconTex = new ControllerIconTexture();
@@ -452,8 +427,6 @@ public partial class MainScene : Control
         return iconTex;
     }
 
-    // Opens/closes the start menu (or closes the settings menu if it's open). Shared by the
-    // ToggleSettings action and the footer "Options" button so both behave identically.
     private void ToggleStartMenu()
     {
         if (settingsMenuContainer != null && settingsMenuContainer.Visible)
@@ -496,8 +469,6 @@ public partial class MainScene : Control
     {
         if (GameListHandler.currentlySelectedGame == null) return;
 
-        // Controller "Select" routes here directly, bypassing Godot's disabled-button gate, so
-        // honor the disabled state here too (e.g. while an emulator install or download is running).
         if (actionBtn != null && actionBtn.Disabled) return;
 
         string emulatorName = appInstance.emulatorManager.GetMappedEmulator(GameListHandler.currentlySelectedGame.PlatformSlug);
@@ -533,9 +504,6 @@ public partial class MainScene : Control
     {
         if (systemCarousel == null) return;
 
-        // Reads CurrentSection rather than the containers' Visible flags: mid-transition both the
-        // outgoing and incoming containers are visible, and the header should already name the
-        // section being entered.
         switch (SectionHandler.CurrentSection)
         {
             case MainSceneSectionHandler.Section.Settings:
@@ -552,9 +520,6 @@ public partial class MainScene : Control
 
     public override void _Input(InputEvent @event)
     {
-        // Section routing below keys off the containers' Visible flags, but during a crossfade the
-        // outgoing and incoming sections are both visible, so an event arriving mid-transition
-        // could act on either one. Swallow input until the section change settles.
         if (SectionHandler.IsTransitioning)
         {
             GetViewport().SetInputAsHandled();
@@ -566,7 +531,6 @@ public partial class MainScene : Control
             UpdateMouseFocus();
         }
 
-        // Mouse wheel scrolls the game selection wheel when the cursor is over it.
         if (@event is InputEventMouseButton wheelEvent && wheelEvent.Pressed
             && (wheelEvent.ButtonIndex == MouseButton.WheelUp || wheelEvent.ButtonIndex == MouseButton.WheelDown)
             && IsMouseOverGameList()
@@ -610,8 +574,8 @@ public partial class MainScene : Control
 
         if (InputHandler.isListeningForInput)
         {
-            if ((@event is InputEventKey listenKeyEvent && listenKeyEvent.Pressed) || 
-                (@event is InputEventJoypadButton listenJoyBtn && listenJoyBtn.Pressed) || 
+            if ((@event is InputEventKey listenKeyEvent && listenKeyEvent.Pressed) ||
+                (@event is InputEventJoypadButton listenJoyBtn && listenJoyBtn.Pressed) ||
                 (@event is InputEventJoypadMotion listenJoyMotion && Mathf.Abs(listenJoyMotion.AxisValue) > 0.5f))
             {
                 string mappedInput = InputHandler.ConvertInputEventToStandardString(@event);
@@ -635,8 +599,6 @@ public partial class MainScene : Control
 
         if (changelogPopup != null && changelogPopup.Visible)
         {
-            // Let mouse events through so the Install/Close buttons can be clicked; handle A/B
-            // (and keyboard equivalents) for controller/keyboard users.
             if (@event is InputEventMouse) return;
 
             if (@event.IsActionPressed("ui_accept") || @event.IsActionPressed("Select"))
@@ -682,14 +644,11 @@ public partial class MainScene : Control
 
         if (releasePickerPopup != null && releasePickerPopup.Visible)
         {
-            // Let mouse events reach the popup's buttons; consume everything else so no
-            // input leaks through to the UI behind the popup.
             if (@event is InputEventMouse) return;
             releasePickerPopup.HandleInput(@event);
 
             if (!releasePickerPopup.Visible)
             {
-                // User backed out without picking a version; restore the action button state.
                 if (GameListHandler.currentlySelectedGame != null)
                 {
                     GameListHandler.UpdateDetailsPanelButtons(GameListHandler.currentlySelectedGame);
@@ -704,8 +663,6 @@ public partial class MainScene : Control
 
         if (systemJumpPopup != null && systemJumpPopup.Visible)
         {
-            // Let mouse events reach the popup's buttons; consume everything else so no
-            // input leaks through to the UI behind the popup.
             if (@event is InputEventMouse) return;
             systemJumpPopup.HandleInput(@event);
             GetViewport().SetInputAsHandled();
@@ -718,8 +675,8 @@ public partial class MainScene : Control
             GetViewport().SetInputAsHandled();
             return;
         }
-        
-        bool isAnyPopupVisible = (startMenuRoot != null && startMenuRoot.Visible) || 
+
+        bool isAnyPopupVisible = (startMenuRoot != null && startMenuRoot.Visible) ||
                                  (settingsMenuContainer != null && settingsMenuContainer.Visible) ||
                                  (downloadsListContainer != null && downloadsListContainer.Visible);
 
@@ -729,7 +686,6 @@ public partial class MainScene : Control
 
             if (keyEvent.Keycode == Key.Backspace)
             {
-                // Let the user fix typos by removing the last character.
                 if (GameListHandler.fuzzySearchBuffer.Length > 0)
                 {
                     GameListHandler.fuzzySearchBuffer = GameListHandler.fuzzySearchBuffer.Substring(0, GameListHandler.fuzzySearchBuffer.Length - 1);
@@ -737,7 +693,7 @@ public partial class MainScene : Control
                 GameListHandler.lastKeystrokeTime = currentTime;
                 GameListHandler.isFuzzySearchDirty = true;
             }
-            else if (keyEvent.Unicode >= 32) // printable characters only; skip control keys
+            else if (keyEvent.Unicode >= 32)
             {
                 if (currentTime - GameListHandler.lastKeystrokeTime > 1500)
                 {
@@ -784,7 +740,6 @@ public partial class MainScene : Control
             else if (@event.IsActionPressed("ui_accept") || @event.IsActionPressed("Select"))
             {
                 var focusOwner = GetViewport().GuiGetFocusOwner();
-                // Emitting Pressed manually bypasses Godot's disabled-button gate, so check it here.
                 if (focusOwner is BaseButton btn && !btn.Disabled)
                 {
                     btn.EmitSignal(BaseButton.SignalName.Pressed);
@@ -857,11 +812,11 @@ public partial class MainScene : Control
                     return;
                 }
             }
-            else if (@event.IsActionPressed("ui_up", true) || @event.IsActionPressed("MoveUp") || 
+            else if (@event.IsActionPressed("ui_up", true) || @event.IsActionPressed("MoveUp") ||
                      @event.IsActionPressed("ui_down", true) || @event.IsActionPressed("MoveDown"))
             {
                 int direction = (@event.IsActionPressed("ui_down", true) || @event.IsActionPressed("MoveDown")) ? 1 : -1;
-                
+
                 if (isFocusInTree)
                 {
                     SettingsHandler.CycleFocusInContainer(settingsSectionsTree, direction);
@@ -874,7 +829,7 @@ public partial class MainScene : Control
                         SettingsHandler.CycleFocusInContainer(visibleForm, direction);
                     }
                 }
-                
+
                 GetViewport().SetInputAsHandled();
                 return;
             }
@@ -895,7 +850,7 @@ public partial class MainScene : Control
                     return;
                 }
             }
-            return; 
+            return;
         }
 
         if(@event.IsActionPressed("CylceSystemUp") && (downloadsListContainer == null || !downloadsListContainer.Visible))
@@ -918,7 +873,7 @@ public partial class MainScene : Control
             GetViewport().SetInputAsHandled();
             return;
         }
-        
+
         if (@event.IsActionPressed("CycleSystemDown") && (downloadsListContainer == null || !downloadsListContainer.Visible))
         {
             if (systemJumpPopup != null && systemJumpPopup.Visible) return;
@@ -940,9 +895,6 @@ public partial class MainScene : Control
             return;
         }
 
-        // Footer-button actions are only consumed when driven by a controller. In keyboard/mouse
-        // mode the footer buttons are clicked instead, which keeps their bound keys (e.g. Backspace
-        // for ToggleDownloadsPage, Enter for Select) free for fuzzy search and normal typing.
         if (IsControllerEvent(@event))
         {
             if (@event.IsActionPressed("Select") && (downloadsListContainer == null || !downloadsListContainer.Visible))
@@ -999,7 +951,7 @@ public partial class MainScene : Control
             }
             return;
         }
-        
+
         if (@event.IsActionPressed("ui_down", true) || @event.IsActionPressed("MoveDown"))
         {
             if (downloadsListContainer != null && downloadsListContainer.Visible)
@@ -1014,26 +966,17 @@ public partial class MainScene : Control
         }
     }
 
-    // True when the input originated from a controller (button or stick/trigger), as opposed to
-    // keyboard or mouse. Used to gate footer-button shortcuts to controller-only.
     private static bool IsControllerEvent(InputEvent @event)
     {
         return @event is InputEventJoypadButton || @event is InputEventJoypadMotion;
     }
 
-    // Focus-follows-mouse for keyboard/mouse users: whichever focusable widget the cursor moves
-    // over takes focus. The nearest focusable ancestor is used, so hovering a settings entry's
-    // inner widget still focuses the entry. The game carousel is handled at the list level since
-    // it drives its own index-based selection rather than per-entry focus.
     private void UpdateMouseFocus()
     {
         var viewport = GetViewport();
         var hovered = viewport.GuiGetHoveredControl();
         if (hovered == null) return;
 
-        // While a modal popup owns the screen, only controls inside it may take mouse focus —
-        // otherwise incidental mouse motion over the UI behind it steals focus from the popup
-        // entries and controller input goes dead.
         if (releasePickerPopup != null && releasePickerPopup.Visible && !releasePickerPopup.IsAncestorOf(hovered)) return;
         if (systemJumpPopup != null && systemJumpPopup.Visible && !systemJumpPopup.IsAncestorOf(hovered)) return;
 
@@ -1047,7 +990,6 @@ public partial class MainScene : Control
 
         if (gameList != null && (focusable == gameList || gameList.IsAncestorOf(focusable)))
         {
-            // Don't pull focus onto the game list while a menu/popup owns the screen.
             if (IsAnyMenuOpen()) return;
 
             focusable = gameList;
@@ -1059,7 +1001,6 @@ public partial class MainScene : Control
         }
     }
 
-    // True when the start menu, settings, downloads page, or system-jump popup is showing.
     private bool IsAnyMenuOpen()
     {
         return (startMenuRoot != null && startMenuRoot.Visible)
@@ -1082,8 +1023,6 @@ public partial class MainScene : Control
 
     public override void _Process(double delta)
     {
-        // Drains a few cover-art decodes per frame; see MainSceneGameListHandler for why these
-        // can't all run in the frame the carousel reveals them.
         GameListHandler?.ProcessPendingImageLoads();
 
         ulong currentTime = Time.GetTicksMsec();
@@ -1109,13 +1048,11 @@ public partial class MainScene : Control
                 GameListHandler.fuzzySearchBuffer = "";
                 if (fuzzySearchPopup != null) PopupAnimator.Hide(fuzzySearchPopup);
             }
-            
+
             if (GameListHandler.isFuzzySearchDirty && currentTime - GameListHandler.lastKeystrokeTime > 400)
             {
                 GameListHandler.isFuzzySearchDirty = false;
 
-                // Skip searching on an empty buffer; Contains("") matches everything and would
-                // jump to the first game when the user backspaces the query away.
                 if (!string.IsNullOrEmpty(GameListHandler.fuzzySearchBuffer))
                 {
                     int matchIndex = GameListHandler.currentlyShownGames.FindIndex(g => g.Name.ToLower().Contains(GameListHandler.fuzzySearchBuffer));
@@ -1135,8 +1072,6 @@ public partial class MainScene : Control
             {
                 if (!string.IsNullOrEmpty(GameListHandler.fuzzySearchBuffer))
                 {
-                    // Text first: the popup is content-sized, and PopupAnimator centres its scale
-                    // pivot on the current size. Showing first would pivot on the stale size.
                     if (fuzzySearchLabel != null) fuzzySearchLabel.Text = "Search: " + GameListHandler.fuzzySearchBuffer;
                     if (!fuzzySearchPopup.Visible || PopupAnimator.IsHiding(fuzzySearchPopup)) PopupAnimator.Show(fuzzySearchPopup);
                 }
@@ -1147,8 +1082,6 @@ public partial class MainScene : Control
             }
         }
     }
-
-
 
     private void OpenSystemJumpPopup()
     {

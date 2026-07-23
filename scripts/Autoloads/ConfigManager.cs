@@ -23,8 +23,6 @@ public partial class ConfigManager : Node
     public string AppTheme { get; private set; }
     public string AppBackground { get; private set; }
 
-    // Each style is a separate shader sharing the uniform names declared in bg_common.gdshaderinc,
-    // so ApplyTheme can swap the shader on the shared material and re-apply one set of parameters.
     public static readonly (string Name, string ShaderPath)[] BackgroundStyles = new (string, string)[]
     {
         ("Flow", "res://assets/shaders/backgrounds/bg_flow.gdshader"),
@@ -37,8 +35,6 @@ public partial class ConfigManager : Node
         ("Solid", "res://assets/shaders/backgrounds/bg_solid.gdshader")
     };
 
-    // Falls back to the first style so an unrecognised name in config.cfg (a hand-edit, or a style
-    // removed in a later version) still renders something instead of leaving the background blank.
     public static string BackgroundShaderPath(string styleName)
     {
         foreach (var style in BackgroundStyles)
@@ -48,24 +44,14 @@ public partial class ConfigManager : Node
         return BackgroundStyles[0].ShaderPath;
     }
 
-    // Active palettes: the built-ins below, overridden and extended by themes.json. Populated by
-    // LoadThemes at startup, so anything reading this must run after ConfigManager._Ready.
     public static readonly System.Collections.Generic.Dictionary<string, (Color Bg, Color Primary, Color Secondary, Color Panel)> Themes = new System.Collections.Generic.Dictionary<string, (Color Bg, Color Primary, Color Secondary, Color Panel)>();
 
     public const string ThemesFileName = "themes.json";
 
-    // Not a palette but a mode: colours are derived from the selected platform's logo at runtime by
-    // SystemPalette. Kept out of Themes (and out of themes.json) precisely because it has no fixed
-    // values; the settings list offers it alongside the real palettes.
     public const string SystemThemeName = "Match System";
 
     public static bool IsSystemTheme(string themeName) => themeName == SystemThemeName;
 
-    // Palette entries are hand-tuned rather than derived from a blanket .Darkened() pass: the shader
-    // mixes Primary and Secondary over Bg fairly aggressively, so uniformly darkening a palette's
-    // accents collapsed every theme into the same murky blue-purple. These values are the final
-    // rendered colors. Secondary doubles as the UI accent (popup focus highlight), so it is kept the
-    // brighter and more saturated of the two blobs while staying dark enough not to wash the flow out.
     private static readonly System.Collections.Generic.Dictionary<string, (Color Bg, Color Primary, Color Secondary, Color Panel)> BuiltInThemes = new System.Collections.Generic.Dictionary<string, (Color Bg, Color Primary, Color Secondary, Color Panel)>
     {
         { "Default", (new Color("#0a0713"), new Color("#341052"), new Color("#123a63"), new Color("#100c1a8c")) },
@@ -87,9 +73,6 @@ public partial class ConfigManager : Node
 
     public string ThemesFilePath => System.IO.Path.Combine(ApplicationRootDirectory, ThemesFileName);
 
-    // Rebuilds Themes from the built-ins plus themes.json. The built-ins are always present, so a
-    // JSON entry reusing a built-in name retunes that theme and removing the entry reverts it --
-    // this way palettes added in a later version still reach users who already have the file.
     private void LoadThemes()
     {
         Themes.Clear();
@@ -159,8 +142,6 @@ public partial class ConfigManager : Node
         return true;
     }
 
-    // Seeds themes.json with the built-in palettes. They are all redundant overrides at that point,
-    // but they document the format and give a working starting point to edit.
     private void WriteThemesFile()
     {
         var document = new Godot.Collections.Dictionary();
@@ -186,7 +167,7 @@ public partial class ConfigManager : Node
 
     public int EmulatorCloseHotkeyCount { get; private set; }
     public Godot.Collections.Array EmulatorCloseHotkeys { get; private set; }
-    
+
     public System.Collections.Generic.Dictionary<string, string> PreferredEmulators { get; private set; } = new System.Collections.Generic.Dictionary<string, string>();
 
     public System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<int, System.Collections.Generic.Dictionary<string, string>>> PlatformInputMappings { get; private set; } = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<int, System.Collections.Generic.Dictionary<string, string>>>();
@@ -250,14 +231,8 @@ public partial class ConfigManager : Node
         }
     }
 
-    // A path that is always resolved relative to the executable's own folder. Used for
-    // directories that ship with the app or are ephemeral caches, so a build stays
-    // relocatable: move it to another PC/OS and it recomputes its own paths.
     private string DeriveDefaultPath(string subdirectory) => $"{ApplicationRootDirectory}/{subdirectory}/";
 
-    // User-relocatable directory: honor a stored override only if it actually exists on
-    // disk, otherwise fall back to the derived default. This makes stale absolute paths
-    // (from a moved folder or a different machine/OS) self-heal instead of breaking.
     private string ResolveRelocatablePath(string key, string subdirectory)
     {
         string derivedDefault = DeriveDefaultPath(subdirectory);
@@ -272,24 +247,18 @@ public partial class ConfigManager : Node
         return derivedDefault;
     }
 
-    // Resolves every path property. App-layout dirs are always derived from the executable
-    // location; user-relocatable dirs use a valid stored override or fall back to the default.
     private void ResolveAllPaths()
     {
-        // App layout — shipped with the app or ephemeral cache; always next to the exe.
         DownloadsPath = DeriveDefaultPath("downloads");
         InstallScriptsPath = DeriveDefaultPath("install_scripts");
         ToolsPath = DeriveDefaultPath("tools");
         AssetsPath = DeriveDefaultPath("assets");
 
-        // User-relocatable — a user may point these at a separate/large drive.
         RomsPath = ResolveRelocatablePath("RomsPath", "roms");
         BiosPath = ResolveRelocatablePath("BiosPath", "bios");
         EmulatorsPath = ResolveRelocatablePath("EmulatorsPath", "emulators");
     }
 
-    // Persist a relocatable path only when it's an actual override (differs from the
-    // executable-relative default). Otherwise remove any stale key so defaults stay derived.
     private void WriteRelocatablePathValue(string key, string currentValue, string subdirectory)
     {
         if (currentValue != DeriveDefaultPath(subdirectory))
@@ -326,7 +295,7 @@ public partial class ConfigManager : Node
         EmulatorCloseHotkeyCount = (int)configurationFile.GetValue("Input", "EmulatorCloseHotkeyCount", 4);
         var defaultHotkeyButtons = new Godot.Collections.Array { (int)JoyButton.LeftShoulder, (int)JoyButton.RightShoulder, (int)JoyButton.Back, (int)JoyButton.Start };
         EmulatorCloseHotkeys = (Godot.Collections.Array)configurationFile.GetValue("Input", "EmulatorCloseHotkeys", defaultHotkeyButtons);
-        
+
         if (configurationFile.HasSection("PreferredEmulators"))
         {
             foreach (string key in configurationFile.GetSectionKeys("PreferredEmulators"))
@@ -384,13 +353,9 @@ public partial class ConfigManager : Node
 
     private void WriteAllConfigurationValues()
     {
-        // Only user-relocatable paths are persisted, and only when overridden. App-layout
-        // dirs (downloads/install_scripts/tools/assets) are derived from the executable
-        // location at load time and intentionally not stored, so builds stay relocatable.
         WriteRelocatablePathValue("RomsPath", RomsPath, "roms");
         WriteRelocatablePathValue("BiosPath", BiosPath, "bios");
         WriteRelocatablePathValue("EmulatorsPath", EmulatorsPath, "emulators");
-        // Scrub app-layout keys that older versions baked in, so stale absolute paths don't linger.
         foreach (string deprecatedPathKey in new[] { "DownloadsPath", "InstallScriptsPath", "ToolsPath", "AssetsPath" })
         {
             if (configurationFile.HasSectionKey("Paths", deprecatedPathKey))
@@ -495,7 +460,6 @@ public partial class ConfigManager : Node
                 InputMap.EraseAction($"CloseKey{actionIndex}");
             }
         }
-
 
         for (int hotkeyIndex = 0; hotkeyIndex < EmulatorCloseHotkeyCount; hotkeyIndex++)
         {

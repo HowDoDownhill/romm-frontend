@@ -17,13 +17,13 @@ public partial class GameGridItem : Control
     {
         focusStyle = new StyleBoxFlat
         {
-            BgColor = new Color(0, 0, 0, 0), // Transparent background
+            BgColor = new Color(0, 0, 0, 0),
             BorderWidthTop = 2,
             BorderWidthBottom = 2,
             BorderWidthLeft = 2,
             BorderWidthRight = 2,
-            BorderColor = new Color(1f, 1f, 1f, 0.5f), // White semi-transparent for focus
-            DrawCenter = false // We only want the border
+            BorderColor = new Color(1f, 1f, 1f, 0.5f),
+            DrawCenter = false
         };
 
         FocusEntered += OnFocusEntered;
@@ -83,4 +83,3 @@ public partial class GameGridItem : Control
         }
     }
 }
-

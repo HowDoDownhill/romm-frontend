@@ -1,29 +1,21 @@
 using Godot;
 using System.Collections.Generic;
 
-// Derives a theme palette from a platform's logo, for the dynamic "System" app theme.
-//
-// Only the *hue* is taken from the artwork. Saturation and value are forced to the same targets the
-// hand-tuned palettes in ConfigManager use, because logo colours are chosen to read on packaging at
-// full brightness -- dropped in unaltered they blow out the background and drown the UI panels.
 public static class SystemPalette
 {
-    // Matched to the built-in palettes: dark background, mid-dark accents that stay behind the UI.
     private const float BgSaturation = 0.62f;
     private const float BgValue = 0.075f;
     private const float PrimarySaturation = 0.80f;
     private const float PrimaryValue = 0.32f;
     private const float SecondarySaturation = 0.82f;
     private const float SecondaryValue = 0.39f;
-    private const float PanelAlpha = 0.549f; // 0x8c, as in the built-in palettes
+    private const float PanelAlpha = 0.549f;
 
     private const int HueBuckets = 24;
     private const int SampleSize = 48;
-    // Below these a pixel carries no usable hue: transparent, near-grey, or near-black/white.
     private const float MinAlpha = 0.35f;
     private const float MinSaturation = 0.18f;
     private const float MinValue = 0.15f;
-    // Two accents drawn from nearly the same hue would be indistinguishable once normalised.
     private const int MinBucketSeparation = 3;
 
     private static readonly Dictionary<string, (Color Bg, Color Primary, Color Secondary, Color Panel)> cache =
@@ -34,8 +26,6 @@ public static class SystemPalette
         cache.Clear();
     }
 
-    // Returns null when the logo has no usable colour -- a great many platform logos are pure white
-    // or greyscale silhouettes -- so the caller can fall back to a static palette.
     public static (Color Bg, Color Primary, Color Secondary, Color Panel)? FromSystem(GameSystem system)
     {
         if (system == null) return null;
@@ -58,8 +48,6 @@ public static class SystemPalette
         return palette;
     }
 
-    // Prefers the plain platform mark over the "titles" wordmark: wordmarks are more often flat
-    // white lettering, while the mark usually carries the platform's actual brand colour.
     private static Texture2D FindIcon(string stub)
     {
         foreach (string basePath in new[] { "res://assets/platforms/", "res://assets/platforms/titles/" })
@@ -87,7 +75,6 @@ public static class SystemPalette
             return null;
         }
 
-        // Downsample first: a logo can be 1024px square and only the hue distribution matters.
         if (image.GetWidth() > SampleSize || image.GetHeight() > SampleSize)
         {
             image.Resize(SampleSize, SampleSize, Image.Interpolation.Bilinear);
@@ -107,7 +94,6 @@ public static class SystemPalette
                 float v = pixel.V;
                 if (s < MinSaturation || v < MinValue) continue;
 
-                // Weight by saturation and value so a small vivid mark outvotes a large washed one.
                 int bucket = Mathf.Clamp((int)(pixel.H * HueBuckets), 0, HueBuckets - 1);
                 float weight = s * v;
                 weights[bucket] += weight;
@@ -120,8 +106,6 @@ public static class SystemPalette
         int primaryBucket = IndexOfMax(weights, -1);
         if (primaryBucket < 0) return null;
 
-        // A second hue far enough away to stay distinct; if the logo is essentially monochrome,
-        // rotate off the primary instead so the two accents still differ.
         int secondaryBucket = IndexOfMax(weights, primaryBucket);
         float primaryHue = (primaryBucket + 0.5f) / HueBuckets;
         float secondaryHue = secondaryBucket >= 0
@@ -136,8 +120,6 @@ public static class SystemPalette
         return (bg, primary, secondary, panel);
     }
 
-    // Highest-weighted bucket, optionally excluding anything too close to an already-picked one.
-    // Hue is circular, so distance wraps.
     private static int IndexOfMax(float[] weights, int excludeNear)
     {
         int best = -1;

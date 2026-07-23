@@ -28,16 +28,10 @@ public partial class AssetManager : Node
 
     private AppInstance appInstance;
 
-    // Priority queue: newly requested (on-screen) games are pushed to the FRONT so the game the
-    // user is currently on is fetched before games they merely scrolled past. A plain FIFO would
-    // put the current selection behind everything already queued (priority inversion).
     private readonly LinkedList<AssetDownloadItem> pendingAssetDownloadQueue = new();
-    // Number of still-queued items per game, used to dedupe requests and to cancel on scroll-out.
     private readonly Dictionary<int, int> pendingItemCountByGameId = new();
     private readonly object queueLock = new();
 
-    // Only the on-screen window is ever queued now (off-screen games are pruned), so we can afford
-    // more workers and no inter-download delay to get visible art up quickly.
     private int maximumConcurrentDownloadWorkers = 4;
     private int activeDownloadWorkerCount = 0;
     private CancellationTokenSource cancellationTokenSource = new CancellationTokenSource();
@@ -64,13 +58,11 @@ public partial class AssetManager : Node
 
         lock (queueLock)
         {
-            // Already queued (or partially in-flight) for this game; don't duplicate.
             if (pendingItemCountByGameId.ContainsKey(game.Id))
             {
                 return;
             }
 
-            // Push to the front, reversed, so items[0] (the 3D cover) ends up frontmost.
             for (int i = items.Count - 1; i >= 0; i--)
             {
                 pendingAssetDownloadQueue.AddFirst(items[i]);
@@ -82,9 +74,6 @@ public partial class AssetManager : Node
         EnsureDownloadWorkersAreRunning();
     }
 
-    // Removes a game's not-yet-started downloads from the queue when it scrolls off screen, so a
-    // fast scrub doesn't rack up a huge backlog of art for games the user is no longer looking at.
-    // Any item already handed to a worker finishes; only pending items are dropped.
     public void CancelGameAssets(int gameId)
     {
         lock (queueLock)
@@ -112,8 +101,6 @@ public partial class AssetManager : Node
         }
     }
 
-    // Drops the entire pending backlog (e.g. when the game list is rebuilt for a new system/filter).
-    // Visible entries re-request themselves via their VisibilityChanged handlers after the rebuild.
     public void ClearPendingAssetDownloads()
     {
         lock (queueLock)
@@ -210,8 +197,6 @@ public partial class AssetManager : Node
             item = first.Value;
             pendingAssetDownloadQueue.RemoveFirst();
 
-            // The item is now in-flight rather than pending; drop the per-game count so the game can
-            // be re-requested once its whole set has left the queue.
             if (pendingItemCountByGameId.TryGetValue(item.GameId, out int remaining))
             {
                 if (remaining <= 1)
@@ -258,9 +243,6 @@ public partial class AssetManager : Node
                     {
                         CallDeferred(MethodName.EmitAssetDownloaded, downloadTask.GameId, downloadTask.AssetType);
                     }
-                    // A false result is usually just a 404 (the server has no art for this game), which is
-                    // normal and not worth logging. Genuine failures (real HTTP errors, exceptions) are
-                    // already logged with URL/status detail inside DownloadAssetAsync.
                 }
 
                 else

@@ -4,48 +4,45 @@ using System.Collections.Generic;
 
 public class MainSceneSettingsHandler
 {
-    private MainScene _mainScene;
-    private AppInstance _appInstance;
-    private static readonly PackedScene _settingsListEntryScene = GD.Load<PackedScene>("res://scenes/settings_list/settings_list_entry.tscn");
-    private static readonly PackedScene _settingsSectionNavEntryScene = GD.Load<PackedScene>("res://scenes/settings_list/settings_section_nav_entry.tscn");
+    private MainScene mainScene;
+    private AppInstance appInstance;
+    private static readonly PackedScene settingsListEntryScene = GD.Load<PackedScene>("res://scenes/settings_list/settings_list_entry.tscn");
+    private static readonly PackedScene settingsSectionNavEntryScene = GD.Load<PackedScene>("res://scenes/settings_list/settings_section_nav_entry.tscn");
 
     public MainSceneSettingsHandler(MainScene mainScene, AppInstance appInstance)
     {
-        _mainScene = mainScene;
-        _appInstance = appInstance;
+        this.mainScene = mainScene;
+        this.appInstance = appInstance;
     }
 
-    // Container, footer and focus bookkeeping now lives in MainSceneSectionHandler; this stays as
-    // the entry point the footer button and the ToggleSettings action already call.
     public void ToggleSettingsMenu()
     {
-        _mainScene.SectionHandler.ToggleSettings();
+        mainScene.SectionHandler.ToggleSettings();
     }
 
-    // Called by MainSceneSectionHandler once the settings section has finished animating in.
     public void FocusFirstSettingsEntry()
     {
-        CycleFocusInContainer(_mainScene.settingsSectionsTree, 0);
+        CycleFocusInContainer(mainScene.settingsSectionsTree, 0);
     }
 
     public void SetupSettingsTree()
     {
-        if (_mainScene.settingsSectionsTree == null)
+        if (mainScene.settingsSectionsTree == null)
         {
             return;
         }
 
-        foreach (Node child in _mainScene.settingsSectionsTree.GetChildren())
+        foreach (Node child in mainScene.settingsSectionsTree.GetChildren())
         {
-            _mainScene.settingsSectionsTree.RemoveChild(child);
+            mainScene.settingsSectionsTree.RemoveChild(child);
             child.QueueFree();
         }
-        
-        if (_mainScene.sectionOptionsContainer != null)
+
+        if (mainScene.sectionOptionsContainer != null)
         {
-            foreach (Node child in _mainScene.sectionOptionsContainer.GetChildren())
+            foreach (Node child in mainScene.sectionOptionsContainer.GetChildren())
             {
-                _mainScene.sectionOptionsContainer.RemoveChild(child);
+                mainScene.sectionOptionsContainer.RemoveChild(child);
                 child.QueueFree();
             }
         }
@@ -53,22 +50,21 @@ public class MainSceneSettingsHandler
         AddNavEntry("General Settings", GenerateGeneralSettingsForm);
         AddNavEntry("Game List Settings", GenerateGameListSettingsForm);
         AddNavEntry("Input Settings", GenerateInputSettingsForm);
-        
+
         AddNavHeader("Platform Settings");
 
-        if (_mainScene.GameListHandler.gameSystems != null)
+        if (mainScene.GameListHandler.gameSystems != null)
         {
-            foreach (var system in _mainScene.GameListHandler.gameSystems)
+            foreach (var system in mainScene.GameListHandler.gameSystems)
             {
                 AddNavEntry(system.Name, () => GeneratePlatformSettingsForm(system));
             }
         }
-        
-        // Hide all forms initially and show the first one if available
+
         var visibleForm = GetVisibleSettingsForm();
-        if (visibleForm == null && _mainScene.sectionOptionsContainer?.GetChildCount() > 0)
+        if (visibleForm == null && mainScene.sectionOptionsContainer?.GetChildCount() > 0)
         {
-            if (_mainScene.sectionOptionsContainer.GetChild(0) is Control c)
+            if (mainScene.sectionOptionsContainer.GetChild(0) is Control c)
             {
                 c.Visible = true;
             }
@@ -80,34 +76,34 @@ public class MainSceneSettingsHandler
         var label = new Label();
         label.Text = headerName;
         label.AddThemeColorOverride("font_color", new Color(0.7f, 0.7f, 0.7f, 1f));
-        
+
         var margin = new MarginContainer();
         margin.AddThemeConstantOverride("margin_top", 20);
         margin.AddThemeConstantOverride("margin_bottom", 5);
         margin.AddThemeConstantOverride("margin_left", 5);
         margin.AddChild(label);
-        
-        _mainScene.settingsSectionsTree.AddChild(margin);
+
+        mainScene.settingsSectionsTree.AddChild(margin);
     }
 
     private void AddNavEntry(string sectionName, Action generateFormAction)
     {
         if (generateFormAction != null) generateFormAction();
 
-        var entry = _settingsSectionNavEntryScene.Instantiate<SettingsSectionNavEntry>();
+        var entry = settingsSectionNavEntryScene.Instantiate<SettingsSectionNavEntry>();
         entry.Setup(sectionName);
         entry.EntrySelected += OnSettingsTreeItemSelected;
-        _mainScene.settingsSectionsTree.AddChild(entry);
+        mainScene.settingsSectionsTree.AddChild(entry);
     }
 
     public Control GetVisibleSettingsForm()
     {
-        if (_mainScene.sectionOptionsContainer == null)
+        if (mainScene.sectionOptionsContainer == null)
         {
             return null;
         }
 
-        foreach (Node child in _mainScene.sectionOptionsContainer.GetChildren())
+        foreach (Node child in mainScene.sectionOptionsContainer.GetChildren())
         {
             if (child is Control c && c.Visible)
             {
@@ -140,7 +136,7 @@ public class MainSceneSettingsHandler
 
     public void CycleFocusedOption(int direction)
     {
-        var focusOwner = _mainScene.GetViewport().GuiGetFocusOwner();
+        var focusOwner = mainScene.GetViewport().GuiGetFocusOwner();
 
         if (focusOwner == null)
         {
@@ -221,21 +217,21 @@ public class MainSceneSettingsHandler
 
         List<Control> focusableChildren = new List<Control>();
         GatherFocusableControls(container, focusableChildren);
-        
+
         if (focusableChildren.Count == 0)
         {
             return;
         }
 
-        var focusOwner = _mainScene.GetViewport().GuiGetFocusOwner();
+        var focusOwner = mainScene.GetViewport().GuiGetFocusOwner();
         int currentIndex = focusOwner != null ? focusableChildren.IndexOf(focusOwner) : -1;
-        
+
         if (currentIndex == -1)
         {
             focusableChildren[0].GrabFocus();
             return;
         }
-        
+
         int nextIndex = currentIndex + direction;
 
         if (nextIndex < 0)
@@ -249,7 +245,7 @@ public class MainSceneSettingsHandler
 
         focusableChildren[nextIndex].GrabFocus();
     }
-    
+
     private void GatherFocusableControls(Node parent, List<Control> list)
     {
         foreach (Node child in parent.GetChildren())
@@ -261,8 +257,6 @@ public class MainSceneSettingsHandler
                     continue;
                 }
 
-                // Skip disabled controls so d-pad navigation passes over greyed-out entries
-                // instead of parking focus on something that can't be actioned.
                 if (c is BaseButton disableableButton && disableableButton.Disabled)
                 {
                     continue;
@@ -280,14 +274,14 @@ public class MainSceneSettingsHandler
 
     private void GenerateGeneralSettingsForm()
     {
-        if (_mainScene.sectionOptionsContainer == null)
+        if (mainScene.sectionOptionsContainer == null)
         {
             return;
         }
 
         string nodeName = "GeneralSettings";
 
-        if (_mainScene.sectionOptionsContainer.HasNode(nodeName))
+        if (mainScene.sectionOptionsContainer.HasNode(nodeName))
         {
             return;
         }
@@ -296,7 +290,7 @@ public class MainSceneSettingsHandler
         formContainer.Name = nodeName;
         formContainer.Visible = false;
         formContainer.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-        
+
         ScrollContainer scrollContainer = new ScrollContainer();
         scrollContainer.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
         scrollContainer.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
@@ -307,7 +301,7 @@ public class MainSceneSettingsHandler
         VBoxContainer vbox = new VBoxContainer();
         vbox.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         scrollContainer.AddChild(vbox);
-        _mainScene.sectionOptionsContainer.AddChild(formContainer);
+        mainScene.sectionOptionsContainer.AddChild(formContainer);
 
         HBoxContainer fieldBox = new HBoxContainer();
         Label label = new Label();
@@ -318,9 +312,8 @@ public class MainSceneSettingsHandler
         CarouselButton themeOptionButton = new CarouselButton();
         int idx = 0;
         int selectedIdx = 0;
-        string currentTheme = _appInstance.configManager.AppTheme;
+        string currentTheme = appInstance.configManager.AppTheme;
 
-        // "Match System" is a mode rather than a palette, so it is not in Themes; offer it first.
         foreach (var theme in System.Linq.Enumerable.Prepend(ConfigManager.Themes.Keys, ConfigManager.SystemThemeName))
         {
             themeOptionButton.AddItem(theme, idx);
@@ -330,17 +323,17 @@ public class MainSceneSettingsHandler
             }
             idx++;
         }
-        
+
         themeOptionButton.Select(selectedIdx);
         themeOptionButton.ItemSelected += (long index) =>
         {
             string selectedTheme = themeOptionButton.GetItemText((int)index);
-            _appInstance.configManager.SaveAppTheme(selectedTheme);
-            _mainScene.ApplyTheme();
+            appInstance.configManager.SaveAppTheme(selectedTheme);
+            mainScene.ApplyTheme();
         };
 
         fieldBox.AddChild(themeOptionButton);
-        var entry = _settingsListEntryScene.Instantiate<SettingsListEntry>();
+        var entry = settingsListEntryScene.Instantiate<SettingsListEntry>();
         entry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(fieldBox);
         vbox.AddChild(entry);
 
@@ -352,7 +345,7 @@ public class MainSceneSettingsHandler
 
         CarouselButton backgroundOptionButton = new CarouselButton();
         int selectedBackgroundIdx = 0;
-        string currentBackground = _appInstance.configManager.AppBackground;
+        string currentBackground = appInstance.configManager.AppBackground;
 
         for (int i = 0; i < ConfigManager.BackgroundStyles.Length; i++)
         {
@@ -366,26 +359,26 @@ public class MainSceneSettingsHandler
         backgroundOptionButton.Select(selectedBackgroundIdx);
         backgroundOptionButton.ItemSelected += (long index) =>
         {
-            _appInstance.configManager.SaveAppBackground(backgroundOptionButton.GetItemText((int)index));
-            _mainScene.ApplyTheme();
+            appInstance.configManager.SaveAppBackground(backgroundOptionButton.GetItemText((int)index));
+            mainScene.ApplyTheme();
         };
 
         backgroundFieldBox.AddChild(backgroundOptionButton);
-        var backgroundEntry = _settingsListEntryScene.Instantiate<SettingsListEntry>();
+        var backgroundEntry = settingsListEntryScene.Instantiate<SettingsListEntry>();
         backgroundEntry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(backgroundFieldBox);
         vbox.AddChild(backgroundEntry);
     }
 
     private void GenerateGameListSettingsForm()
     {
-        if (_mainScene.sectionOptionsContainer == null)
+        if (mainScene.sectionOptionsContainer == null)
         {
             return;
         }
 
         string nodeName = "GameListSettings";
 
-        if (_mainScene.sectionOptionsContainer.HasNode(nodeName))
+        if (mainScene.sectionOptionsContainer.HasNode(nodeName))
         {
             return;
         }
@@ -394,7 +387,7 @@ public class MainSceneSettingsHandler
         formContainer.Name = nodeName;
         formContainer.Visible = false;
         formContainer.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-        
+
         ScrollContainer scrollContainer = new ScrollContainer();
         scrollContainer.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
         scrollContainer.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
@@ -405,34 +398,34 @@ public class MainSceneSettingsHandler
         VBoxContainer vbox = new VBoxContainer();
         vbox.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         scrollContainer.AddChild(vbox);
-        _mainScene.sectionOptionsContainer.AddChild(formContainer);
+        mainScene.sectionOptionsContainer.AddChild(formContainer);
 
         HBoxContainer fieldBox = new HBoxContainer();
-        
+
         Label label = new Label();
         label.Text = "Hide games without box art";
         label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         fieldBox.AddChild(label);
 
         CheckButton checkbox = new CheckButton();
-        checkbox.ButtonPressed = _appInstance.configManager.HideGamesWithoutBoxArt;
-        
+        checkbox.ButtonPressed = appInstance.configManager.HideGamesWithoutBoxArt;
+
         CheckButton showAllCheckbox = new CheckButton();
-        showAllCheckbox.ButtonPressed = _appInstance.configManager.ShowAllSystems;
+        showAllCheckbox.ButtonPressed = appInstance.configManager.ShowAllSystems;
 
-        checkbox.Toggled += (bool toggledOn) => 
+        checkbox.Toggled += (bool toggledOn) =>
         {
-            _appInstance.configManager.SaveGameListSettings(toggledOn, showAllCheckbox.ButtonPressed);
+            appInstance.configManager.SaveGameListSettings(toggledOn, showAllCheckbox.ButtonPressed);
 
-            if (_mainScene.GameListHandler.gameSystems != null && _mainScene.GameListHandler.currentGameSystemIndex >= 0 && _mainScene.GameListHandler.currentGameSystemIndex < _mainScene.GameListHandler.gameSystems.Count)
+            if (mainScene.GameListHandler.gameSystems != null && mainScene.GameListHandler.currentGameSystemIndex >= 0 && mainScene.GameListHandler.currentGameSystemIndex < mainScene.GameListHandler.gameSystems.Count)
             {
-                _mainScene.GameListHandler.SelectSystemByIndex(_mainScene.GameListHandler.currentGameSystemIndex); 
-                _mainScene.GameListHandler.OnSystemSelected(_mainScene.GameListHandler.gameSystems[_mainScene.GameListHandler.currentGameSystemIndex]);
+                mainScene.GameListHandler.SelectSystemByIndex(mainScene.GameListHandler.currentGameSystemIndex);
+                mainScene.GameListHandler.OnSystemSelected(mainScene.GameListHandler.gameSystems[mainScene.GameListHandler.currentGameSystemIndex]);
             }
         };
         fieldBox.AddChild(checkbox);
-        
-        var entry1 = _settingsListEntryScene.Instantiate<SettingsListEntry>();
+
+        var entry1 = settingsListEntryScene.Instantiate<SettingsListEntry>();
         entry1.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(fieldBox);
         vbox.AddChild(entry1);
 
@@ -441,18 +434,18 @@ public class MainSceneSettingsHandler
         label2.Text = "Show all systems";
         label2.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         fieldBox2.AddChild(label2);
-        
-        showAllCheckbox.Toggled += (bool toggledOn) => 
+
+        showAllCheckbox.Toggled += (bool toggledOn) =>
         {
-            _appInstance.configManager.SaveGameListSettings(checkbox.ButtonPressed, toggledOn);
-            _mainScene.GetCache();
-            _mainScene.GameListHandler.SelectSystemByIndex(0);
-            
+            appInstance.configManager.SaveGameListSettings(checkbox.ButtonPressed, toggledOn);
+            mainScene.GetCache();
+            mainScene.GameListHandler.SelectSystemByIndex(0);
+
             Callable.From(() => {
                 SetupSettingsTree();
-                if (_mainScene.settingsSectionsTree != null && _mainScene.settingsSectionsTree.GetChildCount() > 1)
+                if (mainScene.settingsSectionsTree != null && mainScene.settingsSectionsTree.GetChildCount() > 1)
                 {
-                    if (_mainScene.settingsSectionsTree.GetChild(1) is SettingsSectionNavEntry navEntry)
+                    if (mainScene.settingsSectionsTree.GetChild(1) is SettingsSectionNavEntry navEntry)
                     {
                         navEntry.GrabFocus();
                         OnSettingsTreeItemSelected(navEntry.SectionName);
@@ -461,22 +454,22 @@ public class MainSceneSettingsHandler
             }).CallDeferred();
         };
         fieldBox2.AddChild(showAllCheckbox);
-        
-        var entry2 = _settingsListEntryScene.Instantiate<SettingsListEntry>();
+
+        var entry2 = settingsListEntryScene.Instantiate<SettingsListEntry>();
         entry2.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(fieldBox2);
         vbox.AddChild(entry2);
     }
 
     private void GenerateInputSettingsForm()
     {
-        if (_mainScene.sectionOptionsContainer == null)
+        if (mainScene.sectionOptionsContainer == null)
         {
             return;
         }
 
         string nodeName = "InputSettings";
 
-        if (_mainScene.sectionOptionsContainer.HasNode(nodeName))
+        if (mainScene.sectionOptionsContainer.HasNode(nodeName))
         {
             return;
         }
@@ -485,7 +478,7 @@ public class MainSceneSettingsHandler
         formContainer.Name = nodeName;
         formContainer.Visible = false;
         formContainer.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-        
+
         ScrollContainer scrollContainer = new ScrollContainer();
         scrollContainer.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
         scrollContainer.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
@@ -496,7 +489,7 @@ public class MainSceneSettingsHandler
         VBoxContainer vbox = new VBoxContainer();
         vbox.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         scrollContainer.AddChild(vbox);
-        _mainScene.sectionOptionsContainer.AddChild(formContainer);
+        mainScene.sectionOptionsContainer.AddChild(formContainer);
 
         HBoxContainer countBox = new HBoxContainer();
         Label countLabel = new Label();
@@ -507,47 +500,47 @@ public class MainSceneSettingsHandler
         SpinBox countSpin = new SpinBox();
         countSpin.MinValue = 1;
         countSpin.MaxValue = 10;
-        countSpin.Value = _appInstance.configManager.EmulatorCloseHotkeyCount;
+        countSpin.Value = appInstance.configManager.EmulatorCloseHotkeyCount;
         countBox.AddChild(countSpin);
-        
-        var entry1 = _settingsListEntryScene.Instantiate<SettingsListEntry>();
+
+        var entry1 = settingsListEntryScene.Instantiate<SettingsListEntry>();
         entry1.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(countBox);
         vbox.AddChild(entry1);
 
-        _mainScene.emulatorCloseHotkeysBtn = new Button();
-        _mainScene.InputHandler.UpdateEmulatorCloseHotkeysBtnText(); // Assuming InputHandler is public on MainScene
-        
-        _mainScene.emulatorCloseHotkeysBtn.Pressed += () =>
+        mainScene.emulatorCloseHotkeysBtn = new Button();
+        mainScene.InputHandler.UpdateEmulatorCloseHotkeysBtnText();
+
+        mainScene.emulatorCloseHotkeysBtn.Pressed += () =>
         {
-            _mainScene.InputHandler.expectedEmulatorCloseHotkeysCount = (int)countSpin.Value;
-            _mainScene.InputHandler.collectedEmulatorCloseHotkeys.Clear();
-            _mainScene.InputHandler.isListeningForEmulatorCloseHotkeys = true;
-            _mainScene.emulatorCloseHotkeysBtn.Text = $"Listening... (0/{_mainScene.InputHandler.expectedEmulatorCloseHotkeysCount})";
+            mainScene.InputHandler.expectedEmulatorCloseHotkeysCount = (int)countSpin.Value;
+            mainScene.InputHandler.collectedEmulatorCloseHotkeys.Clear();
+            mainScene.InputHandler.isListeningForEmulatorCloseHotkeys = true;
+            mainScene.emulatorCloseHotkeysBtn.Text = $"Listening... (0/{mainScene.InputHandler.expectedEmulatorCloseHotkeysCount})";
         };
-        
-        var entry2 = _settingsListEntryScene.Instantiate<SettingsListEntry>();
-        entry2.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(_mainScene.emulatorCloseHotkeysBtn);
+
+        var entry2 = settingsListEntryScene.Instantiate<SettingsListEntry>();
+        entry2.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(mainScene.emulatorCloseHotkeysBtn);
         vbox.AddChild(entry2);
 
         countSpin.ValueChanged += (double val) =>
         {
             int newCount = (int)val;
-            _appInstance.configManager.SaveInputSettings(newCount, _appInstance.configManager.EmulatorCloseHotkeys);
-            _mainScene.InputHandler.UpdateEmulatorCloseHotkeysBtnText();
+            appInstance.configManager.SaveInputSettings(newCount, appInstance.configManager.EmulatorCloseHotkeys);
+            mainScene.InputHandler.UpdateEmulatorCloseHotkeysBtnText();
         };
     }
 
     private void GeneratePlatformSettingsForm(GameSystem system)
     {
-        if (_mainScene.sectionOptionsContainer == null) return;
+        if (mainScene.sectionOptionsContainer == null) return;
         string nodeName = system.Name.Replace(" ", "");
-        if (_mainScene.sectionOptionsContainer.HasNode(nodeName)) return;
+        if (mainScene.sectionOptionsContainer.HasNode(nodeName)) return;
 
         MarginContainer formContainer = new MarginContainer();
         formContainer.Name = nodeName;
         formContainer.Visible = false;
         formContainer.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
-        
+
         ScrollContainer scrollContainer = new ScrollContainer();
         scrollContainer.SizeFlagsVertical = Control.SizeFlags.ExpandFill;
         scrollContainer.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
@@ -558,7 +551,7 @@ public class MainSceneSettingsHandler
         VBoxContainer vbox = new VBoxContainer();
         vbox.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         scrollContainer.AddChild(vbox);
-        _mainScene.sectionOptionsContainer.AddChild(formContainer);
+        mainScene.sectionOptionsContainer.AddChild(formContainer);
 
         HBoxContainer prefEmulatorBox = new HBoxContainer();
         Label prefLabel = new Label();
@@ -568,8 +561,8 @@ public class MainSceneSettingsHandler
 
         CarouselButton emulatorOptionButton = new CarouselButton();
         prefEmulatorBox.AddChild(emulatorOptionButton);
-        
-        var entry = _settingsListEntryScene.Instantiate<SettingsListEntry>();
+
+        var entry = settingsListEntryScene.Instantiate<SettingsListEntry>();
         entry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(prefEmulatorBox);
         vbox.AddChild(entry);
 
@@ -579,12 +572,12 @@ public class MainSceneSettingsHandler
         MarginContainer controllerMappingsContainer = new MarginContainer();
         vbox.AddChild(controllerMappingsContainer);
 
-        List<string> supportedEmulators = _appInstance.emulatorManager.GetSupportedEmulators(system.Slug);
-        var allEmulators = _appInstance.emulatorManager.GetAllAvailableEmulators();
+        List<string> supportedEmulators = appInstance.emulatorManager.GetSupportedEmulators(system.Slug);
+        var allEmulators = appInstance.emulatorManager.GetAllAvailableEmulators();
 
         int idx = 0;
         int selectedIdx = 0;
-        string currentPref = _appInstance.configManager.PreferredEmulators.ContainsKey(system.Slug) ? _appInstance.configManager.PreferredEmulators[system.Slug] : null;
+        string currentPref = appInstance.configManager.PreferredEmulators.ContainsKey(system.Slug) ? appInstance.configManager.PreferredEmulators[system.Slug] : null;
 
         foreach (string emuSlug in supportedEmulators)
         {
@@ -613,17 +606,17 @@ public class MainSceneSettingsHandler
             if (allEmulators.ContainsKey(currentPref))
             {
                 GenerateEmulatorSettingsUI(currentPref, allEmulators[currentPref], emulatorSettingsContainer);
-                _mainScene.InputHandler.GeneratePlatformControllerMappingsUI(system.Slug, allEmulators[currentPref], controllerMappingsContainer);
+                mainScene.InputHandler.GeneratePlatformControllerMappingsUI(system.Slug, allEmulators[currentPref], controllerMappingsContainer);
             }
 
             emulatorOptionButton.ItemSelected += (long index) =>
             {
                 string selectedSlug = emulatorOptionButton.GetItemMetadata((int)index).AsString();
-                _appInstance.configManager.SavePreferredEmulator(system.Slug, selectedSlug);
+                appInstance.configManager.SavePreferredEmulator(system.Slug, selectedSlug);
                 if (allEmulators.ContainsKey(selectedSlug))
                 {
                     GenerateEmulatorSettingsUI(selectedSlug, allEmulators[selectedSlug], emulatorSettingsContainer);
-                    _mainScene.InputHandler.GeneratePlatformControllerMappingsUI(system.Slug, allEmulators[selectedSlug], controllerMappingsContainer);
+                    mainScene.InputHandler.GeneratePlatformControllerMappingsUI(system.Slug, allEmulators[selectedSlug], controllerMappingsContainer);
                 }
             };
         }
@@ -641,20 +634,20 @@ public class MainSceneSettingsHandler
         VBoxContainer vbox = new VBoxContainer();
         parentContainer.AddChild(vbox);
 
-        var userSettings = _appInstance.emulatorManager.LoadEmulatorSettings(slug);
-        
+        var userSettings = appInstance.emulatorManager.LoadEmulatorSettings(slug);
+
         foreach (var field in meta.SettingsFields)
         {
             if (string.IsNullOrEmpty(field.Id)) continue;
-            
+
             bool hasValue = userSettings.TryGetValue(field.Id, out System.Text.Json.JsonElement element);
-            
+
             HBoxContainer fieldBox = new HBoxContainer();
             Label label = new Label();
             label.Text = field.Label;
             label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
             fieldBox.AddChild(label);
-            
+
             if (field.Type == "boolean")
             {
                 CheckButton checkbox = new CheckButton();
@@ -662,7 +655,7 @@ public class MainSceneSettingsHandler
                 if (hasValue && element.ValueKind == System.Text.Json.JsonValueKind.True) val = true;
                 if (hasValue && element.ValueKind == System.Text.Json.JsonValueKind.False) val = false;
                 checkbox.ButtonPressed = val;
-                checkbox.Toggled += (bool toggledOn) => { _appInstance.emulatorManager.SaveEmulatorSetting(slug, field.Id, toggledOn); };
+                checkbox.Toggled += (bool toggledOn) => { appInstance.emulatorManager.SaveEmulatorSetting(slug, field.Id, toggledOn); };
                 fieldBox.AddChild(checkbox);
             }
             else if (field.Type == "string")
@@ -672,7 +665,7 @@ public class MainSceneSettingsHandler
                 string val = field.DefaultValueString;
                 if (hasValue && element.ValueKind == System.Text.Json.JsonValueKind.String) val = element.GetString();
                 lineEdit.Text = val;
-                lineEdit.TextChanged += (string newText) => { _appInstance.emulatorManager.SaveEmulatorSetting(slug, field.Id, newText); };
+                lineEdit.TextChanged += (string newText) => { appInstance.emulatorManager.SaveEmulatorSetting(slug, field.Id, newText); };
                 fieldBox.AddChild(lineEdit);
             }
             else if (field.Type == "dropdown")
@@ -694,12 +687,12 @@ public class MainSceneSettingsHandler
                 optionButton.Select(selectedIdx);
                 optionButton.ItemSelected += (long index) => {
                     string selectedValue = optionButton.GetItemMetadata((int)index).AsString();
-                    _appInstance.emulatorManager.SaveEmulatorSetting(slug, field.Id, selectedValue);
+                    appInstance.emulatorManager.SaveEmulatorSetting(slug, field.Id, selectedValue);
                 };
                 fieldBox.AddChild(optionButton);
             }
-            
-            var entry = _settingsListEntryScene.Instantiate<SettingsListEntry>();
+
+            var entry = settingsListEntryScene.Instantiate<SettingsListEntry>();
             entry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(fieldBox);
             vbox.AddChild(entry);
         }
@@ -707,12 +700,12 @@ public class MainSceneSettingsHandler
 
     private void OnSettingsTreeItemSelected(string sectionName)
     {
-        if (_mainScene.settingsSectionsTree == null || _mainScene.sectionOptionsContainer == null)
+        if (mainScene.settingsSectionsTree == null || mainScene.sectionOptionsContainer == null)
         {
             return;
         }
 
-        foreach (Node child in _mainScene.sectionOptionsContainer.GetChildren())
+        foreach (Node child in mainScene.sectionOptionsContainer.GetChildren())
         {
             if (child is Control control)
             {
@@ -721,7 +714,7 @@ public class MainSceneSettingsHandler
         }
 
         string nodeName = sectionName.Replace(" ", "");
-        var activePanel = _mainScene.sectionOptionsContainer.GetNodeOrNull<Control>(nodeName);
+        var activePanel = mainScene.sectionOptionsContainer.GetNodeOrNull<Control>(nodeName);
 
         if (activePanel != null)
         {

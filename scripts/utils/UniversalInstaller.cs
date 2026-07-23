@@ -79,8 +79,6 @@ public static class UniversalInstaller
                 {
                     if (Directory.Exists(emulatorTargetDirectory))
                     {
-                        // Reinstalling over an existing install: clear it out but keep save data,
-                        // which lives inside the emulator directory, then merge the new build in.
                         ClearDirectoryPreservingPaths(emulatorTargetDirectory, emulatorMetadata.GetPreservePaths());
                         CopyDirectoryRecursively(matchingExtractedDirectory, emulatorTargetDirectory);
                         Directory.Delete(matchingExtractedDirectory, true);
@@ -107,8 +105,6 @@ public static class UniversalInstaller
                 ? emulatorMetadata.ExecutableName[currentOperatingSystem]
                 : selectedRelease.AssetName;
 
-            // Version-stamped executables (e.g. AppImages) keep their release filename; remove any
-            // previously installed versions matching executable_regex so only one remains.
             if (emulatorMetadata.ExecutableRegex != null && emulatorMetadata.ExecutableRegex.ContainsKey(currentOperatingSystem))
             {
                 destinationExecutableName = selectedRelease.AssetName;
@@ -234,8 +230,6 @@ public static class UniversalInstaller
             GD.PrintErr($"Github API error: {exception.Message}");
         }
 
-        // Prefer stable releases; some repos (e.g. PCSX2) flag every rolling release as a
-        // prerelease, in which case those are the only versions there are.
         return stableReleaseOptions.Count > 0 ? stableReleaseOptions : prereleaseOptions;
     }
 
@@ -294,8 +288,6 @@ public static class UniversalInstaller
 
             if (!string.IsNullOrEmpty(installRecipe.UrlTemplate) && !string.IsNullOrEmpty(installRecipe.VersionRegex))
             {
-                // Template mode: every distinct version_regex match becomes a release whose
-                // download URL is url_template with {version} substituted.
                 var versionPattern = new Regex(installRecipe.VersionRegex, RegexOptions.IgnoreCase);
                 var seenVersions = new HashSet<string>();
 
@@ -321,8 +313,6 @@ public static class UniversalInstaller
 
             else if (!string.IsNullOrEmpty(installRecipe.LinkRegex))
             {
-                // Link mode: every distinct link_regex match is itself a download URL; the
-                // optional version_regex extracts a display label from it.
                 var linkPattern = new Regex(installRecipe.LinkRegex, RegexOptions.IgnoreCase);
                 var versionPattern = string.IsNullOrEmpty(installRecipe.VersionRegex) ? null : new Regex(installRecipe.VersionRegex, RegexOptions.IgnoreCase);
                 var seenUrls = new HashSet<string>();
@@ -466,9 +456,6 @@ public static class UniversalInstaller
         }
     }
 
-    // Removes everything in a directory except the given relative paths (and the directories
-    // leading to them). Used so uninstalling or reinstalling an emulator never destroys the save
-    // data that emulators keep inside their own install directory.
     public static void ClearDirectoryPreservingPaths(string directoryPath, List<string> relativePathsToPreserve)
     {
         if (!Directory.Exists(directoryPath))
@@ -478,11 +465,8 @@ public static class UniversalInstaller
 
         string rootFullPath = Path.GetFullPath(directoryPath);
 
-        // Paths to keep entirely (the save targets themselves, subtree and all)...
         var exactlyPreservedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        // ...versus directories that merely lead to one, which must be kept but still cleaned
-        // out so unrelated files inside them are removed.
         var ancestorsOfPreservedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (string relativePath in relativePathsToPreserve ?? new List<string>())
@@ -522,7 +506,6 @@ public static class UniversalInstaller
         {
             string fullSubdirectoryPath = Path.GetFullPath(subdirectoryPath);
 
-            // A preserved target itself: leave the whole subtree untouched, contents included.
             if (exactlyPreservedPaths.Contains(fullSubdirectoryPath))
             {
                 continue;
@@ -530,7 +513,6 @@ public static class UniversalInstaller
 
             if (ancestorsOfPreservedPaths.Contains(fullSubdirectoryPath))
             {
-                // Only leads to a preserved path: recurse so unrelated siblings inside it still go.
                 ClearDirectoryPreservingPaths(subdirectoryPath, relativePathsToPreserve
                     .Select(relativePath => Path.GetFullPath(Path.Combine(directoryPath, relativePath.Replace('/', Path.DirectorySeparatorChar))))
                     .Where(preservedPath => preservedPath.StartsWith(fullSubdirectoryPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))

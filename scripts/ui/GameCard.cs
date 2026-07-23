@@ -1,24 +1,13 @@
 using Godot;
 
-// One entry in the game carousel.
-//
-// Entries used to be a bare TextureRect that MainSceneGameListHandler decorated in code on every
-// rebuild, with a separate HoverPopupOverlay drawing an imitation of the selected entry on top of
-// it. Those were two objects that had to agree on size and position and never quite did -- the real
-// art visibly peeked out from behind the popup. The card is now the only object: selecting it
-// changes its own appearance rather than spawning a copy, so there is nothing to misalign, and a
-// cover that finishes loading updates the card because it *is* the card.
 public partial class GameCard : Control, ICarouselItem
 {
-    // Matches the margins set on the Content node in the scene.
     private const float CardPadding = 12.0f;
     private const float RevealDuration = 0.18f;
 
     private static readonly ShaderMaterial MicaMaterial =
         GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
 
-    // Resolved lazily rather than in _Ready: the list handler assigns content immediately after
-    // Instantiate(), which is before the node enters the tree and _Ready runs.
     private Control body;
     private PanelContainer cardPanel;
     private TextureRect coverRect;
@@ -27,9 +16,6 @@ public partial class GameCard : Control, ICarouselItem
     private TextureRect installedIcon;
     private Panel focusPanel;
 
-    // Everything visible hangs off Body so the reveal can fade the whole card. Modulate is
-    // hierarchical, so this composes with the root modulate VerticalCarousel writes for depth
-    // falloff instead of fighting it.
     private Control Body => body ??= GetNode<Control>("Body");
     private PanelContainer CardPanel => cardPanel ??= GetNode<PanelContainer>("Body/CardPanel");
     private TextureRect CoverRect => coverRect ??= GetNode<TextureRect>("Body/CardPanel/Content/Stack/Cover");
@@ -40,8 +26,6 @@ public partial class GameCard : Control, ICarouselItem
 
     public Texture2D Cover => CoverRect.Texture;
 
-    // Whether the card is showing actual art rather than the shared placeholder. The fallback title
-    // is the centred label that stands in for missing art; the caption is the name under the cover.
     public bool HasRealCover { get; private set; }
 
     public void SetCover(Texture2D texture, bool isPlaceholder)
@@ -49,18 +33,10 @@ public partial class GameCard : Control, ICarouselItem
         HasRealCover = !isPlaceholder && texture != null;
         CoverRect.Texture = texture;
 
-        // Exactly one of the two labels shows at a time. Without art the centred title fills the
-        // empty cover area; with art the caption sits under it. Showing both named the game twice.
         TitleLabel.Visible = !HasRealCover;
         CaptionLabel.Visible = HasRealCover;
     }
 
-    // Cards are built hidden (Body starts at alpha 0 in the scene) and revealed once their cover
-    // load has been *attempted*, so the list fills in with finished cards rather than flashing a
-    // grid of empty placeholders while decoding catches up.
-    //
-    // Revealing on the attempt rather than on success is deliberate: plenty of games have no art at
-    // all, and gating on success would leave those cards invisible forever.
     public void Reveal()
     {
         if (revealed)
@@ -114,9 +90,6 @@ public partial class GameCard : Control, ICarouselItem
         {
             selected = value;
             FocusPanel.Visible = value;
-            // Only the selected card gets the frosted material. Mica samples the back buffer, and
-            // carousel cards overlap by design, so frosting all of them would have them blurring
-            // each other's output instead of the background.
             CardPanel.Material = value ? MicaMaterial : null;
         }
     }
@@ -127,11 +100,6 @@ public partial class GameCard : Control, ICarouselItem
         InstalledIcon.Visible = icon != null;
     }
 
-    // Reports the aspect of the whole card, not just the cover: the carousel sets the card's width
-    // and derives its height from this, so padding and the caption strip have to be included or the
-    // cover gets letterboxed by exactly the space they occupy.
-    //
-    // Relies on VerticalCarousel assigning CustomMinimumSize.X before it asks.
     public float CoverAspectRatio
     {
         get

@@ -20,18 +20,12 @@ public interface IConfigurationUpdater
 
 public class IniConfigurationUpdater : IConfigurationUpdater
 {
-    // Deliberate catch-all for INI-shaped formats: .ini (PCSX2, DuckStation, mGBA),
-    // .cfg (flycast's emu.cfg) and .toml (melonDS), which all use [Section] + key = value.
-    // Any format with a dedicated updater must be excluded here — this one is checked
-    // last, but an explicit exclusion keeps it correct regardless of ordering.
     public bool CanHandle(string filePath)
     {
         return !filePath.EndsWith(".json", StringComparison.OrdinalIgnoreCase) &&
                !filePath.EndsWith(".bml", StringComparison.OrdinalIgnoreCase);
     }
 
-    // Reads a single key, or null if the file/section/key isn't there. Used to leave
-    // emulator-authored values alone rather than overwriting them with a guess.
     public string ReadValue(string configurationFilePath, string targetSection, string targetKey)
     {
         if (!System.IO.File.Exists(configurationFilePath))
@@ -91,7 +85,7 @@ public class IniConfigurationUpdater : IConfigurationUpdater
                     updatedConfigurationLines.Add($"{targetKey} = {stringValue}");
                     hasUpdatedTargetKey = true;
                 }
-                
+
                 string currentSection = trimmedCurrentLine.Substring(1, trimmedCurrentLine.Length - 2);
                 isInsideTargetSection = (currentSection == targetSection);
                 updatedConfigurationLines.Add(currentLine);
@@ -146,12 +140,6 @@ public class IniConfigurationUpdater : IConfigurationUpdater
     }
 }
 
-// Azahar (and other Citra-lineage emulators) store each setting in qt-config.ini
-// alongside a companion "<key>\default" boolean. On read, if "<key>\default" is true the
-// stored value is IGNORED in favour of the built-in default (see QtConfig::ReadSetting in
-// azahar's config.cpp). So writing only "<key>" is silently discarded whenever the
-// companion is true. This updater writes the value AND sets "<key>\default = false",
-// which is exactly what Azahar itself does when a user changes a setting.
 public class QtConfigurationUpdater : IConfigurationUpdater
 {
     private readonly IniConfigurationUpdater iniUpdater = new IniConfigurationUpdater();
@@ -279,7 +267,7 @@ public class BmlConfigurationUpdater : IConfigurationUpdater
     public void UpdateValue(string configurationFilePath, string targetSection, string targetKey, string stringValue, object rawValue)
     {
         string[] lines = System.IO.File.Exists(configurationFilePath) ? System.IO.File.ReadAllLines(configurationFilePath) : new string[0];
-        
+
         var parsedLines = new System.Collections.Generic.List<BmlLine>();
 
         foreach (var line in lines)
@@ -289,7 +277,7 @@ public class BmlConfigurationUpdater : IConfigurationUpdater
                 parsedLines.Add(new BmlLine { Text = line, IsParsed = false });
                 continue;
             }
-            
+
             int indent = 0;
 
             while (indent < line.Length && line[indent] == ' ')
@@ -304,15 +292,15 @@ public class BmlConfigurationUpdater : IConfigurationUpdater
                 parsedLines.Add(new BmlLine { Text = line, IsParsed = false });
                 continue;
             }
-            
+
             int colonIndex = content.IndexOf(':');
             string key = colonIndex >= 0 ? content.Substring(0, colonIndex).TrimEnd() : content.TrimEnd();
-            
+
             parsedLines.Add(new BmlLine { Text = line, Indent = indent, Key = key, IsParsed = true });
         }
 
         string[] sectionPath = string.IsNullOrEmpty(targetSection) ? new string[0] : targetSection.Split('/');
-        
+
         int currentLineIndex = 0;
         int currentIndent = 0;
         int parentIndent = -1;
@@ -321,7 +309,7 @@ public class BmlConfigurationUpdater : IConfigurationUpdater
         {
             string expectedSection = sectionPath[i];
             bool found = false;
-            
+
             for (int j = currentLineIndex; j < parsedLines.Count; j++)
             {
                 var pl = parsedLines[j];
@@ -335,13 +323,13 @@ public class BmlConfigurationUpdater : IConfigurationUpdater
                 {
                     break;
                 }
-                
+
                 if (pl.Indent == currentIndent && pl.Key == expectedSection)
                 {
                     found = true;
                     currentLineIndex = j + 1;
                     parentIndent = currentIndent;
-                    
+
                     int childIndent = currentIndent + 2;
 
                     for (int next = currentLineIndex; next < parsedLines.Count; next++)
@@ -361,18 +349,18 @@ public class BmlConfigurationUpdater : IConfigurationUpdater
                     break;
                 }
             }
-            
+
             if (!found)
             {
                 for (int k = i; k < sectionPath.Length; k++)
                 {
                     int insertAt = FindInsertPosition(parsedLines, currentLineIndex, parentIndent);
-                    parsedLines.Insert(insertAt, new BmlLine 
-                    { 
-                        Text = new string(' ', currentIndent) + sectionPath[k], 
-                        Indent = currentIndent, 
-                        Key = sectionPath[k], 
-                        IsParsed = true 
+                    parsedLines.Insert(insertAt, new BmlLine
+                    {
+                        Text = new string(' ', currentIndent) + sectionPath[k],
+                        Indent = currentIndent,
+                        Key = sectionPath[k],
+                        IsParsed = true
                     });
                     currentLineIndex = insertAt + 1;
                     parentIndent = currentIndent;
@@ -382,7 +370,7 @@ public class BmlConfigurationUpdater : IConfigurationUpdater
                 break;
             }
         }
-        
+
         bool keyFound = false;
 
         for (int j = currentLineIndex; j < parsedLines.Count; j++)
@@ -398,7 +386,7 @@ public class BmlConfigurationUpdater : IConfigurationUpdater
             {
                 break;
             }
-            
+
             if (pl.Indent == currentIndent && pl.Key == targetKey)
             {
                 pl.Text = new string(' ', currentIndent) + targetKey + ": " + stringValue;
@@ -406,33 +394,33 @@ public class BmlConfigurationUpdater : IConfigurationUpdater
                 break;
             }
         }
-        
+
         if (!keyFound)
         {
             int insertAt = FindInsertPosition(parsedLines, currentLineIndex, parentIndent);
-            parsedLines.Insert(insertAt, new BmlLine 
-            { 
-                Text = new string(' ', currentIndent) + targetKey + ": " + stringValue, 
-                Indent = currentIndent, 
-                Key = targetKey, 
-                IsParsed = true 
+            parsedLines.Insert(insertAt, new BmlLine
+            {
+                Text = new string(' ', currentIndent) + targetKey + ": " + stringValue,
+                Indent = currentIndent,
+                Key = targetKey,
+                IsParsed = true
             });
         }
-        
+
         var outputLines = new System.Collections.Generic.List<string>();
 
         foreach(var pl in parsedLines)
         {
             outputLines.Add(pl.Text);
         }
-        
+
         string directory = Path.GetDirectoryName(configurationFilePath);
 
         if (!string.IsNullOrEmpty(directory) && !System.IO.Directory.Exists(directory))
         {
             System.IO.Directory.CreateDirectory(directory);
         }
-        
+
         System.IO.File.WriteAllLines(configurationFilePath, outputLines);
     }
 
@@ -462,9 +450,6 @@ public class EmulatorMeta
     [JsonPropertyName("executable_name")]
     public Dictionary<string, string> ExecutableName { get; set; }
 
-    // Optional per-OS regex matched against files in the emulator directory when the literal
-    // executable_name is absent — lets version-stamped executables (e.g. AppImages) resolve
-    // regardless of which release was installed.
     [JsonPropertyName("executable_regex")]
     public Dictionary<string, string> ExecutableRegex { get; set; }
 
@@ -477,10 +462,6 @@ public class EmulatorMeta
     [JsonPropertyName("relative_save_path")]
     public Dictionary<string, JsonElement> RelativeSavePath { get; set; }
 
-    // Extra install-relative paths to keep across reinstall/uninstall that are NOT save
-    // data — e.g. ares' settings.bml, which holds the user's controller mapping. Kept
-    // separate from relative_save_path because that list also drives save sync, and these
-    // paths must never be uploaded to RomM as game saves.
     [JsonPropertyName("preserve_on_reinstall")]
     public List<string> PreserveOnReinstall { get; set; }
 
@@ -490,18 +471,9 @@ public class EmulatorMeta
     [JsonPropertyName("launch_args_without_game")]
     public string LaunchArgsWithoutGame { get; set; }
 
-    // Per-OS environment variables applied to the emulator process. Some emulators
-    // hardcode a user config location (e.g. snes9x-gtk resolves XDG_CONFIG_HOME or
-    // $HOME/.config) with no portable mode and no CLI override — env vars are the only
-    // way to keep their config and saves inside the install directory. Values support
-    // the {emulator_dir} placeholder.
     [JsonPropertyName("launch_env")]
     public Dictionary<string, Dictionary<string, string>> LaunchEnv { get; set; }
 
-    // Per-platform launch fragment substituted for the {system} placeholder, keyed by
-    // system slug. Needed when one emulator serves several platforms from a single meta
-    // (e.g. ares) and must be told which system a ROM is — auto-detection by file
-    // extension is ambiguous for shared formats like .bin/.cue (Genesis vs disc systems).
     [JsonPropertyName("system_flags")]
     public Dictionary<string, string> SystemFlags { get; set; }
 
@@ -514,9 +486,6 @@ public class EmulatorMeta
     [JsonPropertyName("controller_config")]
     public ControllerConfig ControllerConfig { get; set; }
 
-    // Every emulator keeps its saves inside its own install directory (memory cards, save
-    // folders), so uninstalling or reinstalling must know which sub-paths to leave alone.
-    // Flattens relative_save_path, whose values are either a single string or a list of them.
     public List<string> GetSaveRelativePaths()
     {
         var savePaths = new List<string>();
@@ -548,10 +517,6 @@ public class EmulatorMeta
         return savePaths;
     }
 
-    // Paths to leave intact when clearing the install directory (reinstall/uninstall):
-    // save data plus any preserve_on_reinstall entries (config the user shouldn't lose,
-    // but which isn't game-save data). Save sync deliberately uses GetSaveRelativePaths()
-    // instead, so preserved config never gets uploaded to RomM.
     public List<string> GetPreservePaths()
     {
         var preservePaths = GetSaveRelativePaths();
@@ -591,11 +556,6 @@ public class EmulatorSettingField
     [JsonPropertyName("launch_arg_format")]
     public string LaunchArgFormat { get; set; }
 
-    // Each of the three config-target fields may be either a plain string (same file /
-    // section / key on every OS) or an object keyed by OS name, e.g.
-    //   "config_file_relative_path": { "windows": "snes9x.conf", "linux": "config/snes9x/snes9x.conf" }
-    // because some emulators use different config files or key names per platform. Resolve
-    // them per-OS via the Resolve* helpers rather than reading these directly.
     [JsonPropertyName("config_file_relative_path")]
     public JsonElement ConfigFileRelativePath { get; set; }
 
@@ -620,9 +580,6 @@ public class EmulatorSettingField
 
     public string ResolveConfigKey(string operatingSystem) => ResolveOsScopedValue(ConfigKey, operatingSystem);
 
-    // A config-target field is either a bare string (applies to every OS) or an object
-    // whose keys are OS names. Returns the string for this OS, or null when unset or when
-    // the object has no entry for this OS.
     private static string ResolveOsScopedValue(JsonElement fieldValue, string operatingSystem)
     {
         if (fieldValue.ValueKind == JsonValueKind.String)
@@ -661,8 +618,6 @@ public class InstallRecipe
     [JsonPropertyName("extract_folder_regex")]
     public string ExtractFolderRegex { get; set; }
 
-    // web_scrape recipes: fetch list_url (HTML or JSON) and either collect download links
-    // matching link_regex, or expand url_template for each version_regex match.
     [JsonPropertyName("list_url")]
     public string ListUrl { get; set; }
 
@@ -675,15 +630,10 @@ public class InstallRecipe
     [JsonPropertyName("url_template")]
     public string UrlTemplate { get; set; }
 
-    // github_tags recipes: list the repo's git tags, keep those matching tag_regex (capture
-    // group 1 = version), and build each download URL from url_template. For projects that tag
-    // on GitHub but host binaries elsewhere (e.g. Dolphin's CDN).
     [JsonPropertyName("tag_regex")]
     public string TagRegex { get; set; }
 }
 
-// One installable release of an emulator, resolved at runtime from the install recipe's
-// source (GitHub releases, a scraped download page, or a single direct URL).
 public class ReleaseOption
 {
     public string VersionLabel { get; set; }
@@ -824,7 +774,7 @@ public partial class EmulatorManager : Node
         {
             GD.PrintErr($"Failed to load emulator map (likely old format): {exception.Message}. Regenerating...");
             GenerateDefaultMaps();
-            
+
             try
             {
                 string mapJsonContent = FileAccess.GetFileAsString(emulatorMapFilePath);
@@ -839,13 +789,6 @@ public partial class EmulatorManager : Node
         MergeMissingDefaultMappings();
     }
 
-    // The on-disk map is only written once, at first run, so platforms added to the
-    // defaults later would never reach an existing install — and because systems with
-    // no mapping are filtered out of the game list entirely, those platforms silently
-    // disappear from the UI rather than failing visibly.
-    //
-    // Union in any default keys the file lacks. Existing keys are never touched, so
-    // user edits and PreferredEmulators overrides both survive.
     private void MergeMissingDefaultMappings()
     {
         if (systemToEmulatorMap == null)
@@ -879,7 +822,6 @@ public partial class EmulatorManager : Node
 
         catch (Exception exception)
         {
-            // Non-fatal: the in-memory map already has the new entries for this session.
             GD.PrintErr($"Failed to persist merged emulator map: {exception.Message}");
         }
     }
@@ -1046,10 +988,7 @@ public partial class EmulatorManager : Node
                             stringValue = jsonElement.GetString();
                         }
                     }
-                    
-                    // IniConfigurationUpdater is a catch-all and must stay last, or it
-                    // claims formats that have a dedicated updater (e.g. ares' settings.bml,
-                    // which is indentation-based and would be corrupted by INI-style writes).
+
                     var updaters = new IConfigurationUpdater[]
                     {
                         new JsonConfigurationUpdater(),
@@ -1073,8 +1012,6 @@ public partial class EmulatorManager : Node
             }
         }
     }
-
-
 
     public Dictionary<string, JsonElement> LoadEmulatorSettings(string emulatorSlug)
     {
@@ -1116,9 +1053,6 @@ public partial class EmulatorManager : Node
         }
     }
 
-    // Resolves the emulator's executable inside its install directory. Tries the literal
-    // executable_name first, then falls back to executable_regex so version-stamped release
-    // filenames (e.g. AppImages) resolve no matter which version was installed.
     public string ResolveExecutablePath(EmulatorMeta emulatorMetadata, string currentOperatingSystem, string emulatorInstallDirectory)
     {
         string literalExecutableName = emulatorMetadata.ExecutableName != null && emulatorMetadata.ExecutableName.ContainsKey(currentOperatingSystem)
@@ -1193,15 +1127,11 @@ public partial class EmulatorManager : Node
         return await UniversalInstaller.ListReleases(emulatorMetadata.InstallRecipe[currentOperatingSystem]);
     }
 
-    // True while an install for this emulator is in flight, so the UI can lock out repeat
-    // "Install Emulator" presses and show an in-progress state.
     public bool IsEmulatorInstalling(string emulatorName)
     {
         return !string.IsNullOrEmpty(emulatorName) && installingEmulators.Contains(emulatorName);
     }
 
-    // Removes an installed emulator's files while keeping its save data (memory cards and save
-    // folders live inside the emulator directory, so a plain directory delete would destroy them).
     public bool UninstallEmulator(string emulatorName)
     {
         if (string.IsNullOrEmpty(emulatorName))
@@ -1262,7 +1192,6 @@ public partial class EmulatorManager : Node
             return;
         }
 
-        // Guard against concurrent installs of the same emulator (e.g. rapid button presses).
         if (!installingEmulators.Add(emulatorName))
         {
             GD.Print($"{emulatorName} is already being installed.");
@@ -1357,11 +1286,6 @@ public partial class EmulatorManager : Node
         return launchArguments;
     }
 
-    // Injects the launch-arg portion of settings_fields into the command line. If the
-    // template contains a {settings} placeholder, the settings are substituted there;
-    // otherwise they are appended at the end. The placeholder matters for emulators that
-    // require the ROM path to be the LAST argument (e.g. Azahar): those put {settings}
-    // before {rom_path} so appended settings can't push the ROM out of final position.
     private string AppendDynamicSettingsToArguments(string launchArguments, string emulatorName, EmulatorMeta emulatorMetadata)
     {
         string settingsArguments = BuildDynamicSettingsArguments(emulatorName, emulatorMetadata);
@@ -1370,9 +1294,6 @@ public partial class EmulatorManager : Node
         {
             if (string.IsNullOrEmpty(settingsArguments))
             {
-                // Drop the placeholder plus exactly one adjacent space so we don't leave a
-                // gap — but never touch other whitespace, since a ROM path may contain
-                // consecutive spaces.
                 return launchArguments.Replace("{settings} ", "").Replace(" {settings}", "").Replace("{settings}", "");
             }
 
@@ -1387,9 +1308,6 @@ public partial class EmulatorManager : Node
         return launchArguments + " " + settingsArguments;
     }
 
-    // Substitutes the {system} placeholder with the per-slug fragment from system_flags
-    // (e.g. "--system \"Mega Drive\"" for ares). Absent placeholder or unmapped slug leaves
-    // the command line unchanged, matching the {settings} cleanup so no stray gap remains.
     private string ResolveSystemPlaceholder(string launchArguments, EmulatorMeta emulatorMetadata, string systemSlug)
     {
         if (launchArguments == null || !launchArguments.Contains("{system}"))
@@ -1517,7 +1435,6 @@ public partial class EmulatorManager : Node
         return Process.Start(processStartInfo);
     }
 
-    // Requires UseShellExecute = false, which is already set above.
     private void ApplyLaunchEnvironment(ProcessStartInfo processStartInfo, EmulatorMeta emulatorMetadata, string emulatorInstallDirectory)
     {
         if (emulatorMetadata?.LaunchEnv == null)
@@ -1579,7 +1496,6 @@ public partial class EmulatorManager : Node
                 return;
             }
 
-
             string emulatorInstallDirectory = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorMetadata.EmulatorDirName[currentOperatingSystem]);
             string fullExecutablePath = ResolveExecutablePath(emulatorMetadata, currentOperatingSystem, emulatorInstallDirectory);
 
@@ -1631,7 +1547,6 @@ public partial class EmulatorManager : Node
                         }
 
                         string configFilePath = Path.Combine(emulatorInstallDirectory, hiddenConfigRelativePath);
-                        // Ini is the catch-all and must stay last; see the matching list above.
                         var updaters = new IConfigurationUpdater[] { new JsonConfigurationUpdater(), new BmlConfigurationUpdater(), new QtConfigurationUpdater(), new IniConfigurationUpdater() };
 
                         foreach (var updater in updaters)
@@ -1716,7 +1631,6 @@ public partial class EmulatorManager : Node
                 activeEmulatorProcess.Kill();
             }
 
-
         }
     }
 
@@ -1770,11 +1684,6 @@ public partial class EmulatorManager : Node
 
             if (emulatorProcess != null)
             {
-                // Track the process even though there's no game: IsEmulatorRunning is what
-                // gates the frontend's input handling, and without it the UI keeps reacting
-                // to the controller behind the emulator — which makes configuring an
-                // emulator's own controller bindings nearly impossible. activeGame stays
-                // null so _Process cleans up without triggering a save sync.
                 activeEmulatorProcess = emulatorProcess;
 
                 emulatorProcess.EnableRaisingEvents = true;
@@ -1791,8 +1700,6 @@ public partial class EmulatorManager : Node
         }
     }
 
-    // Single source of truth for the built-in platform mappings, shared by
-    // GenerateDefaultMaps (first run) and MergeMissingDefaultMappings (upgrades).
     private static Dictionary<string, List<string>> BuildDefaultEmulatorMap()
     {
         return new Dictionary<string, List<string>>
@@ -1849,20 +1756,6 @@ public partial class EmulatorManager : Node
         }
     }
 
-    // Disabled while controller mappings are being re-derived per emulator. Two reasons,
-    // and the second is why this ships disabled rather than being a local-only toggle:
-    //
-    // 1. The writer stamps bindings into the exact files we need to read back clean after
-    //    a manual in-emulator mapping pass.
-    // 2. Its correctness is in doubt. {controller_name} resolves to Godot's name for the
-    //    pad ("XInput Controller"), which is NOT what the emulator's SDL calls the same
-    //    device ("Xbox Series X Controller") — so Dolphin's Device = SDL/{i}/{name} line
-    //    is likely not matching. gopher64's assignment_template was outright wrong and was
-    //    removed. Every emulator fixed so far was fixed by shipping static config instead.
-    //
-    // See docs/controller-followups.md. Audit those macros before flipping this back.
-    // Deliberately static readonly rather than const: a const would be folded at compile
-    // time and make every guarded branch an unreachable-code warning.
     private static readonly bool SuspendControllerMapping = true;
 
     private void ApplyControllerMappings(EmulatorMeta emulatorMetadata, string emulatorInstallDirectory, GameSystem currentGameSystem)
@@ -1885,10 +1778,6 @@ public partial class EmulatorManager : Node
 
         GD.Print($"Applying controller mappings: {availableControllerCount} of {controllerConfig.MaxControllers} max controllers");
 
-        // If no controllers were detected, do NOT rewrite the config: several scripts ship
-        // static player-1 bindings (e.g. PCSX2, DuckStation on SDL-0) and the writers would
-        // otherwise stamp port 1 as "disconnected", wiping those bindings. Leaving the config
-        // untouched preserves whatever was shipped.
         if (availableControllerCount == 0)
         {
             GD.Print("No controllers detected; leaving shipped controller config untouched.");
@@ -1928,18 +1817,6 @@ public partial class EmulatorManager : Node
                 {
                     if (isControllerConnected)
                     {
-                        // Never overwrite a device line the emulator already wrote.
-                        //
-                        // {controller_name} resolves to Godot's name for the pad, which is
-                        // NOT what the emulator's SDL calls the same device — one Xbox
-                        // Series X pad is "XInput Controller" to Godot and "Xbox One
-                        // Controller" to Dolphin. Dolphin requires an exact match and has
-                        // no fallback (verified: deleting the Device line entirely kills
-                        // all input), so a name we synthesised would read as disconnected
-                        // and silently break every binding in the section.
-                        //
-                        // Once the emulator or the user has put a real device there, it is
-                        // authoritative. We only fill it in when it is missing.
                         string existingDevice = iniUpdater.ReadValue(configFilePath, sectionName, sectionDef.DeviceKey);
 
                         if (string.IsNullOrEmpty(existingDevice))
@@ -2014,11 +1891,6 @@ public partial class EmulatorManager : Node
                     emulatorSpecificString = config.SdlStringMap[mappedSdlInput];
                 }
 
-                // A stored per-platform mapping can name an input this emulator's
-                // sdl_string_map doesn't know (e.g. "A" instead of "FaceSouth"). Falling
-                // through with an empty string would write a blank binding, which the
-                // emulator then silently discards — so fall back to the platform_layout
-                // default, which is always a valid key for this emulator.
                 else if (config.SdlStringMap != null && config.SdlStringMap.ContainsKey(defaultSdlInput))
                 {
                     GD.Print($"Controller mapping '{platformButton}' -> '{mappedSdlInput}' is not valid for this emulator; using default '{defaultSdlInput}'.");
@@ -2113,4 +1985,3 @@ public partial class EmulatorManager : Node
         currentNode[pathSegments.Last()] = valueToSet;
     }
 }
-

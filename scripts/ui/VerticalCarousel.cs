@@ -4,12 +4,12 @@ using System;
 public partial class VerticalCarousel : Control
 {
     [Export] public float itemSpacing = 160.0f;
-    [Export] public float depthOffset = 80.0f; // Horizontal shift for 3D wheel curve
-    [Export] public float xOffset = 0.0f; // Global horizontal adjustment
+    [Export] public float depthOffset = 80.0f;
+    [Export] public float xOffset = 0.0f;
     [Export] public bool useScreenPercentageForOffsets = true;
-    [Export] public float itemSpacingRatio = 0.074f; // roughly 160 / 2160
-    [Export] public float depthOffsetRatio = 0.104f; // roughly 400 / 3840
-    [Export] public float xOffsetRatio = -0.078f; // roughly -300 / 3840
+    [Export] public float itemSpacingRatio = 0.074f;
+    [Export] public float depthOffsetRatio = 0.104f;
+    [Export] public float xOffsetRatio = -0.078f;
     [Export] public float minimumScale = 0.5f;
     [Export] public float minimumOpacity = 0.3f;
     [Export] public float animationDuration = 0.25f;
@@ -31,11 +31,10 @@ public partial class VerticalCarousel : Control
     [Signal]
     public delegate void JumpSectionRequestedEventHandler(int direction);
 
-
     public override void _Ready()
     {
         FocusMode = FocusModeEnum.All;
-        ClipContents = true; // Clip items cleanly so they don't bleed over the header/footer
+        ClipContents = true;
     }
 
     public override void _GuiInput(InputEvent @event)
@@ -104,8 +103,6 @@ public partial class VerticalCarousel : Control
         UpdateLayout(false);
     }
 
-    // Items that know their artwork report it themselves; the bare-TextureRect case is kept so a
-    // carousel of plain textures still sizes correctly. Returns 0 when there is nothing to size from.
     private static float GetItemAspectRatio(Control child)
     {
         if (child is ICarouselItem item)
@@ -147,7 +144,7 @@ public partial class VerticalCarousel : Control
         for (int i = 0; i < childCount; i++)
         {
             Control child = GetChild<Control>(i);
-            
+
             if (scaleItemsToWindow)
             {
                 child.CustomMinimumSize = new Vector2(targetWidth, 0);
@@ -166,9 +163,9 @@ public partial class VerticalCarousel : Control
             }
 
             child.PivotOffset = child.Size / 2.0f;
-            
+
             int diff = i - SelectedIndex;
-            
+
             int halfCount = childCount / 2;
 
             if (diff > halfCount)
@@ -184,24 +181,23 @@ public partial class VerticalCarousel : Control
             if (childCount % 2 == 0 && diff == halfCount)
             {
 
-
             }
 
             float absDiff = Mathf.Abs(diff);
             float t = Mathf.Clamp(absDiff / visibleItemsHalfCount, 0.0f, 1.0f);
-            
+
             float currentItemSpacing = useScreenPercentageForOffsets ? GetViewport().GetVisibleRect().Size.Y * itemSpacingRatio : itemSpacing;
             float currentDepthOffset = useScreenPercentageForOffsets ? viewportWidth * depthOffsetRatio : depthOffset;
             float currentXOffset = useScreenPercentageForOffsets ? viewportWidth * xOffsetRatio : xOffset;
 
             float targetY = center.Y + (diff * currentItemSpacing) - (child.Size.Y / 2.0f);
             float targetX = center.X - (child.Size.X / 2.0f) - (t * t * currentDepthOffset) + currentXOffset;
-            
+
             Vector2 targetPos = new Vector2(targetX, targetY);
-            
+
             float targetScaleVal = Mathf.Lerp(1.0f, minimumScale, t);
             Vector2 targetScale = new Vector2(targetScaleVal, targetScaleVal);
-            
+
             Color targetColor = child.Modulate;
             targetColor.A = Mathf.Lerp(1.0f, minimumOpacity, t);
 
@@ -238,7 +234,7 @@ public partial class VerticalCarousel : Control
 
         EmitSignal(SignalName.ItemFocused, SelectedIndex);
     }
-    
+
     public override void _Notification(int what)
     {
         if (what == NotificationResized)
