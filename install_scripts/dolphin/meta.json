@@ -53,6 +53,9 @@
       "launch_arg_format": "-C Dolphin.Display.GFXBackend={value}"
     }
   ],
+  "preserve_on_reinstall": [
+    "User/Config/GCPadNew.ini"
+  ],
   "relative_save_path": {
     "ngc": [
       "User/GC/EUR/Card A",
@@ -93,10 +96,10 @@
       "C-Stick Right": "RightStick_Right"
     },
     "sdl_string_map": {
-      "FaceSouth": "`Button A`",
-      "FaceEast": "`Button B`",
-      "FaceWest": "`Button X`",
-      "FaceNorth": "`Button Y`",
+      "FaceSouth": "`Button S`",
+      "FaceEast": "`Button E`",
+      "FaceWest": "`Button W`",
+      "FaceNorth": "`Button N`",
       "LeftShoulder": "`Shoulder L`",
       "RightShoulder": "`Shoulder R`",
       "LeftTrigger": "`Trigger L`",

@@ -21,37 +21,10 @@ public class MainSceneDownloadHandler
         }
     }
 
+    // Container, footer and focus bookkeeping now lives in MainSceneSectionHandler.
     public void SwapLists()
     {
-        if (_mainScene.downloadsListContainer != null && _mainScene.gameList != null)
-        {
-            _mainScene.downloadsListContainer.Visible = !_mainScene.downloadsListContainer.Visible;
-
-            var gamesListContainer = _mainScene.gameList.GetParent().GetParent<Control>();
-
-            if (gamesListContainer != null)
-            {
-                gamesListContainer.Visible = !_mainScene.downloadsListContainer.Visible;
-            }
-
-            if (!_mainScene.downloadsListContainer.Visible)
-            {
-                _mainScene.gameList.GrabFocus();
-                _mainScene.GameListHandler.OnGameSelected((long)_mainScene.gameList.Get("SelectedIndex"));
-            }
-
-            if (_mainScene.gameListFooter != null)
-            {
-                _mainScene.gameListFooter.Visible = !_mainScene.downloadsListContainer.Visible;
-            }
-
-            if (_mainScene.downloadsFooter != null)
-            {
-                _mainScene.downloadsFooter.Visible = _mainScene.downloadsListContainer.Visible;
-            }
-
-            _mainScene.UpdateHeaderLabel();
-        }
+        _mainScene.SectionHandler.ToggleDownloads();
     }
 
     public void OnCancelDownloadPressed()

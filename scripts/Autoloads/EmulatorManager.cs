@@ -30,6 +30,44 @@ public class IniConfigurationUpdater : IConfigurationUpdater
                !filePath.EndsWith(".bml", StringComparison.OrdinalIgnoreCase);
     }
 
+    // Reads a single key, or null if the file/section/key isn't there. Used to leave
+    // emulator-authored values alone rather than overwriting them with a guess.
+    public string ReadValue(string configurationFilePath, string targetSection, string targetKey)
+    {
+        if (!System.IO.File.Exists(configurationFilePath))
+        {
+            return null;
+        }
+
+        bool isInsideTargetSection = false;
+
+        foreach (string currentLine in System.IO.File.ReadAllLines(configurationFilePath))
+        {
+            string trimmedCurrentLine = currentLine.Trim();
+
+            if (trimmedCurrentLine.StartsWith("[") && trimmedCurrentLine.EndsWith("]"))
+            {
+                string currentSection = trimmedCurrentLine.Substring(1, trimmedCurrentLine.Length - 2);
+                isInsideTargetSection = (currentSection == targetSection);
+                continue;
+            }
+
+            if (!isInsideTargetSection)
+            {
+                continue;
+            }
+
+            int separatorIndex = trimmedCurrentLine.IndexOf('=');
+
+            if (separatorIndex > 0 && trimmedCurrentLine.Substring(0, separatorIndex).Trim() == targetKey)
+            {
+                return trimmedCurrentLine.Substring(separatorIndex + 1).Trim();
+            }
+        }
+
+        return null;
+    }
+
     public void UpdateValue(string configurationFilePath, string targetSection, string targetKey, string stringValue, object rawValue)
     {
         if (!System.IO.File.Exists(configurationFilePath))
@@ -1732,6 +1770,13 @@ public partial class EmulatorManager : Node
 
             if (emulatorProcess != null)
             {
+                // Track the process even though there's no game: IsEmulatorRunning is what
+                // gates the frontend's input handling, and without it the UI keeps reacting
+                // to the controller behind the emulator — which makes configuring an
+                // emulator's own controller bindings nearly impossible. activeGame stays
+                // null so _Process cleans up without triggering a save sync.
+                activeEmulatorProcess = emulatorProcess;
+
                 emulatorProcess.EnableRaisingEvents = true;
                 emulatorProcess.Exited += (sender, exitEventArgs) =>
                 {
@@ -1804,8 +1849,30 @@ public partial class EmulatorManager : Node
         }
     }
 
+    // Disabled while controller mappings are being re-derived per emulator. Two reasons,
+    // and the second is why this ships disabled rather than being a local-only toggle:
+    //
+    // 1. The writer stamps bindings into the exact files we need to read back clean after
+    //    a manual in-emulator mapping pass.
+    // 2. Its correctness is in doubt. {controller_name} resolves to Godot's name for the
+    //    pad ("XInput Controller"), which is NOT what the emulator's SDL calls the same
+    //    device ("Xbox Series X Controller") — so Dolphin's Device = SDL/{i}/{name} line
+    //    is likely not matching. gopher64's assignment_template was outright wrong and was
+    //    removed. Every emulator fixed so far was fixed by shipping static config instead.
+    //
+    // See docs/controller-followups.md. Audit those macros before flipping this back.
+    // Deliberately static readonly rather than const: a const would be folded at compile
+    // time and make every guarded branch an unreachable-code warning.
+    private static readonly bool SuspendControllerMapping = true;
+
     private void ApplyControllerMappings(EmulatorMeta emulatorMetadata, string emulatorInstallDirectory, GameSystem currentGameSystem)
     {
+        if (SuspendControllerMapping)
+        {
+            GD.Print("Controller mapping is suspended; leaving emulator config untouched.");
+            return;
+        }
+
         if (emulatorMetadata.ControllerConfig == null)
         {
             return;
@@ -1861,10 +1928,32 @@ public partial class EmulatorManager : Node
                 {
                     if (isControllerConnected)
                     {
-                        string deviceValue = sectionDef.DeviceTemplate
-                            .Replace("{sdl_index}", connectedControllers[portOffset].ConnectionOrder.ToString())
-                            .Replace("{controller_name}", connectedControllers[portOffset].ControllerName);
-                        iniUpdater.UpdateValue(configFilePath, sectionName, sectionDef.DeviceKey, deviceValue, deviceValue);
+                        // Never overwrite a device line the emulator already wrote.
+                        //
+                        // {controller_name} resolves to Godot's name for the pad, which is
+                        // NOT what the emulator's SDL calls the same device — one Xbox
+                        // Series X pad is "XInput Controller" to Godot and "Xbox One
+                        // Controller" to Dolphin. Dolphin requires an exact match and has
+                        // no fallback (verified: deleting the Device line entirely kills
+                        // all input), so a name we synthesised would read as disconnected
+                        // and silently break every binding in the section.
+                        //
+                        // Once the emulator or the user has put a real device there, it is
+                        // authoritative. We only fill it in when it is missing.
+                        string existingDevice = iniUpdater.ReadValue(configFilePath, sectionName, sectionDef.DeviceKey);
+
+                        if (string.IsNullOrEmpty(existingDevice))
+                        {
+                            string deviceValue = sectionDef.DeviceTemplate
+                                .Replace("{sdl_index}", connectedControllers[portOffset].ConnectionOrder.ToString())
+                                .Replace("{controller_name}", connectedControllers[portOffset].ControllerName);
+                            iniUpdater.UpdateValue(configFilePath, sectionName, sectionDef.DeviceKey, deviceValue, deviceValue);
+                        }
+
+                        else
+                        {
+                            GD.Print($"Keeping existing device for {sectionName}: {existingDevice}");
+                        }
                     }
 
                     else if (!string.IsNullOrEmpty(sectionDef.DeviceDisconnected))
@@ -1923,6 +2012,17 @@ public partial class EmulatorManager : Node
                 if (!string.IsNullOrEmpty(mappedSdlInput) && config.SdlStringMap != null && config.SdlStringMap.ContainsKey(mappedSdlInput))
                 {
                     emulatorSpecificString = config.SdlStringMap[mappedSdlInput];
+                }
+
+                // A stored per-platform mapping can name an input this emulator's
+                // sdl_string_map doesn't know (e.g. "A" instead of "FaceSouth"). Falling
+                // through with an empty string would write a blank binding, which the
+                // emulator then silently discards — so fall back to the platform_layout
+                // default, which is always a valid key for this emulator.
+                else if (config.SdlStringMap != null && config.SdlStringMap.ContainsKey(defaultSdlInput))
+                {
+                    GD.Print($"Controller mapping '{platformButton}' -> '{mappedSdlInput}' is not valid for this emulator; using default '{defaultSdlInput}'.");
+                    emulatorSpecificString = config.SdlStringMap[defaultSdlInput];
                 }
 
                 result = result.Replace(macro, emulatorSpecificString);

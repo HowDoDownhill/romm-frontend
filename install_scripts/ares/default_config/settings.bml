@@ -1,0 +1,29 @@
+Input
+  Driver: SDL
+  Defocus: Pause
+VirtualPad1
+  Pad.Up: /0/1/1/Lo;;
+  Pad.Down: /0/1/1/Hi;;
+  Pad.Left: /0/1/0/Lo;;
+  Pad.Right: /0/1/0/Hi;;
+  Select: /0/3/6;;
+  Start: /0/3/7;;
+  A..South: /0/3/0;;
+  B..East: /0/3/1;;
+  X..West: /0/3/2;;
+  Y..North: /0/3/3;;
+  L-Bumper: /0/3/4;;
+  R-Bumper: /0/3/5;;
+  L-Trigger: /0/0/2/Hi;;
+  R-Trigger: /0/0/5/Hi;;
+  L-Stick..Click: /0/3/8;;
+  R-Stick..Click: /0/3/9;;
+  L-Up: /0/0/1/Lo;;
+  L-Down: /0/0/1/Hi;;
+  L-Left: /0/0/0/Lo;;
+  L-Right: /0/0/0/Hi;;
+  R-Up: /0/0/4/Lo;;
+  R-Down: /0/0/4/Hi;;
+  R-Left: /0/0/3/Lo;;
+  R-Right: /0/0/3/Hi;;
+  Rumble: ;;

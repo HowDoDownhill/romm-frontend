@@ -53,7 +53,6 @@ public partial class MainSceneGameListHandler
         preFadedForQuickSwitch = true;
 
         float duration = 0.15f;
-        if (_mainScene.HoverOverlay != null) _mainScene.HoverOverlay.ForceCancelPopup();
 
         Tween fadeOutTween = _mainScene.CreateTween();
         Color glColorOut = _mainScene.gameList.Modulate; glColorOut.A = 0.0f;
@@ -91,11 +90,6 @@ public partial class MainSceneGameListHandler
             fadeOutTween.Parallel().TweenProperty(_mainScene.detailsPanelContainer, "modulate", dpcColorOut, duration);
         }
 
-        if (_mainScene.HoverOverlay != null) {
-            Color hoColorOut = _mainScene.HoverOverlay.Modulate; hoColorOut.A = 0.0f;
-            fadeOutTween.Parallel().TweenProperty(_mainScene.HoverOverlay, "modulate", hoColorOut, duration);
-        }
-            
         await _mainScene.ToSignal(fadeOutTween, Tween.SignalName.Finished);
         }
 
@@ -106,11 +100,6 @@ public partial class MainSceneGameListHandler
 
 
         if (_mainScene.detailsPanelContainer != null) { var dpcMod = _mainScene.detailsPanelContainer.Modulate; dpcMod.A = 0.0f; _mainScene.detailsPanelContainer.Modulate = dpcMod; }
-
-        if (_mainScene.HoverOverlay != null) { 
-            _mainScene.HoverOverlay.ForceCancelPopup();
-            var hoMod = _mainScene.HoverOverlay.Modulate; hoMod.A = 1.0f; _mainScene.HoverOverlay.Modulate = hoMod;
-        }
 
         DoSelectSystemByIndex(targetIndex);
 
@@ -169,8 +158,16 @@ public partial class MainSceneGameListHandler
 
         currentGameSystemIndex = index;
         var selectedSystem = gameSystems[index];
-        
+
         _mainScene.UpdateHeaderLabel();
+
+        // The "Match System" theme is derived from the selected platform, so it has to be re-applied
+        // whenever that changes. Static themes ignore this.
+        if (ConfigManager.IsSystemTheme(_appInstance.configManager.AppTheme))
+        {
+            _mainScene.ApplyTheme();
+        }
+
         OnSystemSelected(selectedSystem);
     }
 
@@ -265,8 +262,6 @@ public partial class MainSceneGameListHandler
         IsFilterTransitioning = true;
         float duration = 0.15f;
 
-        if (_mainScene.HoverOverlay != null) _mainScene.HoverOverlay.ForceCancelPopup();
-
         Tween fadeOut = _mainScene.CreateTween();
         Color glOut = _mainScene.gameList.Modulate; glOut.A = 0.0f;
         fadeOut.TweenProperty(_mainScene.gameList, "modulate", glOut, duration);
@@ -301,6 +296,83 @@ public partial class MainSceneGameListHandler
         IsFilterTransitioning = false;
     }
 
+    // Cover art is decoded on the main thread at roughly 5ms per entry. The carousel reveals ~25
+    // entries at once when a list is built, which stalled the frame for ~130ms right between the
+    // fade-out and fade-in of a system switch. Loads are spread over frames instead; each entry
+    // keeps its placeholder until its turn comes.
+    // Budgeted by time rather than by a fixed count: a single cover decode measured ~5ms here but
+    // varies with image size and disk, and a fixed count would blow the frame budget on slower
+    // machines. One load always runs so the queue cannot stall.
+    private const double ImageLoadBudgetMs = 4.0;
+    private readonly List<GameCard> pendingImageLoads = new List<GameCard>();
+    private readonly Dictionary<GameCard, Action> imageLoaders = new Dictionary<GameCard, Action>();
+
+    private void RequestImageLoad(GameCard entry)
+    {
+        if (entry == null || pendingImageLoads.Contains(entry))
+        {
+            return;
+        }
+        pendingImageLoads.Add(entry);
+    }
+
+    // Driven from MainScene._Process.
+    public void ProcessPendingImageLoads()
+    {
+        var frameBudget = System.Diagnostics.Stopwatch.StartNew();
+
+        while (pendingImageLoads.Count > 0)
+        {
+            GameCard entry = TakeTopmostPending();
+            if (entry == null)
+            {
+                break;
+            }
+
+            if (imageLoaders.TryGetValue(entry, out Action load))
+            {
+                load();
+            }
+
+            if (frameBudget.Elapsed.TotalMilliseconds >= ImageLoadBudgetMs)
+            {
+                break;
+            }
+        }
+    }
+
+    // Picks the highest card on screen rather than the oldest request, so the list fills downward
+    // instead of outward from the selected game.
+    //
+    // Ordering has to happen here rather than at request time for two reasons: the carousel queues
+    // entries in child-index order, which is unrelated to vertical position, and it assigns each
+    // child's Position *after* flipping Visible -- so at the moment a load is requested the card
+    // has not been placed yet.
+    private GameCard TakeTopmostPending()
+    {
+        // Entries freed by a rebuild, or scrolled back out of the preload window before their turn
+        // came up, are dropped without spending any of the frame budget.
+        pendingImageLoads.RemoveAll(candidate => !GodotObject.IsInstanceValid(candidate) || !candidate.Visible);
+
+        if (pendingImageLoads.Count == 0)
+        {
+            return null;
+        }
+
+        int topmost = 0;
+        for (int i = 1; i < pendingImageLoads.Count; i++)
+        {
+            if (pendingImageLoads[i].Position.Y < pendingImageLoads[topmost].Position.Y)
+            {
+                topmost = i;
+            }
+        }
+
+        GameCard entry = pendingImageLoads[topmost];
+        pendingImageLoads.RemoveAt(topmost);
+        return entry;
+    }
+
     public void RefreshGameList()
     {
         if (_mainScene.gameList == null)
@@ -311,6 +383,10 @@ public partial class MainSceneGameListHandler
         // Drop any pending asset downloads from the previous list; the new visible entries will
         // re-request what they need. Prevents stale-system art blocking the incoming system's art.
         _appInstance.assetManager.ClearPendingAssetDownloads();
+
+        // The entries these referred to are about to be freed.
+        pendingImageLoads.Clear();
+        imageLoaders.Clear();
 
         foreach (Node child in _mainScene.gameList.GetChildren())
         {
@@ -339,31 +415,12 @@ public partial class MainSceneGameListHandler
                 continue;
             }
 
-            TextureRect entry = _mainScene.gameListEntryScene.Instantiate<TextureRect>();
+            // The focus border, fallback title and installed marker are part of the card scene now,
+            // so building an entry is just assigning content.
+            GameCard entry = _mainScene.gameListEntryScene.Instantiate<GameCard>();
             entry.FocusMode = Control.FocusModeEnum.All;
-
-            Panel focusPanel = new Panel();
-            focusPanel.Name = "FocusPanel";
-            focusPanel.SetAnchorsPreset(Control.LayoutPreset.FullRect);
-            focusPanel.MouseFilter = Control.MouseFilterEnum.Ignore;
-            StyleBoxFlat focusStyle = new StyleBoxFlat
-            {
-                BgColor = new Color(0, 0, 0, 0),
-                BorderWidthTop = 4,
-                BorderWidthBottom = 4,
-                BorderWidthLeft = 4,
-                BorderWidthRight = 4,
-                BorderColor = new Color(1f, 1f, 1f, 0.5f),
-                DrawCenter = false
-            };
-            focusPanel.AddThemeStyleboxOverride("panel", focusStyle);
-            focusPanel.Visible = false;
-            entry.AddChild(focusPanel);
-
-            entry.Texture = _mainScene.placeholderTexture;
-            Label titleLabel = entry.GetNode<Label>("TitleLabel");
-            titleLabel.Text = game.Name;
-            titleLabel.AddThemeColorOverride("font_color", Colors.Black);
+            entry.Title = game.Name;
+            entry.SetCover(_mainScene.placeholderTexture, true);
 
             bool textureLoaded = false;
 
@@ -374,29 +431,28 @@ public partial class MainSceneGameListHandler
                 string assetsPath = _appInstance.configManager.AssetsPath;
                 string path3d = System.IO.Path.Combine(assetsPath, "covers_3d", $"{game.Id}.png");
                 string path2d = System.IO.Path.Combine(assetsPath, "covers_2d", $"{game.Id}.png");
-                string pathFallback = "";
-                string[] exts = { ".png", ".jpg", ".webp" };
 
-                foreach (var ext in exts)
+                ImageTexture loadedTex = SafeLoadTexture(path2d) ?? SafeLoadTexture(path3d);
+
+                // Probe the fallback extensions only once the 2d/3d covers have missed. These three
+                // FileExists calls used to run for every entry, including the common case where a
+                // 2d cover exists and the result was thrown away.
+                if (loadedTex == null)
                 {
-                    string p = System.IO.Path.Combine(assetsPath, "covers_fallback", $"{game.Id}{ext}");
-                    if (Godot.FileAccess.FileExists(p))
+                    foreach (var ext in new[] { ".png", ".jpg", ".webp" })
                     {
-                        pathFallback = p;
-                        break;
+                        string p = System.IO.Path.Combine(assetsPath, "covers_fallback", $"{game.Id}{ext}");
+                        if (Godot.FileAccess.FileExists(p))
+                        {
+                            loadedTex = SafeLoadTexture(p);
+                            break;
+                        }
                     }
                 }
 
-                ImageTexture loadedTex = null;
-
-                if (!string.IsNullOrEmpty(path2d)) loadedTex = SafeLoadTexture(path2d);
-                if (loadedTex == null && !string.IsNullOrEmpty(path3d)) loadedTex = SafeLoadTexture(path3d);
-                if (loadedTex == null && !string.IsNullOrEmpty(pathFallback)) loadedTex = SafeLoadTexture(pathFallback);
-
                 if (loadedTex != null)
                 {
-                    entry.Texture = loadedTex;
-                    titleLabel.Visible = false;
+                    entry.SetCover(loadedTex, false);
                     textureLoaded = true;
                 }
                 else
@@ -404,19 +460,11 @@ public partial class MainSceneGameListHandler
                     _appInstance.assetManager.RequestGameAssets(game);
                 }
 
-                TextureRect installedIcon = entry.GetNodeOrNull<TextureRect>("InstalledIcon");
-                if (installedIcon != null)
-                {
-                    if (CheckIfGameIsDownloaded(game) && systemControllerIcon != null)
-                    {
-                        installedIcon.Texture = systemControllerIcon;
-                        installedIcon.Visible = true;
-                    }
-                    else
-                    {
-                        installedIcon.Visible = false;
-                    }
-                }
+                entry.SetInstalledIcon(CheckIfGameIsDownloaded(game) ? systemControllerIcon : null);
+
+                // Reveal on the attempt, not on success: a game with no art anywhere would never
+                // reach a successful load and its card would stay invisible for good.
+                entry.Reveal();
 
                 if (textureLoaded && _mainScene.gameList.HasMethod("UpdateLayout"))
                 {
@@ -435,15 +483,15 @@ public partial class MainSceneGameListHandler
                 _appInstance.assetManager.CancelGameAssets(game.Id);
 
                 if (!textureLoaded) return;
-                entry.Texture = _mainScene.placeholderTexture;
-                titleLabel.Visible = true;
+                entry.SetCover(_mainScene.placeholderTexture, true);
                 textureLoaded = false;
             }
 
             entry.Visible = false;
-            entry.VisibilityChanged += () => 
+            imageLoaders[entry] = TryLoadImage;
+            entry.VisibilityChanged += () =>
             {
-                if (entry.Visible) TryLoadImage();
+                if (entry.Visible) RequestImageLoad(entry);
                 else TryUnloadImage();
             };
 
@@ -453,10 +501,10 @@ public partial class MainSceneGameListHandler
                 if (downloadedGameId == game.Id && (assetType == "box3d" || assetType == "box2d"))
                 {
                     textureLoaded = false;
-                    if (entry.Visible) TryLoadImage();
-                    // The popup snapshots entry.Texture when shown; refresh it now that the cover
-                    // has loaded so a game selected before its art arrived isn't stuck on the placeholder.
-                    _mainScene.HoverOverlay?.RefreshContentIfTarget(entry);
+                    // The popup refresh now happens inside TryLoadImage once the texture actually
+                    // exists; refreshing here would snapshot the placeholder, since the load is
+                    // only queued at this point rather than performed.
+                    if (entry.Visible) RequestImageLoad(entry);
                 }
             };
             _appInstance.assetManager.AssetDownloaded += onAssetDownloaded;
@@ -465,6 +513,7 @@ public partial class MainSceneGameListHandler
             {
                 _appInstance.assetManager.AssetDownloaded -= onAssetDownloaded;
                 _appInstance.assetManager.CancelGameAssets(game.Id);
+                imageLoaders.Remove(entry);
             };
 
             _mainScene.gameList.AddChild(entry);
@@ -518,48 +567,14 @@ public partial class MainSceneGameListHandler
             var children = _mainScene.gameList.GetChildren();
             for (int i = 0; i < children.Count; i++)
             {
-                var entry = children[i] as TextureRect;
-                var focusPanel = entry?.GetNodeOrNull<Panel>("FocusPanel");
-                if (focusPanel != null)
+                var entry = children[i] as GameCard;
+                if (entry == null)
                 {
-                    focusPanel.Visible = (i == (int)index);
+                    continue;
                 }
 
-                if (i == (int)index && entry != null)
-                {
-                    var popupItem = new DelegateHoverPopupItem(() => {
-                        var vbox = new VBoxContainer();
-                        var viewportSize = _mainScene.GetViewport().GetVisibleRect().Size;
-                        float targetWidth = viewportSize.X * 0.225f; // 22.5% of screen width
-                        float targetHeight = targetWidth;
-                        
-                        if (entry.Texture != null && entry.Texture.GetSize().X > 0)
-                        {
-                            targetHeight = targetWidth * (entry.Texture.GetSize().Y / entry.Texture.GetSize().X);
-                        }
-
-                        var tex = new TextureRect { 
-                            Texture = entry.Texture, 
-                            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, 
-                            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered, 
-                            CustomMinimumSize = new Vector2(targetWidth, targetHeight) 
-                        };
-                        var lbl = new Label {
-                            Text = currentlySelectedGame.Name,
-                            HorizontalAlignment = HorizontalAlignment.Center,
-                            AutowrapMode = TextServer.AutowrapMode.WordSmart,
-                            CustomMinimumSize = new Vector2(targetWidth, 0)
-                        };
-
-                        int titleFontSize = (int)(viewportSize.Y * 0.022f);
-                        lbl.AddThemeFontSizeOverride("font_size", titleFontSize);
-
-                        vbox.AddChild(tex);
-                        vbox.AddChild(lbl);
-                        return vbox;
-                    });
-                    _mainScene.HoverOverlay.OnItemHovered(entry, popupItem);
-                }
+                // Selection is now just a state on the card itself.
+                entry.Selected = (i == (int)index);
             }
         }
     }

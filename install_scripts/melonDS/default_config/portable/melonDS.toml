@@ -30,3 +30,38 @@ ScaleFactor = 2
 [Instance0]
 SaveFilePath = "saves"
 SavestatePath = "savestates"
+
+# Index of the SDL joystick to use, not a device ID — 0 is simply the first pad.
+JoystickID = 0
+
+# Gamepad bindings. Nothing here is device-specific (no GUID, no controller name),
+# so these apply to any connected pad.
+#
+# Face/shoulder values are raw SDL joystick button indices, which for XInput pads are
+# 0=A 1=B 2=X 3=Y 4=LB 5=RB 6=Back 7=Start 8=LStick 9=RStick. Note this is the raw
+# joystick numbering, NOT the SDL GameController enum — gopher64 uses the latter and
+# its indices mean different buttons.
+#
+# D-pad values are hat encodings: 0x100 | (hat_index << 4) | SDL_HAT_direction,
+# where the direction bits are UP=1 RIGHT=2 DOWN=4 LEFT=8. So 257/258/260/264 are
+# hat 0's up/right/down/left.
+#
+# Face buttons follow the positional convention (see docs/controller-followups.md):
+# the DS has A on the right and B on the bottom, so DS A binds to the Xbox pad's
+# right button (index 1) and DS B to its bottom button (index 0).
+#
+# Hotkeys (HK_*) are deliberately omitted — melonDS writes them as -1 (unbound),
+# which is already its default.
+[Instance0.Joystick]
+A =  1
+B =  0
+X =  3
+Y =  2
+L =  4
+R =  5
+Start =  7
+Select =  6
+Up = 257
+Right = 258
+Down = 260
+Left = 264

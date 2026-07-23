@@ -35,5 +35,9 @@
   },
   "relative_save_path": {
     "default": "Saves"
-  }
+  },
+  "preserve_on_reinstall": [
+    "snes9x.conf",
+    "config/snes9x/snes9x.conf"
+  ]
 }

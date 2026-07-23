@@ -15,71 +15,17 @@ public class MainSceneSettingsHandler
         _appInstance = appInstance;
     }
 
+    // Container, footer and focus bookkeeping now lives in MainSceneSectionHandler; this stays as
+    // the entry point the footer button and the ToggleSettings action already call.
     public void ToggleSettingsMenu()
     {
-        if (_mainScene.settingsMenuContainer != null)
-        {
-            var gamesListContainer = _mainScene.gameList?.GetParent()?.GetParent<Control>();
+        _mainScene.SectionHandler.ToggleSettings();
+    }
 
-            if (_mainScene.settingsMenuContainer.Visible)
-            {
-                _mainScene.settingsMenuContainer.Visible = false;
-
-                if (_mainScene.settingsFooter != null)
-                {
-                    _mainScene.settingsFooter.Visible = false;
-                }
-
-                if (gamesListContainer != null)
-                {
-                    gamesListContainer.Visible = true;
-                }
-
-                if (_mainScene.gameListFooter != null)
-                {
-                    _mainScene.gameListFooter.Visible = (_mainScene.downloadsListContainer == null || !_mainScene.downloadsListContainer.Visible);
-                }
-
-                if (_mainScene.downloadsFooter != null)
-                {
-                    _mainScene.downloadsFooter.Visible = (_mainScene.downloadsListContainer != null && _mainScene.downloadsListContainer.Visible);
-                }
-
-                if (_mainScene.gameList != null)
-                {
-                    _mainScene.gameList.GrabFocus();
-                    _mainScene.GameListHandler.OnGameSelected((long)_mainScene.gameList.Get("SelectedIndex"));
-                }
-            }
-            else
-            {
-                _mainScene.settingsMenuContainer.Visible = true;
-
-                if (_mainScene.settingsFooter != null)
-                {
-                    _mainScene.settingsFooter.Visible = true;
-                }
-
-                if (gamesListContainer != null)
-                {
-                    gamesListContainer.Visible = false;
-                }
-
-                if (_mainScene.gameListFooter != null)
-                {
-                    _mainScene.gameListFooter.Visible = false;
-                }
-
-                if (_mainScene.downloadsFooter != null)
-                {
-                    _mainScene.downloadsFooter.Visible = false;
-                }
-
-                CycleFocusInContainer(_mainScene.settingsSectionsTree, 0);
-            }
-
-            _mainScene.UpdateHeaderLabel();
-        }
+    // Called by MainSceneSectionHandler once the settings section has finished animating in.
+    public void FocusFirstSettingsEntry()
+    {
+        CycleFocusInContainer(_mainScene.settingsSectionsTree, 0);
     }
 
     public void SetupSettingsTree()
@@ -374,7 +320,8 @@ public class MainSceneSettingsHandler
         int selectedIdx = 0;
         string currentTheme = _appInstance.configManager.AppTheme;
 
-        foreach (var theme in ConfigManager.Themes.Keys)
+        // "Match System" is a mode rather than a palette, so it is not in Themes; offer it first.
+        foreach (var theme in System.Linq.Enumerable.Prepend(ConfigManager.Themes.Keys, ConfigManager.SystemThemeName))
         {
             themeOptionButton.AddItem(theme, idx);
             if (theme == currentTheme)
@@ -396,6 +343,37 @@ public class MainSceneSettingsHandler
         var entry = _settingsListEntryScene.Instantiate<SettingsListEntry>();
         entry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(fieldBox);
         vbox.AddChild(entry);
+
+        HBoxContainer backgroundFieldBox = new HBoxContainer();
+        Label backgroundLabel = new Label();
+        backgroundLabel.Text = "Background Style";
+        backgroundLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        backgroundFieldBox.AddChild(backgroundLabel);
+
+        CarouselButton backgroundOptionButton = new CarouselButton();
+        int selectedBackgroundIdx = 0;
+        string currentBackground = _appInstance.configManager.AppBackground;
+
+        for (int i = 0; i < ConfigManager.BackgroundStyles.Length; i++)
+        {
+            backgroundOptionButton.AddItem(ConfigManager.BackgroundStyles[i].Name, i);
+            if (ConfigManager.BackgroundStyles[i].Name == currentBackground)
+            {
+                selectedBackgroundIdx = i;
+            }
+        }
+
+        backgroundOptionButton.Select(selectedBackgroundIdx);
+        backgroundOptionButton.ItemSelected += (long index) =>
+        {
+            _appInstance.configManager.SaveAppBackground(backgroundOptionButton.GetItemText((int)index));
+            _mainScene.ApplyTheme();
+        };
+
+        backgroundFieldBox.AddChild(backgroundOptionButton);
+        var backgroundEntry = _settingsListEntryScene.Instantiate<SettingsListEntry>();
+        backgroundEntry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(backgroundFieldBox);
+        vbox.AddChild(backgroundEntry);
     }
 
     private void GenerateGameListSettingsForm()

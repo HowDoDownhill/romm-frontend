@@ -1,11 +1,11 @@
 [gd_resource type="ShaderMaterial" format=3 uid="uid://dhmv62s1oow6i"]
 
-[ext_resource type="Shader" uid="uid://dqd8vh224871o" path="res://assets/shaders/moving_background.gdshader" id="1_movbg"]
+[ext_resource type="Shader" uid="uid://doktjhhpe16u2" path="res://assets/shaders/backgrounds/bg_flow.gdshader" id="1_movbg"]
 
 [resource]
 shader = ExtResource("1_movbg")
-shader_parameter/bg_color = Color(0.05, 0.02, 0.1, 1)
-shader_parameter/primary_color = Color(0.3, 0, 0.4, 1)
-shader_parameter/secondary_color = Color(0, 0.2, 0.4, 1)
+shader_parameter/bg_color = Color(0.039216, 0.027451, 0.07451, 1)
+shader_parameter/primary_color = Color(0.203922, 0.062745, 0.321569, 1)
+shader_parameter/secondary_color = Color(0.070588, 0.227451, 0.388235, 1)
 shader_parameter/speed = 0.2
 shader_parameter/scale = 1.0

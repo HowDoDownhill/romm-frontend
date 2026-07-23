@@ -2,568 +2,253 @@
   "input": {
     "input_profiles": {
       "default": {
-        "keys": [
-          {
-            "enabled": true,
-            "id": 7
-          },
-          {
-            "enabled": true,
-            "id": 4
-          },
-          {
-            "enabled": true,
-            "id": 22
-          },
-          {
-            "enabled": true,
-            "id": 26
-          },
-          {
-            "enabled": true,
-            "id": 40
-          },
-          {
-            "enabled": true,
-            "id": 29
-          },
-          {
-            "enabled": true,
-            "id": 224
-          },
-          {
-            "enabled": true,
-            "id": 225
-          },
-          {
-            "enabled": true,
-            "id": 15
-          },
-          {
-            "enabled": true,
-            "id": 13
-          },
-          {
-            "enabled": true,
-            "id": 14
-          },
-          {
-            "enabled": true,
-            "id": 12
-          },
-          {
-            "enabled": true,
-            "id": 6
-          },
-          {
-            "enabled": true,
-            "id": 27
-          },
-          {
-            "enabled": true,
-            "id": 80
-          },
-          {
-            "enabled": true,
-            "id": 79
-          },
-          {
-            "enabled": true,
-            "id": 82
-          },
-          {
-            "enabled": true,
-            "id": 81
-          },
-          {
-            "enabled": true,
-            "id": 54
-          }
-        ],
-        "controller_buttons": [
-          {
-            "enabled": true,
-            "id": 14
-          },
-          {
-            "enabled": true,
-            "id": 13
-          },
-          {
-            "enabled": true,
-            "id": 12
-          },
-          {
-            "enabled": true,
-            "id": 11
-          },
-          {
-            "enabled": true,
-            "id": 6
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": true,
-            "id": 2
-          },
-          {
-            "enabled": true,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": true,
-            "id": 10
-          },
-          {
-            "enabled": true,
-            "id": 9
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": true,
-            "id": 4
-          }
-        ],
-        "controller_axis": [
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": true,
-            "id": 4,
-            "axis": 1,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": true,
-            "id": 2,
-            "axis": 1,
-            "initial_state": 0
-          },
-          {
-            "enabled": true,
-            "id": 2,
-            "axis": -1,
-            "initial_state": 0
-          },
-          {
-            "enabled": true,
-            "id": 3,
-            "axis": 1,
-            "initial_state": 0
-          },
-          {
-            "enabled": true,
-            "id": 3,
-            "axis": -1,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": true,
-            "id": 0,
-            "axis": -1,
-            "initial_state": 0
-          },
-          {
-            "enabled": true,
-            "id": 0,
-            "axis": 1,
-            "initial_state": 0
-          },
-          {
-            "enabled": true,
-            "id": 1,
-            "axis": -1,
-            "initial_state": 0
-          },
-          {
-            "enabled": true,
-            "id": 1,
-            "axis": 1,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          }
-        ],
-        "joystick_buttons": [
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          },
-          {
-            "enabled": false,
-            "id": 0
-          }
-        ],
-        "joystick_hat": [
-          {
-            "enabled": false,
-            "id": 0,
-            "direction": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "direction": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "direction": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "direction": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "direction": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "direction": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "direction": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "direction": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "direction": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "direction": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "direction": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "direction": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "direction": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "direction": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "direction": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "direction": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "direction": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "direction": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "direction": 0
-          }
-        ],
-        "joystick_axis": [
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          },
-          {
-            "enabled": false,
-            "id": 0,
-            "axis": 0,
-            "initial_state": 0
-          }
+        "inputs": [
+          [
+            {
+              "Key": {
+                "id": 7
+              }
+            },
+            {
+              "ControllerButton": {
+                "id": 14
+              }
+            }
+          ],
+          [
+            {
+              "Key": {
+                "id": 4
+              }
+            },
+            {
+              "ControllerButton": {
+                "id": 13
+              }
+            }
+          ],
+          [
+            {
+              "Key": {
+                "id": 22
+              }
+            },
+            {
+              "ControllerButton": {
+                "id": 12
+              }
+            }
+          ],
+          [
+            {
+              "Key": {
+                "id": 26
+              }
+            },
+            {
+              "ControllerButton": {
+                "id": 11
+              }
+            }
+          ],
+          [
+            {
+              "Key": {
+                "id": 40
+              }
+            },
+            {
+              "ControllerButton": {
+                "id": 6
+              }
+            }
+          ],
+          [
+            {
+              "Key": {
+                "id": 29
+              }
+            },
+            {
+              "ControllerAxis": {
+                "id": 5,
+                "axis": 1,
+                "initial_state": 0
+              }
+            }
+          ],
+          [
+            {
+              "Key": {
+                "id": 224
+              }
+            },
+            {
+              "ControllerButton": {
+                "id": 2
+              }
+            }
+          ],
+          [
+            {
+              "Key": {
+                "id": 225
+              }
+            },
+            {
+              "ControllerButton": {
+                "id": 0
+              }
+            }
+          ],
+          [
+            {
+              "Key": {
+                "id": 15
+              }
+            },
+            {
+              "ControllerAxis": {
+                "id": 2,
+                "axis": 1,
+                "initial_state": 0
+              }
+            }
+          ],
+          [
+            {
+              "Key": {
+                "id": 13
+              }
+            },
+            {
+              "ControllerAxis": {
+                "id": 2,
+                "axis": -1,
+                "initial_state": 0
+              }
+            }
+          ],
+          [
+            {
+              "Key": {
+                "id": 14
+              }
+            },
+            {
+              "ControllerAxis": {
+                "id": 3,
+                "axis": 1,
+                "initial_state": 0
+              }
+            }
+          ],
+          [
+            {
+              "Key": {
+                "id": 12
+              }
+            },
+            {
+              "ControllerAxis": {
+                "id": 3,
+                "axis": -1,
+                "initial_state": 0
+              }
+            }
+          ],
+          [
+            {
+              "Key": {
+                "id": 6
+              }
+            },
+            {
+              "ControllerButton": {
+                "id": 10
+              }
+            }
+          ],
+          [
+            {
+              "Key": {
+                "id": 27
+              }
+            },
+            {
+              "ControllerButton": {
+                "id": 9
+              }
+            }
+          ],
+          [
+            {
+              "Key": {
+                "id": 79
+              }
+            },
+            {
+              "ControllerAxis": {
+                "id": 0,
+                "axis": 1,
+                "initial_state": 0
+              }
+            }
+          ],
+          [
+            {
+              "Key": {
+                "id": 80
+              }
+            },
+            {
+              "ControllerAxis": {
+                "id": 0,
+                "axis": -1,
+                "initial_state": 0
+              }
+            }
+          ],
+          [
+            {
+              "Key": {
+                "id": 81
+              }
+            },
+            {
+              "ControllerAxis": {
+                "id": 1,
+                "axis": 1,
+                "initial_state": 0
+              }
+            }
+          ],
+          [
+            {
+              "Key": {
+                "id": 82
+              }
+            },
+            {
+              "ControllerAxis": {
+                "id": 1,
+                "axis": -1,
+                "initial_state": 0
+              }
+            }
+          ],
+          [
+            {
+              "Key": {
+                "id": 54
+              }
+            },
+            {
+              "ControllerButton": {
+                "id": 4
+              }
+            }
+          ]
         ],
         "dinput": false,
         "deadzone": 5

@@ -56,10 +56,15 @@ public class MainSceneInputHandler
         {
             switch (joyBtn.ButtonIndex)
             {
-                case JoyButton.A: return "A";
-                case JoyButton.B: return "B";
-                case JoyButton.X: return "X";
-                case JoyButton.Y: return "Y";
+                // Godot names the face buttons Xbox-style, but the canonical vocabulary
+                // here (StandardSdlInputs, and every emulator's sdl_string_map) is
+                // positional. JoyButton.A/B/X/Y are South/East/West/North respectively;
+                // returning "A".."Y" instead produced values no sdl_string_map contains,
+                // which resolved to empty bindings and left face buttons dead.
+                case JoyButton.A: return "FaceSouth";
+                case JoyButton.B: return "FaceEast";
+                case JoyButton.X: return "FaceWest";
+                case JoyButton.Y: return "FaceNorth";
                 case JoyButton.LeftShoulder: return "LeftShoulder";
                 case JoyButton.RightShoulder: return "RightShoulder";
                 case JoyButton.Back: return "Back";

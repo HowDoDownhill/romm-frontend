@@ -45,12 +45,12 @@
       "extract_folder_regex": "ares-*"
     }
   },
-  "launch_args_with_game": "{system} --no-file-prompt --settings-file settings.bml --setting Paths/Saves=saves/ --setting MegaCD/Firmware/BIOS.US=bios/bios_CD_U.bin --setting MegaCD/Firmware/BIOS.Japan=bios/bios_CD_J.bin --setting MegaCD/Firmware/BIOS.Europe=bios/bios_CD_E.bin \"{rom_path}\"",
+  "launch_args_with_game": "{system} --no-file-prompt --settings-file settings.bml --setting Paths/Saves=saves/ \"{rom_path}\"",
   "launch_args_without_game": "--settings-file settings.bml --setting Paths/Saves=saves/",
   "system_flags": {
     "nes": "--system \"Famicom\"",
     "genesis": "--system \"Mega Drive\"",
-    "segacd": "--system \"Mega CD\"",
+    "segacd": "--system \"Mega CD\" --setting MegaCD/Firmware/BIOS.US=bios/bios_CD_U.bin --setting MegaCD/Firmware/BIOS.Japan=bios/bios_CD_J.bin --setting MegaCD/Firmware/BIOS.Europe=bios/bios_CD_E.bin",
     "sms": "--system \"Master System\"",
     "sega32": "--system \"Mega 32X\""
   },

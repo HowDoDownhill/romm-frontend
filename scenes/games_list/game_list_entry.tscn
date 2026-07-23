@@ -1,14 +1,81 @@
-[gd_scene format=3 uid="uid://cew2a8jxcgu6t"]
+[gd_scene load_steps=4 format=3 uid="uid://cew2a8jxcgu6t"]
 
-[node name="TextureRect" type="TextureRect" unique_id=2014039112]
-custom_minimum_size = Vector2(400, 600)
-offset_top = 1.0
+[ext_resource type="Script" path="res://scripts/ui/GameCard.cs" id="1_gamecard"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card"]
+bg_color = Color(0, 0, 0, 0.25)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_focus"]
+draw_center = false
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 1, 1, 0.4)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="GameCard" type="Control"]
 offset_right = 400.0
-offset_bottom = 601.0
+offset_bottom = 600.0
+script = ExtResource("1_gamecard")
+
+[node name="Body" type="Control" parent="."]
+modulate = Color(1, 1, 1, 0)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="CardPanel" type="PanelContainer" parent="Body"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_card")
+
+[node name="Content" type="MarginContainer" parent="Body/CardPanel"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="Stack" type="VBoxContainer" parent="Body/CardPanel/Content"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="Cover" type="TextureRect" parent="Body/CardPanel/Content/Stack"]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
 
-[node name="TitleLabel" type="Label" parent="." unique_id=2011165587]
+[node name="Caption" type="Label" parent="Body/CardPanel/Content/Stack"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+theme_override_font_sizes/font_size = 24
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="TitleLabel" type="Label" parent="Body"]
+theme_override_font_sizes/font_size = 24
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -17,11 +84,13 @@ offset_top = 2.0
 offset_bottom = 2.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 horizontal_alignment = 1
 vertical_alignment = 1
 autowrap_mode = 3
 
-[node name="InstalledIcon" type="TextureRect" parent="." unique_id=2014039113]
+[node name="InstalledIcon" type="TextureRect" parent="Body"]
+visible = false
 layout_mode = 1
 anchors_preset = 2
 anchor_top = 1.0
@@ -29,6 +98,17 @@ anchor_bottom = 1.0
 offset_top = -40.0
 offset_right = 40.0
 grow_vertical = 0
+mouse_filter = 2
 expand_mode = 1
 stretch_mode = 5
 
+[node name="FocusPanel" type="Panel" parent="Body"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_focus")

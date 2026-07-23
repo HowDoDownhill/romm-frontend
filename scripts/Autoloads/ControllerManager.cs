@@ -58,7 +58,7 @@ public partial class ControllerManager : Node
         };
 
         connectedControllers.Add(controller);
-        GD.Print($"Controller connected: {controller.ControllerName} (Device {deviceId}, SDL index {controller.ConnectionOrder})");
+        GD.Print($"Controller connected: {controller.ControllerName} (Device {deviceId}, SDL index {controller.ConnectionOrder}, GUID {controller.Guid})");
     }
 
     private void RemoveController(int deviceId)

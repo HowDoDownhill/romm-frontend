@@ -104,6 +104,23 @@ public partial class VerticalCarousel : Control
         UpdateLayout(false);
     }
 
+    // Items that know their artwork report it themselves; the bare-TextureRect case is kept so a
+    // carousel of plain textures still sizes correctly. Returns 0 when there is nothing to size from.
+    private static float GetItemAspectRatio(Control child)
+    {
+        if (child is ICarouselItem item)
+        {
+            return item.CoverAspectRatio;
+        }
+
+        if (child is TextureRect texRect && texRect.Texture != null && texRect.Texture.GetSize().X > 0)
+        {
+            return texRect.Texture.GetSize().Y / texRect.Texture.GetSize().X;
+        }
+
+        return 0.0f;
+    }
+
     public void UpdateLayout(bool animated = true)
     {
         int childCount = GetChildCount();
@@ -135,9 +152,10 @@ public partial class VerticalCarousel : Control
             {
                 child.CustomMinimumSize = new Vector2(targetWidth, 0);
 
-                if (child is TextureRect texRect && texRect.Texture != null && texRect.Texture.GetSize().X > 0)
+                float aspect = GetItemAspectRatio(child);
+
+                if (aspect > 0.0f)
                 {
-                    float aspect = texRect.Texture.GetSize().Y / texRect.Texture.GetSize().X;
                     child.Size = new Vector2(targetWidth, targetWidth * aspect);
                 }
 

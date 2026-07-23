@@ -59,6 +59,7 @@ states/
 States/
 
 config.cfg
+themes.json
 games.cache
 systems.cache
 assets/screenshots/

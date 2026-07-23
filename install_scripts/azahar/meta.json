@@ -17,6 +17,9 @@
       "user/nand"
     ]
   },
+  "preserve_on_reinstall": [
+    "user/config/qt-config.ini"
+  ],
   "launch_args_with_game": "{settings} \"{rom_path}\"",
   "launch_args_without_game": "",
   "settings_fields": [

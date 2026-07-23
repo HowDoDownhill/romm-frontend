@@ -175,8 +175,9 @@ focus_mode = 2
 script = ExtResource("3_gubc5")
 depthOffset = 400.0
 xOffset = -300.0
-visibleItemsHalfCount = 6
-preloadItemsHalfCount = 6
+itemSpacingRatio = 0.1
+visibleItemsHalfCount = 3
+preloadItemsHalfCount = 3
 
 [node name="Panel" type="Panel" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer" unique_id=1330960290]
 material = ExtResource("3_mica")

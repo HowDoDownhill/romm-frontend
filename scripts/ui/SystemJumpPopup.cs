@@ -6,6 +6,13 @@ public partial class SystemJumpPopup : Control
     private GridContainer gridContainer;
     private List<GameSystem> systems;
 
+    // The frosted panel itself, exposed so PopupAnimator can scale it without scaling the backdrop.
+    public PanelContainer Panel { get; private set; }
+
+    // True while the close animation is playing. Input is ignored during it so a second press
+    // cannot select an entry from a popup that is already on its way out.
+    public bool IsClosing { get; private set; }
+
     // Highlight color for the focused/hovered system entry. Overridden per-theme via ApplyTheme.
     private Color focusColor = new Color(1, 1, 1, 0.6f);
 
@@ -29,7 +36,8 @@ public partial class SystemJumpPopup : Control
         centerContainer.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         AddChild(centerContainer);
 
-        var panel = new PanelContainer();
+        Panel = new PanelContainer();
+        var panel = Panel;
         // Shared mica frosted-glass material (same as the panels) so it matches exactly.
         panel.Material = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
         var style = new StyleBoxFlat
@@ -142,6 +150,19 @@ public partial class SystemJumpPopup : Control
         return null;
     }
 
+    public void Open()
+    {
+        IsClosing = false;
+        PopupAnimator.Show(this, Panel);
+    }
+
+    public void Close()
+    {
+        if (!Visible || IsClosing) return;
+        IsClosing = true;
+        PopupAnimator.Hide(this, Panel);
+    }
+
     public void FocusSystem(int index)
     {
         if (gridContainer.GetChildCount() > index)
@@ -155,9 +176,11 @@ public partial class SystemJumpPopup : Control
     // leaks to the UI behind it). A selects, B closes, dpad navigates the grid.
     public void HandleInput(InputEvent @event)
     {
+        if (IsClosing) return;
+
         if (@event.IsActionPressed("Back") || @event.IsActionPressed("ui_cancel"))
         {
-            Visible = false;
+            Close();
             return;
         }
 

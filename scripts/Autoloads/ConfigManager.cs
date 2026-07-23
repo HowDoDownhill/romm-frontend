@@ -21,19 +21,168 @@ public partial class ConfigManager : Node
     public bool HideGamesWithoutBoxArt { get; private set; }
     public bool ShowAllSystems { get; private set; }
     public string AppTheme { get; private set; }
+    public string AppBackground { get; private set; }
 
-    public static readonly System.Collections.Generic.Dictionary<string, (Color Bg, Color Primary, Color Secondary, Color Panel)> Themes = new System.Collections.Generic.Dictionary<string, (Color Bg, Color Primary, Color Secondary, Color Panel)>
+    // Each style is a separate shader sharing the uniform names declared in bg_common.gdshaderinc,
+    // so ApplyTheme can swap the shader on the shared material and re-apply one set of parameters.
+    public static readonly (string Name, string ShaderPath)[] BackgroundStyles = new (string, string)[]
     {
-        { "Default", (new Color(0.05f, 0.02f, 0.1f, 1f).Darkened(0.3f), new Color(0.3f, 0f, 0.4f, 1f).Darkened(0.4f), new Color(0f, 0.2f, 0.4f, 1f).Darkened(0.4f), new Color(0f, 0f, 0f, 0.55f)) },
-        { "Rose-pine", (new Color("#191724").Darkened(0.5f), new Color("#c4a7e7").Darkened(0.65f), new Color("#eb6f92").Darkened(0.65f), new Color("#1f1d2e8c")) },
-        { "Gruvbox", (new Color("#282828").Darkened(0.5f), new Color("#cc241d").Darkened(0.65f), new Color("#458588").Darkened(0.65f), new Color("#1d20218c")) },
-        { "catppuccin", (new Color("#1e1e2e").Darkened(0.5f), new Color("#cba6f7").Darkened(0.65f), new Color("#89b4fa").Darkened(0.65f), new Color("#1818258c")) },
-        { "Solarized Dark", (new Color("#002b36").Darkened(0.5f), new Color("#cb4b16").Darkened(0.65f), new Color("#268bd2").Darkened(0.65f), new Color("#00212b8c")) },
-        { "Solarized Light", (new Color("#fdf6e3").Darkened(0.7f), new Color("#d33682").Darkened(0.65f), new Color("#2aa198").Darkened(0.65f), new Color("#eee8d58c")) },
-        { "monokai", (new Color("#272822").Darkened(0.5f), new Color("#f92672").Darkened(0.65f), new Color("#66d9ef").Darkened(0.65f), new Color("#1e1f1c8c")) },
-        { "Nord", (new Color("#2e3440").Darkened(0.5f), new Color("#81a1c1").Darkened(0.65f), new Color("#b48ead").Darkened(0.65f), new Color("#2429338c")) },
-        { "Dracula", (new Color("#282a36").Darkened(0.5f), new Color("#bd93f9").Darkened(0.65f), new Color("#ff79c6").Darkened(0.65f), new Color("#1e1f298c")) }
+        ("Flow", "res://assets/shaders/backgrounds/bg_flow.gdshader"),
+        ("Blobs", "res://assets/shaders/backgrounds/bg_blobs.gdshader"),
+        ("Waves", "res://assets/shaders/backgrounds/bg_waves.gdshader"),
+        ("Aurora", "res://assets/shaders/backgrounds/bg_aurora.gdshader"),
+        ("Bokeh", "res://assets/shaders/backgrounds/bg_bokeh.gdshader"),
+        ("Grid", "res://assets/shaders/backgrounds/bg_grid.gdshader"),
+        ("Gradient", "res://assets/shaders/backgrounds/bg_gradient.gdshader"),
+        ("Solid", "res://assets/shaders/backgrounds/bg_solid.gdshader")
     };
+
+    // Falls back to the first style so an unrecognised name in config.cfg (a hand-edit, or a style
+    // removed in a later version) still renders something instead of leaving the background blank.
+    public static string BackgroundShaderPath(string styleName)
+    {
+        foreach (var style in BackgroundStyles)
+        {
+            if (style.Name == styleName) return style.ShaderPath;
+        }
+        return BackgroundStyles[0].ShaderPath;
+    }
+
+    // Active palettes: the built-ins below, overridden and extended by themes.json. Populated by
+    // LoadThemes at startup, so anything reading this must run after ConfigManager._Ready.
+    public static readonly System.Collections.Generic.Dictionary<string, (Color Bg, Color Primary, Color Secondary, Color Panel)> Themes = new System.Collections.Generic.Dictionary<string, (Color Bg, Color Primary, Color Secondary, Color Panel)>();
+
+    public const string ThemesFileName = "themes.json";
+
+    // Not a palette but a mode: colours are derived from the selected platform's logo at runtime by
+    // SystemPalette. Kept out of Themes (and out of themes.json) precisely because it has no fixed
+    // values; the settings list offers it alongside the real palettes.
+    public const string SystemThemeName = "Match System";
+
+    public static bool IsSystemTheme(string themeName) => themeName == SystemThemeName;
+
+    // Palette entries are hand-tuned rather than derived from a blanket .Darkened() pass: the shader
+    // mixes Primary and Secondary over Bg fairly aggressively, so uniformly darkening a palette's
+    // accents collapsed every theme into the same murky blue-purple. These values are the final
+    // rendered colors. Secondary doubles as the UI accent (popup focus highlight), so it is kept the
+    // brighter and more saturated of the two blobs while staying dark enough not to wash the flow out.
+    private static readonly System.Collections.Generic.Dictionary<string, (Color Bg, Color Primary, Color Secondary, Color Panel)> BuiltInThemes = new System.Collections.Generic.Dictionary<string, (Color Bg, Color Primary, Color Secondary, Color Panel)>
+    {
+        { "Default", (new Color("#0a0713"), new Color("#341052"), new Color("#123a63"), new Color("#100c1a8c")) },
+        { "Rose-pine", (new Color("#16141f"), new Color("#4a3663"), new Color("#8a3f59"), new Color("#1f1d2e8c")) },
+        { "Gruvbox", (new Color("#1d2021"), new Color("#7a2f24"), new Color("#2f5f57"), new Color("#2828288c")) },
+        { "catppuccin", (new Color("#181825"), new Color("#4c3a6b"), new Color("#33517f"), new Color("#1e1e2e8c")) },
+        { "Solarized Dark", (new Color("#00212b"), new Color("#6b3410"), new Color("#10537f"), new Color("#0736428c")) },
+        { "Solarized Light", (new Color("#3b3630"), new Color("#6e3a55"), new Color("#2f7a70"), new Color("#4a443a8c")) },
+        { "monokai", (new Color("#1e1f1c"), new Color("#7a1436"), new Color("#1f6b7a"), new Color("#2728228c")) },
+        { "Nord", (new Color("#232833"), new Color("#35506e"), new Color("#4a7a70"), new Color("#2e34408c")) },
+        { "Dracula", (new Color("#21222c"), new Color("#4a3a7d"), new Color("#8a3f6e"), new Color("#282a368c")) },
+        { "Tokyo Night", (new Color("#16161e"), new Color("#2f3b6b"), new Color("#5c3a7a"), new Color("#1a1b268c")) },
+        { "Synthwave", (new Color("#0d0620"), new Color("#6b1050"), new Color("#0e6b8a"), new Color("#140a2b8c")) },
+        { "Ember", (new Color("#140c08"), new Color("#7a2c0c"), new Color("#8a6b14"), new Color("#1c110b8c")) },
+        { "Abyss", (new Color("#030d14"), new Color("#0b3a4d"), new Color("#1a2f6b"), new Color("#06141e8c")) },
+        { "Verdant", (new Color("#0a120c"), new Color("#1d4a2b"), new Color("#5c7014"), new Color("#0e1a118c")) },
+        { "Noir", (new Color("#0f0f11"), new Color("#2b2b30"), new Color("#5a5a66"), new Color("#17171a8c")) }
+    };
+
+    public string ThemesFilePath => System.IO.Path.Combine(ApplicationRootDirectory, ThemesFileName);
+
+    // Rebuilds Themes from the built-ins plus themes.json. The built-ins are always present, so a
+    // JSON entry reusing a built-in name retunes that theme and removing the entry reverts it --
+    // this way palettes added in a later version still reach users who already have the file.
+    private void LoadThemes()
+    {
+        Themes.Clear();
+        foreach (var builtIn in BuiltInThemes)
+        {
+            Themes[builtIn.Key] = builtIn.Value;
+        }
+
+        string path = ThemesFilePath;
+        if (!FileAccess.FileExists(path))
+        {
+            WriteThemesFile();
+            return;
+        }
+
+        using var file = FileAccess.Open(path, FileAccess.ModeFlags.Read);
+        if (file == null)
+        {
+            GD.PushWarning($"Could not read {ThemesFileName}: {FileAccess.GetOpenError()}. Using built-in themes.");
+            return;
+        }
+
+        var parsed = Json.ParseString(file.GetAsText());
+        if (parsed.VariantType != Variant.Type.Dictionary)
+        {
+            GD.PushWarning($"{ThemesFileName} is not a JSON object. Using built-in themes.");
+            return;
+        }
+
+        foreach (var entry in (Godot.Collections.Dictionary)parsed)
+        {
+            string themeName = entry.Key.AsString();
+            if (entry.Value.VariantType != Variant.Type.Dictionary)
+            {
+                GD.PushWarning($"{ThemesFileName}: theme \"{themeName}\" is not an object, skipping.");
+                continue;
+            }
+
+            var fields = (Godot.Collections.Dictionary)entry.Value;
+            if (TryParseColor(fields, "bg", themeName, out Color bg)
+                && TryParseColor(fields, "primary", themeName, out Color primary)
+                && TryParseColor(fields, "secondary", themeName, out Color secondary)
+                && TryParseColor(fields, "panel", themeName, out Color panel))
+            {
+                Themes[themeName] = (bg, primary, secondary, panel);
+            }
+        }
+    }
+
+    private static bool TryParseColor(Godot.Collections.Dictionary fields, string key, string themeName, out Color color)
+    {
+        color = default;
+        if (!fields.ContainsKey(key))
+        {
+            GD.PushWarning($"{ThemesFileName}: theme \"{themeName}\" is missing \"{key}\", skipping.");
+            return false;
+        }
+
+        string raw = fields[key].AsString();
+        if (!Color.HtmlIsValid(raw))
+        {
+            GD.PushWarning($"{ThemesFileName}: theme \"{themeName}\" has invalid color \"{raw}\" for \"{key}\", skipping.");
+            return false;
+        }
+
+        color = new Color(raw);
+        return true;
+    }
+
+    // Seeds themes.json with the built-in palettes. They are all redundant overrides at that point,
+    // but they document the format and give a working starting point to edit.
+    private void WriteThemesFile()
+    {
+        var document = new Godot.Collections.Dictionary();
+        foreach (var theme in Themes)
+        {
+            document[theme.Key] = new Godot.Collections.Dictionary
+            {
+                { "bg", "#" + theme.Value.Bg.ToHtml(false) },
+                { "primary", "#" + theme.Value.Primary.ToHtml(false) },
+                { "secondary", "#" + theme.Value.Secondary.ToHtml(false) },
+                { "panel", "#" + theme.Value.Panel.ToHtml(true) }
+            };
+        }
+
+        using var file = FileAccess.Open(ThemesFilePath, FileAccess.ModeFlags.Write);
+        if (file == null)
+        {
+            GD.PushWarning($"Could not write {ThemesFileName}: {FileAccess.GetOpenError()}");
+            return;
+        }
+        file.StoreString(Json.Stringify(document, "    "));
+    }
 
     public int EmulatorCloseHotkeyCount { get; private set; }
     public Godot.Collections.Array EmulatorCloseHotkeys { get; private set; }
@@ -67,6 +216,7 @@ public partial class ConfigManager : Node
 
         DetermineApplicationRootDirectory();
         EnsureRequiredDirectoriesExist();
+        LoadThemes();
         LoadConfiguration();
     }
 
@@ -171,6 +321,7 @@ public partial class ConfigManager : Node
         HideGamesWithoutBoxArt = (bool)configurationFile.GetValue("UI", "HideGamesWithoutBoxArt", false);
         ShowAllSystems = (bool)configurationFile.GetValue("UI", "ShowAllSystems", false);
         AppTheme = (string)configurationFile.GetValue("UI", "AppTheme", "Default");
+        AppBackground = (string)configurationFile.GetValue("UI", "AppBackground", "Flow");
 
         EmulatorCloseHotkeyCount = (int)configurationFile.GetValue("Input", "EmulatorCloseHotkeyCount", 4);
         var defaultHotkeyButtons = new Godot.Collections.Array { (int)JoyButton.LeftShoulder, (int)JoyButton.RightShoulder, (int)JoyButton.Back, (int)JoyButton.Start };
@@ -221,6 +372,7 @@ public partial class ConfigManager : Node
         HideGamesWithoutBoxArt = false;
         ShowAllSystems = false;
         AppTheme = "Default";
+        AppBackground = "Flow";
 
         EmulatorCloseHotkeyCount = 4;
         EmulatorCloseHotkeys = new Godot.Collections.Array { (int)JoyButton.LeftShoulder, (int)JoyButton.RightShoulder, (int)JoyButton.Back, (int)JoyButton.Start };
@@ -254,6 +406,7 @@ public partial class ConfigManager : Node
         configurationFile.SetValue("UI", "HideGamesWithoutBoxArt", HideGamesWithoutBoxArt);
         configurationFile.SetValue("UI", "ShowAllSystems", ShowAllSystems);
         configurationFile.SetValue("UI", "AppTheme", AppTheme);
+        configurationFile.SetValue("UI", "AppBackground", AppBackground);
         configurationFile.SetValue("Input", "EmulatorCloseHotkeyCount", EmulatorCloseHotkeyCount);
         configurationFile.SetValue("Input", "EmulatorCloseHotkeys", EmulatorCloseHotkeys);
 
@@ -317,6 +470,12 @@ public partial class ConfigManager : Node
     public void SaveAppTheme(string themeName)
     {
         AppTheme = themeName;
+        SaveConfig();
+    }
+
+    public void SaveAppBackground(string backgroundStyle)
+    {
+        AppBackground = backgroundStyle;
         SaveConfig();
     }
 

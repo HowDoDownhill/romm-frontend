@@ -82,13 +82,13 @@ public partial class MainScene : Control
     public Button emulatorCloseHotkeysBtn;
 
     public MainSceneSettingsHandler SettingsHandler { get; private set; }
+    public MainSceneSectionHandler SectionHandler { get; private set; }
     public MainSceneInputHandler InputHandler { get; private set; }
     public MainSceneGameListHandler GameListHandler { get; private set; }
     public MainSceneDownloadHandler DownloadHandler { get; private set; }
     public MainSceneUpdaterHandler UpdaterHandler { get; private set; }
     public MainScenePopupHandler PopupHandler { get; private set; }
     
-    public HoverPopupOverlay HoverOverlay { get; private set; }
 
     public PanelContainer fuzzySearchPopup;
     public Label fuzzySearchLabel;
@@ -106,6 +106,7 @@ public partial class MainScene : Control
         appInstance = GetNode<AppInstance>("/root/AppInstance");
 
         SettingsHandler = new MainSceneSettingsHandler(this, appInstance);
+        SectionHandler = new MainSceneSectionHandler(this);
         PopupHandler = new MainScenePopupHandler(this, appInstance);
         
         fuzzySearchPopup = new PanelContainer();
@@ -161,8 +162,6 @@ public partial class MainScene : Control
             systemCarousel.Cycled += GameListHandler.BeginQuickSwitchFade;
         }
 
-        HoverOverlay = new HoverPopupOverlay();
-        AddChild(HoverOverlay);
 
         releasePickerPopup = new ReleasePickerPopup();
         AddChild(releasePickerPopup);
@@ -172,7 +171,7 @@ public partial class MainScene : Control
         AddChild(systemJumpPopup);
         systemJumpPopup.SystemSelected += (index) =>
         {
-            systemJumpPopup.Visible = false;
+            systemJumpPopup.Close();
             if (systemCarousel != null)
             {
                 systemCarousel.SetSelectionSilently(index);
@@ -229,7 +228,6 @@ public partial class MainScene : Control
             gameList.Connect("ItemSelected", Callable.From<long>(GameListHandler.OnGameSelected));
             gameList.Connect("ItemFocused", Callable.From<long>(GameListHandler.OnGameSelected));
             gameList.Connect("JumpSectionRequested", Callable.From<int>(GameListHandler.OnJumpSectionRequested));
-            // gameList.FocusExited += () => HoverOverlay.ForceCancelPopup();
         }
 
         DownloadHandler.SetupDownloadsList();
@@ -244,12 +242,19 @@ public partial class MainScene : Control
 
     public void ApplyTheme()
     {
-        string currentTheme = appInstance.configManager.AppTheme;
-        if (ConfigManager.Themes.TryGetValue(currentTheme, out var colors))
+        if (TryResolveThemeColors(out var colors))
         {
             var bgMaterial = GD.Load<ShaderMaterial>("res://assets/materials/moving_background.tres");
             if (bgMaterial != null)
             {
+                // Each background style is its own shader; swap it before setting parameters so the
+                // values land on the shader that is actually going to render them.
+                var bgShader = GD.Load<Shader>(ConfigManager.BackgroundShaderPath(appInstance.configManager.AppBackground));
+                if (bgShader != null && bgMaterial.Shader != bgShader)
+                {
+                    bgMaterial.Shader = bgShader;
+                }
+
                 bgMaterial.SetShaderParameter("bg_color", colors.Bg);
                 bgMaterial.SetShaderParameter("primary_color", colors.Primary);
                 bgMaterial.SetShaderParameter("secondary_color", colors.Secondary);
@@ -265,9 +270,40 @@ public partial class MainScene : Control
                 panelMaterial.SetShaderParameter("mix_color", tint);
             }
 
-            HoverOverlay?.ApplyThemeColor(colors.Panel, colors.Secondary);
             systemJumpPopup?.ApplyTheme(colors.Secondary);
             releasePickerPopup?.ApplyTheme(colors.Secondary);
+        }
+    }
+
+    // Resolves the active palette. "Match System" derives one from the selected platform's logo and
+    // falls back to Default when that platform has no usable colour -- a lot of logos are plain
+    // white silhouettes, and an all-grey background reads as broken rather than as a choice.
+    private bool TryResolveThemeColors(out (Color Bg, Color Primary, Color Secondary, Color Panel) colors)
+    {
+        string currentTheme = appInstance.configManager.AppTheme;
+
+        if (ConfigManager.IsSystemTheme(currentTheme))
+        {
+            var derived = SystemPalette.FromSystem(CurrentGameSystem);
+            if (derived.HasValue)
+            {
+                colors = derived.Value;
+                return true;
+            }
+            return ConfigManager.Themes.TryGetValue("Default", out colors);
+        }
+
+        return ConfigManager.Themes.TryGetValue(currentTheme, out colors);
+    }
+
+    private GameSystem CurrentGameSystem
+    {
+        get
+        {
+            var systems = GameListHandler?.gameSystems;
+            int index = GameListHandler?.currentGameSystemIndex ?? -1;
+            if (systems == null || index < 0 || index >= systems.Count) return null;
+            return systems[index];
         }
     }
 
@@ -497,22 +533,34 @@ public partial class MainScene : Control
     {
         if (systemCarousel == null) return;
 
-        if (settingsMenuContainer != null && settingsMenuContainer.Visible)
+        // Reads CurrentSection rather than the containers' Visible flags: mid-transition both the
+        // outgoing and incoming containers are visible, and the header should already name the
+        // section being entered.
+        switch (SectionHandler.CurrentSection)
         {
-            systemCarousel.SetOverrideText("Settings");
-        }
-        else if (downloadsListContainer != null && downloadsListContainer.Visible)
-        {
-            systemCarousel.SetOverrideText("Downloads");
-        }
-        else
-        {
-            systemCarousel.ClearOverride();
+            case MainSceneSectionHandler.Section.Settings:
+                systemCarousel.SetOverrideText("Settings");
+                break;
+            case MainSceneSectionHandler.Section.Downloads:
+                systemCarousel.SetOverrideText("Downloads");
+                break;
+            default:
+                systemCarousel.ClearOverride();
+                break;
         }
     }
 
     public override void _Input(InputEvent @event)
     {
+        // Section routing below keys off the containers' Visible flags, but during a crossfade the
+        // outgoing and incoming sections are both visible, so an event arriving mid-transition
+        // could act on either one. Swallow input until the section change settles.
+        if (SectionHandler.IsTransitioning)
+        {
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
         if (@event is InputEventMouseMotion)
         {
             UpdateMouseFocus();
@@ -1034,6 +1082,10 @@ public partial class MainScene : Control
 
     public override void _Process(double delta)
     {
+        // Drains a few cover-art decodes per frame; see MainSceneGameListHandler for why these
+        // can't all run in the frame the carousel reveals them.
+        GameListHandler?.ProcessPendingImageLoads();
+
         ulong currentTime = Time.GetTicksMsec();
 
         if (rightBumperPressedTime > 0 && currentTime - rightBumperPressedTime >= 250)
@@ -1055,7 +1107,7 @@ public partial class MainScene : Control
             if (GameListHandler.fuzzySearchBuffer.Length > 0 && currentTime - GameListHandler.lastKeystrokeTime > 1500)
             {
                 GameListHandler.fuzzySearchBuffer = "";
-                if (fuzzySearchPopup != null) fuzzySearchPopup.Visible = false;
+                if (fuzzySearchPopup != null) PopupAnimator.Hide(fuzzySearchPopup);
             }
             
             if (GameListHandler.isFuzzySearchDirty && currentTime - GameListHandler.lastKeystrokeTime > 400)
@@ -1083,12 +1135,14 @@ public partial class MainScene : Control
             {
                 if (!string.IsNullOrEmpty(GameListHandler.fuzzySearchBuffer))
                 {
-                    if (!fuzzySearchPopup.Visible) fuzzySearchPopup.Visible = true;
+                    // Text first: the popup is content-sized, and PopupAnimator centres its scale
+                    // pivot on the current size. Showing first would pivot on the stale size.
                     if (fuzzySearchLabel != null) fuzzySearchLabel.Text = "Search: " + GameListHandler.fuzzySearchBuffer;
+                    if (!fuzzySearchPopup.Visible || PopupAnimator.IsHiding(fuzzySearchPopup)) PopupAnimator.Show(fuzzySearchPopup);
                 }
                 else
                 {
-                    fuzzySearchPopup.Visible = false;
+                    PopupAnimator.Hide(fuzzySearchPopup);
                 }
             }
         }
@@ -1101,7 +1155,7 @@ public partial class MainScene : Control
         if (systemJumpPopup != null && !systemJumpPopup.Visible && (downloadsListContainer == null || !downloadsListContainer.Visible))
         {
             systemJumpPopup.Populate(GameListHandler.gameSystems, GameListHandler.currentGameSystemIndex);
-            systemJumpPopup.Visible = true;
+            systemJumpPopup.Open();
             systemJumpPopup.FocusSystem(GameListHandler.currentGameSystemIndex >= 0 ? GameListHandler.currentGameSystemIndex : 0);
         }
     }
