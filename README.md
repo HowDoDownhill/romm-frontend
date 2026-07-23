@@ -113,9 +113,6 @@ map is generated:
 | PlayStation | PSX (DuckStation) · PS2 (PCSX2) · PS3 (RPCS3) · PS4 (shadPS4) · PSP (PPSSPP) |
 | Sega | 32X, Sega CD, SMS, Genesis (ares) · Dreamcast (Flycast) |
 
-NES uses ares rather than Nestopia — it scores higher on accuracy tests and is portable on
-Linux.
-
 Edit the file to override. It maps system slugs to lists of emulator slugs:
 
 ```json
@@ -271,8 +268,7 @@ Two exceptions:
   Series X controller; other models show as disconnected until selected once in Dolphin's
   own controller settings.
 
-Non-Xbox controllers (DualShock, DualSense, Switch Pro) are not yet handled — see
-[`docs/controller-followups.md`](docs/controller-followups.md).
+Non-Xbox controllers (DualShock, DualSense, Switch Pro) are not yet handled.
 
 ### `controller_config` (currently disabled)
 
@@ -283,7 +279,7 @@ at launch from the connected controllers.
 > This is **disabled** in current builds (`SuspendControllerMapping` in
 > `EmulatorManager.cs`). Its `{controller_name}` macro resolves to Godot's name for a pad,
 > which does not match what an emulator's SDL calls the same device. Shipped static configs
-> are used instead. See [`docs/controller-followups.md`](docs/controller-followups.md).
+> are used instead.
 
 - `max_controllers` — number of ports to configure
 - `config_file_relative_path` — the emulator's controller config
