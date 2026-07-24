@@ -48,6 +48,9 @@ public partial class UiPanel : Control
     public delegate void ClosedEventHandler();
 
     [Signal]
+    public delegate void AboutToOpenEventHandler();
+
+    [Signal]
     public delegate void AboutToCloseEventHandler();
 
     public override void _Ready()
@@ -69,6 +72,7 @@ public partial class UiPanel : Control
         KillActiveTween();
         State = PanelState.Opening;
         Visible = true;
+        EmitSignal(SignalName.AboutToOpen);
 
         Control scaleTarget = ScaleTarget;
 
@@ -141,6 +145,10 @@ public partial class UiPanel : Control
     }
 
     protected virtual void OnClosed()
+    {
+    }
+
+    public virtual void HandleInput(InputEvent inputEvent)
     {
     }
 

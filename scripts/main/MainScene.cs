@@ -99,6 +99,7 @@ public partial class MainScene : Control
 
     public SystemJumpPopup systemJumpPopup;
     public ReleasePickerPopup releasePickerPopup;
+    public UiPanelStack panelStack = new UiPanelStack();
     private ulong leftBumperPressedTime = 0;
     private ulong rightBumperPressedTime = 0;
 
@@ -149,9 +150,13 @@ public partial class MainScene : Control
         releasePickerPopup = new ReleasePickerPopup();
         AddChild(releasePickerPopup);
         releasePickerPopup.ReleaseChosen += OnEmulatorReleaseChosen;
+        releasePickerPopup.Closed += OnReleasePickerClosed;
+
+        panelStack.Register(releasePickerPopup);
 
         systemJumpPopup = new SystemJumpPopup();
         AddChild(systemJumpPopup);
+        panelStack.Register(systemJumpPopup);
         systemJumpPopup.SystemSelected += (index) =>
         {
             systemJumpPopup.Close();
@@ -298,6 +303,16 @@ public partial class MainScene : Control
         return darkest;
     }
 
+    private void OnReleasePickerClosed()
+    {
+        if (GameListHandler.currentlySelectedGame != null)
+        {
+            GameListHandler.UpdateDetailsPanelButtons(GameListHandler.currentlySelectedGame);
+        }
+
+        gameList?.GrabFocus();
+    }
+
     private void OnEmulatorInstallationCompleted(string emulatorName, bool wasSuccessful)
     {
         if (GameListHandler.currentlySelectedGame != null)
@@ -333,14 +348,8 @@ public partial class MainScene : Control
         var chosenRelease = releasePickerPopup.Releases[index];
         string emulatorName = releasePickerPopup.EmulatorName;
         releasePickerPopup.Close();
-        gameList?.GrabFocus();
 
         _ = appInstance.emulatorManager.InstallEmulator(emulatorName, chosenRelease);
-
-        if (GameListHandler.currentlySelectedGame != null)
-        {
-            GameListHandler.UpdateDetailsPanelButtons(GameListHandler.currentlySelectedGame);
-        }
     }
 
     public void GetCache()
@@ -634,29 +643,10 @@ public partial class MainScene : Control
             return;
         }
 
-        if (releasePickerPopup != null && releasePickerPopup.IsOpen)
+        if (panelStack.HasOpenPanel)
         {
             if (@event is InputEventMouse) return;
-            releasePickerPopup.HandleInput(@event);
-
-            if (!releasePickerPopup.IsOpen)
-            {
-                if (GameListHandler.currentlySelectedGame != null)
-                {
-                    GameListHandler.UpdateDetailsPanelButtons(GameListHandler.currentlySelectedGame);
-                }
-
-                gameList?.GrabFocus();
-            }
-
-            GetViewport().SetInputAsHandled();
-            return;
-        }
-
-        if (systemJumpPopup != null && systemJumpPopup.IsOpen)
-        {
-            if (@event is InputEventMouse) return;
-            systemJumpPopup.HandleInput(@event);
+            panelStack.HandleInput(@event);
             GetViewport().SetInputAsHandled();
             return;
         }
@@ -847,7 +837,6 @@ public partial class MainScene : Control
 
         if(@event.IsActionPressed("CylceSystemUp") && (downloadsListContainer == null || !downloadsListContainer.Visible))
         {
-            if (systemJumpPopup != null && systemJumpPopup.IsOpen) return;
             rightBumperPressedTime = Time.GetTicksMsec();
             return;
         }
@@ -868,7 +857,6 @@ public partial class MainScene : Control
 
         if (@event.IsActionPressed("CycleSystemDown") && (downloadsListContainer == null || !downloadsListContainer.Visible))
         {
-            if (systemJumpPopup != null && systemJumpPopup.IsOpen) return;
             leftBumperPressedTime = Time.GetTicksMsec();
             return;
         }
@@ -969,8 +957,8 @@ public partial class MainScene : Control
         var hovered = viewport.GuiGetHoveredControl();
         if (hovered == null) return;
 
-        if (releasePickerPopup != null && releasePickerPopup.IsOpen && !releasePickerPopup.IsAncestorOf(hovered)) return;
-        if (systemJumpPopup != null && systemJumpPopup.IsOpen && !systemJumpPopup.IsAncestorOf(hovered)) return;
+        UiPanel topPanel = panelStack.TopPanel;
+        if (topPanel != null && !topPanel.IsAncestorOf(hovered)) return;
 
         Control focusable = hovered;
         while (focusable != null && focusable.FocusMode != Control.FocusModeEnum.All)
@@ -998,8 +986,7 @@ public partial class MainScene : Control
         return (startMenuRoot != null && startMenuRoot.Visible)
             || (settingsMenuContainer != null && settingsMenuContainer.Visible)
             || (downloadsListContainer != null && downloadsListContainer.Visible)
-            || (systemJumpPopup != null && systemJumpPopup.IsOpen)
-            || (releasePickerPopup != null && releasePickerPopup.IsOpen);
+            || panelStack.HasOpenPanel;
     }
 
     private bool IsMouseOverGameList()

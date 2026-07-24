@@ -127,7 +127,7 @@ public partial class SystemJumpPopup : UiPanel
         }
     }
 
-    public void HandleInput(InputEvent @event)
+    public override void HandleInput(InputEvent @event)
     {
         if (State == PanelState.Closing) return;
 
