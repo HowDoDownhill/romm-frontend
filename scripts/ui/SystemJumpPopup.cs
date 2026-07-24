@@ -1,54 +1,33 @@
 using Godot;
 using System.Collections.Generic;
 
-public partial class SystemJumpPopup : Control
+public partial class SystemJumpPopup : UiPanel
 {
     private GridContainer gridContainer;
     private List<GameSystem> systems;
-
-    public PanelContainer Panel { get; private set; }
-
-    public bool IsClosing { get; private set; }
 
     private Color focusColor = new Color(1, 1, 1, 0.6f);
 
     [Signal]
     public delegate void SystemSelectedEventHandler(int index);
 
+    public SystemJumpPopup()
+    {
+        BackdropDim = 0.7f;
+    }
+
     public override void _Ready()
     {
-        Visible = false;
+        base._Ready();
+
         ZIndex = 200;
-        SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-
-        var backdrop = new ColorRect { Color = new Color(0, 0, 0, 0.7f) };
-        backdrop.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        AddChild(backdrop);
-
-        var centerContainer = new CenterContainer();
-        centerContainer.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        AddChild(centerContainer);
-
-        Panel = new PanelContainer();
-        var panel = Panel;
-        panel.Material = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
-        var style = new StyleBoxFlat
-        {
-            BgColor = new Color(0, 0, 0, 1f),
-            CornerRadiusTopLeft = 12,
-            CornerRadiusTopRight = 12,
-            CornerRadiusBottomLeft = 12,
-            CornerRadiusBottomRight = 12
-        };
-        panel.AddThemeStyleboxOverride("panel", style);
-        centerContainer.AddChild(panel);
 
         var margin = new MarginContainer();
         margin.AddThemeConstantOverride("margin_left", 30);
         margin.AddThemeConstantOverride("margin_top", 30);
         margin.AddThemeConstantOverride("margin_right", 30);
         margin.AddThemeConstantOverride("margin_bottom", 30);
-        panel.AddChild(margin);
+        ContentRoot.AddChild(margin);
 
         gridContainer = new GridContainer();
         gridContainer.Columns = 5;
@@ -139,19 +118,6 @@ public partial class SystemJumpPopup : Control
         return null;
     }
 
-    public void Open()
-    {
-        IsClosing = false;
-        PopupAnimator.Show(this, Panel);
-    }
-
-    public void Close()
-    {
-        if (!Visible || IsClosing) return;
-        IsClosing = true;
-        PopupAnimator.Hide(this, Panel);
-    }
-
     public void FocusSystem(int index)
     {
         if (gridContainer.GetChildCount() > index)
@@ -163,7 +129,7 @@ public partial class SystemJumpPopup : Control
 
     public void HandleInput(InputEvent @event)
     {
-        if (IsClosing) return;
+        if (State == PanelState.Closing) return;
 
         if (@event.IsActionPressed("Back") || @event.IsActionPressed("ui_cancel"))
         {

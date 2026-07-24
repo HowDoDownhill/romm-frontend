@@ -24,7 +24,7 @@ public partial class LoginScreen : Control
         loginButton.Pressed += OnLoginButtonPressed;
 
         var micaMaterial = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
-        MicaBorder.AttachToAll(this, micaMaterial, MicaBorder.DefaultColor);
+        MicaShadow.AttachToAll(this, micaMaterial, MicaShadow.DefaultColor);
 
         PopulateFieldsFromConfig();
         AttemptAutoLogin();

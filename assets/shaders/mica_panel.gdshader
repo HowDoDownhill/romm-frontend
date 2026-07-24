@@ -7,10 +7,11 @@ uniform sampler2D screen_texture : hint_screen_texture, repeat_disable, filter_l
 // Blur radius in screen pixels. Larger = only broad color survives, no shape.
 uniform float blur_radius : hint_range(0.0, 150.0) = 45.0;
 uniform vec4 mix_color : source_color = vec4(0.0, 0.0, 0.0, 0.4);
-// NOTE: the panel outline is NOT drawn here. A shader-computed border reconstructed from UV
-// derivatives ends up ~1px asymmetric (top/left vs bottom/right) because of sub-pixel rasterization.
-// Instead each mica panel gets a native StyleBoxFlat border overlay (see MicaBorder.cs), which Godot
-// renders pixel-perfectly and symmetrically and follows the panel's own rounded corners.
+// NOTE: panel edge treatment is NOT drawn here. Anything reconstructed from UV derivatives ends up
+// ~1px asymmetric (top/left vs bottom/right) because of sub-pixel rasterization, and this shader
+// forces alpha to 1.0 so a stylebox shadow drawn by the panel itself would render as an opaque
+// rectangle. Instead each mica panel gets a native StyleBoxFlat drop shadow on a ShowBehindParent
+// child (see MicaShadow.cs), which follows the panel's own rounded corners.
 
 float hash(vec2 p) {
     return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);

@@ -1,7 +1,7 @@
 using Godot;
 using System.Collections.Generic;
 
-public partial class ReleasePickerPopup : Control
+public partial class ReleasePickerPopup : UiPanel
 {
     private Label titleLabel;
     private Label statusLabel;
@@ -16,39 +16,23 @@ public partial class ReleasePickerPopup : Control
     [Signal]
     public delegate void ReleaseChosenEventHandler(int index);
 
+    public ReleasePickerPopup()
+    {
+        BackdropDim = 0.7f;
+    }
+
     public override void _Ready()
     {
-        Visible = false;
+        base._Ready();
+
         ZIndex = 200;
-        SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-
-        var backdrop = new ColorRect { Color = new Color(0, 0, 0, 0.7f) };
-        backdrop.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        AddChild(backdrop);
-
-        var centerContainer = new CenterContainer();
-        centerContainer.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
-        AddChild(centerContainer);
-
-        var panel = new PanelContainer();
-        panel.Material = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
-        var style = new StyleBoxFlat
-        {
-            BgColor = new Color(0, 0, 0, 1f),
-            CornerRadiusTopLeft = 12,
-            CornerRadiusTopRight = 12,
-            CornerRadiusBottomLeft = 12,
-            CornerRadiusBottomRight = 12
-        };
-        panel.AddThemeStyleboxOverride("panel", style);
-        centerContainer.AddChild(panel);
 
         var margin = new MarginContainer();
         margin.AddThemeConstantOverride("margin_left", 30);
         margin.AddThemeConstantOverride("margin_top", 25);
         margin.AddThemeConstantOverride("margin_right", 30);
         margin.AddThemeConstantOverride("margin_bottom", 25);
-        panel.AddChild(margin);
+        ContentRoot.AddChild(margin);
 
         var vbox = new VBoxContainer();
         vbox.AddThemeConstantOverride("separation", 10);
@@ -176,9 +160,11 @@ public partial class ReleasePickerPopup : Control
 
     public void HandleInput(InputEvent @event)
     {
+        if (State == PanelState.Closing) return;
+
         if (@event.IsActionPressed("Back") || @event.IsActionPressed("ui_cancel"))
         {
-            Visible = false;
+            Close();
             return;
         }
 

@@ -89,7 +89,7 @@ public partial class MainScene : Control
     public MainSceneUpdaterHandler UpdaterHandler { get; private set; }
     public MainScenePopupHandler PopupHandler { get; private set; }
 
-    public PanelContainer fuzzySearchPopup;
+    public UiPanel fuzzySearchPopup;
     public Label fuzzySearchLabel;
 
     public SystemJumpPopup systemJumpPopup;
@@ -108,18 +108,9 @@ public partial class MainScene : Control
         SectionHandler = new MainSceneSectionHandler(this);
         PopupHandler = new MainScenePopupHandler(this, appInstance);
 
-        fuzzySearchPopup = new PanelContainer();
-        fuzzySearchPopup.Visible = false;
-        fuzzySearchPopup.Material = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
-        var fuzzyStyle = new StyleBoxFlat
-        {
-            BgColor = new Color(0, 0, 0, 1f),
-            CornerRadiusTopLeft = 12,
-            CornerRadiusTopRight = 12,
-            CornerRadiusBottomLeft = 12,
-            CornerRadiusBottomRight = 12
-        };
-        fuzzySearchPopup.AddThemeStyleboxOverride("panel", fuzzyStyle);
+        fuzzySearchPopup = new UiPanel();
+        AddChild(fuzzySearchPopup);
+
         var margin = new MarginContainer();
         margin.AddThemeConstantOverride("margin_left", 20);
         margin.AddThemeConstantOverride("margin_right", 20);
@@ -128,11 +119,7 @@ public partial class MainScene : Control
         fuzzySearchLabel = new Label();
         fuzzySearchLabel.AddThemeFontSizeOverride("font_size", 24);
         margin.AddChild(fuzzySearchLabel);
-        fuzzySearchPopup.AddChild(margin);
-        fuzzySearchPopup.SetAnchorsPreset(Control.LayoutPreset.Center);
-        fuzzySearchPopup.GrowHorizontal = Control.GrowDirection.Both;
-        fuzzySearchPopup.GrowVertical = Control.GrowDirection.Both;
-        AddChild(fuzzySearchPopup);
+        fuzzySearchPopup.ContentRoot.AddChild(margin);
 
         GameListHandler = new MainSceneGameListHandler(this, appInstance);
         DownloadHandler = new MainSceneDownloadHandler(this, appInstance);
@@ -227,7 +214,7 @@ public partial class MainScene : Control
         ApplyTheme();
 
         var micaMaterial = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
-        MicaBorder.AttachToAll(this, micaMaterial, MicaBorder.DefaultColor);
+        MicaShadow.AttachToAll(this, micaMaterial, MicaShadow.DefaultColor);
     }
 
     public void ApplyTheme()
@@ -319,11 +306,11 @@ public partial class MainScene : Control
         if (releasePickerPopup == null) return;
 
         releasePickerPopup.ShowLoading(emulatorName);
-        releasePickerPopup.Visible = true;
+        releasePickerPopup.Open();
 
         var releases = await appInstance.emulatorManager.GetAvailableReleases(emulatorName);
 
-        if (!releasePickerPopup.Visible) return;
+        if (!releasePickerPopup.IsOpen) return;
 
         if (releases.Count == 0)
         {
@@ -340,7 +327,7 @@ public partial class MainScene : Control
 
         var chosenRelease = releasePickerPopup.Releases[index];
         string emulatorName = releasePickerPopup.EmulatorName;
-        releasePickerPopup.Visible = false;
+        releasePickerPopup.Close();
         gameList?.GrabFocus();
 
         _ = appInstance.emulatorManager.InstallEmulator(emulatorName, chosenRelease);
@@ -642,12 +629,12 @@ public partial class MainScene : Control
             return;
         }
 
-        if (releasePickerPopup != null && releasePickerPopup.Visible)
+        if (releasePickerPopup != null && releasePickerPopup.IsOpen)
         {
             if (@event is InputEventMouse) return;
             releasePickerPopup.HandleInput(@event);
 
-            if (!releasePickerPopup.Visible)
+            if (!releasePickerPopup.IsOpen)
             {
                 if (GameListHandler.currentlySelectedGame != null)
                 {
@@ -661,7 +648,7 @@ public partial class MainScene : Control
             return;
         }
 
-        if (systemJumpPopup != null && systemJumpPopup.Visible)
+        if (systemJumpPopup != null && systemJumpPopup.IsOpen)
         {
             if (@event is InputEventMouse) return;
             systemJumpPopup.HandleInput(@event);
@@ -855,7 +842,7 @@ public partial class MainScene : Control
 
         if(@event.IsActionPressed("CylceSystemUp") && (downloadsListContainer == null || !downloadsListContainer.Visible))
         {
-            if (systemJumpPopup != null && systemJumpPopup.Visible) return;
+            if (systemJumpPopup != null && systemJumpPopup.IsOpen) return;
             rightBumperPressedTime = Time.GetTicksMsec();
             return;
         }
@@ -876,7 +863,7 @@ public partial class MainScene : Control
 
         if (@event.IsActionPressed("CycleSystemDown") && (downloadsListContainer == null || !downloadsListContainer.Visible))
         {
-            if (systemJumpPopup != null && systemJumpPopup.Visible) return;
+            if (systemJumpPopup != null && systemJumpPopup.IsOpen) return;
             leftBumperPressedTime = Time.GetTicksMsec();
             return;
         }
@@ -977,8 +964,8 @@ public partial class MainScene : Control
         var hovered = viewport.GuiGetHoveredControl();
         if (hovered == null) return;
 
-        if (releasePickerPopup != null && releasePickerPopup.Visible && !releasePickerPopup.IsAncestorOf(hovered)) return;
-        if (systemJumpPopup != null && systemJumpPopup.Visible && !systemJumpPopup.IsAncestorOf(hovered)) return;
+        if (releasePickerPopup != null && releasePickerPopup.IsOpen && !releasePickerPopup.IsAncestorOf(hovered)) return;
+        if (systemJumpPopup != null && systemJumpPopup.IsOpen && !systemJumpPopup.IsAncestorOf(hovered)) return;
 
         Control focusable = hovered;
         while (focusable != null && focusable.FocusMode != Control.FocusModeEnum.All)
@@ -1006,8 +993,8 @@ public partial class MainScene : Control
         return (startMenuRoot != null && startMenuRoot.Visible)
             || (settingsMenuContainer != null && settingsMenuContainer.Visible)
             || (downloadsListContainer != null && downloadsListContainer.Visible)
-            || (systemJumpPopup != null && systemJumpPopup.Visible)
-            || (releasePickerPopup != null && releasePickerPopup.Visible);
+            || (systemJumpPopup != null && systemJumpPopup.IsOpen)
+            || (releasePickerPopup != null && releasePickerPopup.IsOpen);
     }
 
     private bool IsMouseOverGameList()
@@ -1046,7 +1033,7 @@ public partial class MainScene : Control
             if (GameListHandler.fuzzySearchBuffer.Length > 0 && currentTime - GameListHandler.lastKeystrokeTime > 1500)
             {
                 GameListHandler.fuzzySearchBuffer = "";
-                if (fuzzySearchPopup != null) PopupAnimator.Hide(fuzzySearchPopup);
+                fuzzySearchPopup?.Close();
             }
 
             if (GameListHandler.isFuzzySearchDirty && currentTime - GameListHandler.lastKeystrokeTime > 400)
@@ -1073,11 +1060,11 @@ public partial class MainScene : Control
                 if (!string.IsNullOrEmpty(GameListHandler.fuzzySearchBuffer))
                 {
                     if (fuzzySearchLabel != null) fuzzySearchLabel.Text = "Search: " + GameListHandler.fuzzySearchBuffer;
-                    if (!fuzzySearchPopup.Visible || PopupAnimator.IsHiding(fuzzySearchPopup)) PopupAnimator.Show(fuzzySearchPopup);
+                    fuzzySearchPopup.Open();
                 }
                 else
                 {
-                    PopupAnimator.Hide(fuzzySearchPopup);
+                    fuzzySearchPopup.Close();
                 }
             }
         }
@@ -1085,7 +1072,7 @@ public partial class MainScene : Control
 
     private void OpenSystemJumpPopup()
     {
-        if (systemJumpPopup != null && !systemJumpPopup.Visible && (downloadsListContainer == null || !downloadsListContainer.Visible))
+        if (systemJumpPopup != null && !systemJumpPopup.IsOpen && (downloadsListContainer == null || !downloadsListContainer.Visible))
         {
             systemJumpPopup.Populate(GameListHandler.gameSystems, GameListHandler.currentGameSystemIndex);
             systemJumpPopup.Open();
