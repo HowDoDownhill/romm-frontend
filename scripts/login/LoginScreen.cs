@@ -15,6 +15,11 @@ public partial class LoginScreen : Control
     [Export] private LineEdit rommPasswordInput;
     [Export] private LineEdit rommApiKeyInput;
 
+    [ExportGroup("Panel Shadow")]
+    [Export(PropertyHint.Range, "0,120,1")] private int panelShadowSize = MicaShadow.DefaultSize;
+    [Export] private Color panelShadowColor = MicaShadow.DefaultColor;
+    [Export] private Vector2 panelShadowOffset = MicaShadow.DefaultOffset;
+
     private AppInstance appInstance; 
     
     public override void _Ready()
@@ -24,7 +29,7 @@ public partial class LoginScreen : Control
         loginButton.Pressed += OnLoginButtonPressed;
 
         var micaMaterial = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
-        MicaShadow.AttachToAll(this, micaMaterial, MicaShadow.DefaultColor);
+        MicaShadow.AttachToAll(this, micaMaterial, panelShadowColor, panelShadowSize, panelShadowOffset);
 
         PopulateFieldsFromConfig();
         AttemptAutoLogin();

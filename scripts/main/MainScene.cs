@@ -64,6 +64,11 @@ public partial class MainScene : Control
     [Export] public Button acceptUpdateBtn;
     [Export] public Button cancelUpdateBtn;
 
+    [ExportGroup("Panel Shadow")]
+    [Export(PropertyHint.Range, "0,120,1")] public int panelShadowSize = MicaShadow.DefaultSize;
+    [Export] public Color panelShadowColor = MicaShadow.DefaultColor;
+    [Export] public Vector2 panelShadowOffset = MicaShadow.DefaultOffset;
+
     public AppInstance appInstance;
     public ImageTexture placeholderTexture;
     [Export] public ColorRect backgroundRect;
@@ -214,7 +219,7 @@ public partial class MainScene : Control
         ApplyTheme();
 
         var micaMaterial = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
-        MicaShadow.AttachToAll(this, micaMaterial, MicaShadow.DefaultColor);
+        MicaShadow.AttachToAll(this, micaMaterial, panelShadowColor, panelShadowSize, panelShadowOffset);
     }
 
     public void ApplyTheme()

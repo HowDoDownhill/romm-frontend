@@ -10,6 +10,11 @@ public partial class LoadingScreen : Control
     [Export] private ProgressBar progressBar;
     [Export] private Label statusLabel;
 
+    [ExportGroup("Panel Shadow")]
+    [Export(PropertyHint.Range, "0,120,1")] private int panelShadowSize = MicaShadow.DefaultSize;
+    [Export] private Color panelShadowColor = MicaShadow.DefaultColor;
+    [Export] private Vector2 panelShadowOffset = MicaShadow.DefaultOffset;
+
     private AppInstance appInstance;
 
     public override void _Ready()
@@ -17,7 +22,7 @@ public partial class LoadingScreen : Control
         appInstance = GetNode<AppInstance>("/root/AppInstance");
 
         var micaMaterial = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
-        MicaShadow.AttachToAll(this, micaMaterial, MicaShadow.DefaultColor);
+        MicaShadow.AttachToAll(this, micaMaterial, panelShadowColor, panelShadowSize, panelShadowOffset);
 
         AttemptLoadFromCacheAsync();
     }

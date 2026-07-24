@@ -9,47 +9,54 @@ public static class MicaShadow
 
     public static void Attach(Control panel, Color color, int size = DefaultSize, Vector2? offset = null)
     {
-        if (panel == null || panel.HasNode("MicaShadow")) return;
+        if (panel == null) return;
 
-        int radius = 0;
-        if (panel.GetThemeStylebox("panel") is StyleBoxFlat existing)
-            radius = existing.CornerRadiusTopLeft;
+        var shadow = panel.GetNodeOrNull<Panel>("MicaShadow") ?? CreateShadowNode(panel);
+        shadow.AddThemeStyleboxOverride("panel", BuildStyle(panel, color, size, offset ?? DefaultOffset));
+    }
 
-        var style = new StyleBoxFlat
-        {
-            BgColor = new Color(0, 0, 0, 0),
-            ShadowColor = color,
-            ShadowSize = size,
-            ShadowOffset = offset ?? DefaultOffset,
-            CornerRadiusTopLeft = radius,
-            CornerRadiusTopRight = radius,
-            CornerRadiusBottomLeft = radius,
-            CornerRadiusBottomRight = radius,
-        };
-
+    private static Panel CreateShadowNode(Control panel)
+    {
         var shadow = new Panel
         {
             Name = "MicaShadow",
             MouseFilter = Control.MouseFilterEnum.Ignore,
             ShowBehindParent = true,
         };
-        shadow.AddThemeStyleboxOverride("panel", style);
         panel.AddChild(shadow);
         shadow.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        return shadow;
     }
 
-    public static void AttachToAll(Node root, ShaderMaterial material, Color color, int size = DefaultSize)
+    private static StyleBoxFlat BuildStyle(Control panel, Color color, int size, Vector2 offset)
+    {
+        int radius = 0;
+        if (panel.GetThemeStylebox("panel") is StyleBoxFlat existing)
+            radius = existing.CornerRadiusTopLeft;
+
+        return new StyleBoxFlat
+        {
+            BgColor = new Color(0, 0, 0, 0),
+            ShadowColor = color,
+            ShadowSize = size,
+            ShadowOffset = offset,
+            CornerRadiusTopLeft = radius,
+            CornerRadiusTopRight = radius,
+            CornerRadiusBottomLeft = radius,
+            CornerRadiusBottomRight = radius,
+        };
+    }
+
+    public static void AttachToAll(Node root, ShaderMaterial material, Color color, int size = DefaultSize, Vector2? offset = null)
     {
         var found = new List<Control>();
         Collect(root, material, found);
         foreach (var c in found)
-            Attach(c, color, size);
+            Attach(c, color, size, offset);
     }
 
     private static void Collect(Node node, ShaderMaterial material, List<Control> outList)
     {
-        if (node is UiPanel)
-            return;
         if (node is Control c && c.Material == material)
             outList.Add(c);
         foreach (Node child in node.GetChildren())
