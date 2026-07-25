@@ -47,9 +47,9 @@ public partial class StartMenuPanel : UiPanel
         FocusCycler.Cycle(optionsList, 0);
     }
 
-    public override void HandleInput(InputEvent inputEvent)
+    public override bool HandleInput(InputEvent inputEvent)
     {
-        if (State == PanelState.Closing) return;
+        if (State == PanelState.Closing) return true;
 
         Control activeList = IsBiosViewOpen ? biosView : optionsList;
 
@@ -57,19 +57,19 @@ public partial class StartMenuPanel : UiPanel
         {
             if (IsBiosViewOpen) ShowMenuView();
             else Close();
-            return;
+            return true;
         }
 
         if (inputEvent.IsActionPressed("ui_up", true) || inputEvent.IsActionPressed("MoveUp"))
         {
             FocusCycler.Cycle(activeList, -1);
-            return;
+            return true;
         }
 
         if (inputEvent.IsActionPressed("ui_down", true) || inputEvent.IsActionPressed("MoveDown"))
         {
             FocusCycler.Cycle(activeList, 1);
-            return;
+            return true;
         }
 
         if (inputEvent.IsActionPressed("ui_accept") || inputEvent.IsActionPressed("Select"))
@@ -79,5 +79,7 @@ public partial class StartMenuPanel : UiPanel
                 focusedButton.EmitSignal(BaseButton.SignalName.Pressed);
             }
         }
+
+        return true;
     }
 }

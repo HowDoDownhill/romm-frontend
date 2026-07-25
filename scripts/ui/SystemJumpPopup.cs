@@ -127,25 +127,25 @@ public partial class SystemJumpPopup : UiPanel
         }
     }
 
-    public override void HandleInput(InputEvent @event)
+    public override bool HandleInput(InputEvent @event)
     {
-        if (State == PanelState.Closing) return;
+        if (State == PanelState.Closing) return true;
 
         if (@event.IsActionPressed("Back") || @event.IsActionPressed("ui_cancel"))
         {
             Close();
-            return;
+            return true;
         }
 
         if (@event.IsActionPressed("Select") || @event.IsActionPressed("ui_accept"))
         {
             int idx = GetFocusedIndex();
             if (idx >= 0) EmitSignal(SignalName.SystemSelected, idx);
-            return;
+            return true;
         }
 
         int current = GetFocusedIndex();
-        if (current < 0) return;
+        if (current < 0) return true;
 
         int columns = gridContainer.Columns;
         int count = gridContainer.GetChildCount();
@@ -169,6 +169,8 @@ public partial class SystemJumpPopup : UiPanel
         }
 
         if (target != current) FocusSystem(target);
+
+        return true;
     }
 
     private int GetFocusedIndex()

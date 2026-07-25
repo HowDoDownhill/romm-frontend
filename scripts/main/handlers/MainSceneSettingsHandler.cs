@@ -15,6 +15,10 @@ public class MainSceneSettingsHandler
         this.appInstance = appInstance;
     }
 
+    public Control SectionsTree => mainScene.settingsSectionsTree;
+
+    public Control OptionsContainer => mainScene.sectionOptionsContainer;
+
     public void ToggleSettingsMenu()
     {
         mainScene.SectionHandler.ToggleSettings();

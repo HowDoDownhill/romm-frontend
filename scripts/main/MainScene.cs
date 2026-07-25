@@ -77,7 +77,7 @@ public partial class MainScene : Control
 
     [Export] public StartMenuPanel startMenuPanel;
 
-    [Export] public UiPanel settingsMenuContainer;
+    [Export] public SettingsPanel settingsMenuContainer;
     [Export] public VBoxContainer settingsSectionsTree;
     [Export] public VBoxContainer sectionOptionsContainer;
 
@@ -187,6 +187,7 @@ public partial class MainScene : Control
 
         if (settingsMenuContainer != null)
         {
+            settingsMenuContainer.Handler = SettingsHandler;
             SettingsHandler.SetupSettingsTree();
         }
 
@@ -653,104 +654,7 @@ public partial class MainScene : Control
 
         if (settingsMenuContainer != null && settingsMenuContainer.IsOpen)
         {
-            var focusOwner = GetViewport().GuiGetFocusOwner();
-
-            bool isFocusInTree = (focusOwner != null && settingsSectionsTree.IsAncestorOf(focusOwner));
-            bool isFocusInOptions = (focusOwner != null && sectionOptionsContainer.IsAncestorOf(focusOwner));
-
-            if (@event.IsActionPressed("ui_cancel") || @event.IsActionPressed("Back"))
-            {
-                if (isFocusInOptions)
-                {
-                    SettingsHandler.CycleFocusInContainer(settingsSectionsTree, 0);
-                }
-                else
-                {
-                    SettingsHandler.ToggleSettingsMenu();
-                }
-                GetViewport().SetInputAsHandled();
-                return;
-            }
-            else if (@event.IsActionPressed("ui_accept") || @event.IsActionPressed("Select"))
-            {
-                if (isFocusInTree)
-                {
-                    var visibleForm = SettingsHandler.GetVisibleSettingsForm();
-                    if (visibleForm != null)
-                    {
-                        var firstFocusable = SettingsHandler.FindFirstFocusable(visibleForm);
-                        if (firstFocusable != null)
-                        {
-                            firstFocusable.GrabFocus();
-                            GetViewport().SetInputAsHandled();
-                            return;
-                        }
-                    }
-                }
-                else if (isFocusInOptions)
-                {
-                    if (focusOwner is SettingsListEntry entry)
-                    {
-                        entry.InteractWithWidget();
-                    }
-                    else if (focusOwner is BaseButton btn)
-                    {
-                        if (btn is CheckButton checkBtn)
-                        {
-                            checkBtn.ButtonPressed = !checkBtn.ButtonPressed;
-                            checkBtn.EmitSignal(BaseButton.SignalName.Toggled, checkBtn.ButtonPressed);
-                        }
-                        else if (btn is OptionButton optBtn)
-                        {
-                            optBtn.ShowPopup();
-                        }
-                        else
-                        {
-                            btn.EmitSignal(BaseButton.SignalName.Pressed);
-                        }
-                    }
-                    GetViewport().SetInputAsHandled();
-                    return;
-                }
-            }
-            else if (@event.IsActionPressed("ui_up", true) || @event.IsActionPressed("MoveUp") ||
-                     @event.IsActionPressed("ui_down", true) || @event.IsActionPressed("MoveDown"))
-            {
-                int direction = (@event.IsActionPressed("ui_down", true) || @event.IsActionPressed("MoveDown")) ? 1 : -1;
-
-                if (isFocusInTree)
-                {
-                    SettingsHandler.CycleFocusInContainer(settingsSectionsTree, direction);
-                }
-                else if (isFocusInOptions)
-                {
-                    var visibleForm = SettingsHandler.GetVisibleSettingsForm();
-                    if (visibleForm != null)
-                    {
-                        SettingsHandler.CycleFocusInContainer(visibleForm, direction);
-                    }
-                }
-
-                GetViewport().SetInputAsHandled();
-                return;
-            }
-            else if (@event.IsActionPressed("ui_left", true) || @event.IsActionPressed("ui_right", true))
-            {
-                if (isFocusInOptions)
-                {
-                    int direction = @event.IsAction("ui_right") ? 1 : -1;
-                    if (focusOwner is SettingsListEntry entry)
-                    {
-                        entry.CycleWidget(direction);
-                    }
-                    else
-                    {
-                        SettingsHandler.CycleFocusedOption(direction);
-                    }
-                    GetViewport().SetInputAsHandled();
-                    return;
-                }
-            }
+            if (settingsMenuContainer.HandleInput(@event)) GetViewport().SetInputAsHandled();
             return;
         }
 

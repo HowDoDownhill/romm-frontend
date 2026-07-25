@@ -148,8 +148,9 @@ public partial class UiPanel : Control
     {
     }
 
-    public virtual void HandleInput(InputEvent inputEvent)
+    public virtual bool HandleInput(InputEvent inputEvent)
     {
+        return false;
     }
 
     private Control ScaleTarget => ContentRoot ?? this;

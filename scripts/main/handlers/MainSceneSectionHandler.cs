@@ -83,7 +83,7 @@ public class MainSceneSectionHandler
             if (panel == null) continue;
 
             if (section == target) panel.Open(animate);
-            else panel.Close(animate);
+            else panel.Close(false);
         }
 
         ApplyFooters(target, previous, animate);

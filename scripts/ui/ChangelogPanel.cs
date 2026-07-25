@@ -44,9 +44,9 @@ public partial class ChangelogPanel : UiPanel
         Open();
     }
 
-    public override void HandleInput(InputEvent inputEvent)
+    public override bool HandleInput(InputEvent inputEvent)
     {
-        if (State == PanelState.Closing) return;
+        if (State == PanelState.Closing) return true;
 
         if (inputEvent.IsActionPressed("ui_accept") || inputEvent.IsActionPressed("Select"))
         {
@@ -56,6 +56,8 @@ public partial class ChangelogPanel : UiPanel
         {
             EmitDismissed();
         }
+
+        return true;
     }
 
     private void EmitAccepted()

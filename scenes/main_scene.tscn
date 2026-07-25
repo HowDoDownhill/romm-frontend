@@ -8,6 +8,7 @@
 [ext_resource type="Script" uid="uid://dvfmg1ugxmmur" path="res://scripts/ui/UiPanel.cs" id="3_uipanel"]
 [ext_resource type="Script" uid="uid://co0qgvxrtg7qi" path="res://scripts/ui/ChangelogPanel.cs" id="3_chglog"]
 [ext_resource type="Script" uid="uid://bvyjn1xypupv8" path="res://scripts/ui/StartMenuPanel.cs" id="3_stmenu"]
+[ext_resource type="Script" path="res://scripts/ui/SettingsPanel.cs" id="3_setpanel"]
 [ext_resource type="Material" uid="uid://b822n10q6f56b" path="res://assets/materials/mica_panel.tres" id="3_mica"]
 [ext_resource type="PackedScene" uid="uid://cffanb3xjob1c" path="res://scenes/downloads_list/download_entry.tscn" id="4_pu3yx"]
 [ext_resource type="PackedScene" path="res://scenes/ui/system_carousel.tscn" id="5_6wevv"]
@@ -294,7 +295,7 @@ size_flags_vertical = 3
 visible = false
 layout_mode = 2
 size_flags_vertical = 3
-script = ExtResource("3_uipanel")
+script = ExtResource("3_setpanel")
 Transition = 2
 RestingScale = 0.98
 UseMica = false

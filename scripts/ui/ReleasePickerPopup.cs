@@ -158,14 +158,14 @@ public partial class ReleasePickerPopup : UiPanel
         }
     }
 
-    public override void HandleInput(InputEvent @event)
+    public override bool HandleInput(InputEvent @event)
     {
-        if (State == PanelState.Closing) return;
+        if (State == PanelState.Closing) return true;
 
         if (@event.IsActionPressed("Back") || @event.IsActionPressed("ui_cancel"))
         {
             Close();
-            return;
+            return true;
         }
 
         if (@event.IsActionPressed("Select") || @event.IsActionPressed("ui_accept"))
@@ -181,18 +181,18 @@ public partial class ReleasePickerPopup : UiPanel
                 releaseListContainer.GetChild<Button>(0).GrabFocus();
             }
 
-            return;
+            return true;
         }
 
         int current = GetFocusedIndex();
         int count = releaseListContainer.GetChildCount();
 
-        if (count == 0) return;
+        if (count == 0) return true;
 
         if (current < 0)
         {
             releaseListContainer.GetChild<Button>(0).GrabFocus();
-            return;
+            return true;
         }
 
         int target = current;
@@ -210,6 +210,8 @@ public partial class ReleasePickerPopup : UiPanel
         {
             releaseListContainer.GetChild<Button>(target).GrabFocus();
         }
+
+        return true;
     }
 
     private int GetFocusedIndex()
