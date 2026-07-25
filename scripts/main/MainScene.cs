@@ -59,10 +59,7 @@ public partial class MainScene : Control
     [Export] public Label downloadProgressLabel;
     [Export] public ProgressBar downloadProgressBar;
 
-    [Export] public Control changelogPopup;
-    [Export] public RichTextLabel changelogRichTextLabel;
-    [Export] public Button acceptUpdateBtn;
-    [Export] public Button cancelUpdateBtn;
+    [Export] public ChangelogPanel changelogPanel;
 
     [ExportGroup("Panel Frost")]
     [Export(PropertyHint.Range, "0,1,0.01")] public float panelLuminosityFloor = 0.14f;
@@ -201,15 +198,11 @@ public partial class MainScene : Control
             SettingsHandler.SetupSettingsTree();
         }
 
-        if (acceptUpdateBtn != null)
+        if (changelogPanel != null)
         {
-            acceptUpdateBtn.Pressed += UpdaterHandler.OnAcceptUpdatePressed;
-            acceptUpdateBtn.Icon = MakeControllerGlyph("Select");
-        }
-        if (cancelUpdateBtn != null)
-        {
-            cancelUpdateBtn.Pressed += UpdaterHandler.OnCancelUpdatePressed;
-            cancelUpdateBtn.Icon = MakeControllerGlyph("Back");
+            panelStack.Register(changelogPanel);
+            changelogPanel.Accepted += UpdaterHandler.OnAcceptUpdatePressed;
+            changelogPanel.Dismissed += UpdaterHandler.OnCancelUpdatePressed;
         }
 
         GameListHandler.SelectSystemByIndex(0);
@@ -421,15 +414,7 @@ public partial class MainScene : Control
         if (btn == null) return;
         btn.Text = defaultText;
         btn.ThemeTypeVariation = "FlatButton";
-        btn.Icon = MakeControllerGlyph(iconPath);
-    }
-
-    private ControllerIconTexture MakeControllerGlyph(string actionPath)
-    {
-        var iconTex = new ControllerIconTexture();
-        iconTex.path = actionPath;
-        iconTex.show_mode = ControllerIcons.EShowMode.CONTROLLER;
-        return iconTex;
+        btn.Icon = ControllerGlyph.For(iconPath);
     }
 
     private void ToggleStartMenu()
@@ -599,23 +584,6 @@ public partial class MainScene : Control
             {
                 GetViewport().SetInputAsHandled();
             }
-            return;
-        }
-
-        if (changelogPopup != null && changelogPopup.Visible)
-        {
-            if (@event is InputEventMouse) return;
-
-            if (@event.IsActionPressed("ui_accept") || @event.IsActionPressed("Select"))
-            {
-                UpdaterHandler.OnAcceptUpdatePressed();
-            }
-            else if (@event.IsActionPressed("ui_cancel") || @event.IsActionPressed("Back"))
-            {
-                UpdaterHandler.OnCancelUpdatePressed();
-            }
-
-            GetViewport().SetInputAsHandled();
             return;
         }
 

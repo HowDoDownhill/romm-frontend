@@ -32,21 +32,7 @@ public class MainSceneUpdaterHandler
     {
         pendingUpdateVersion = version;
 
-        if (mainScene.changelogPopup != null && mainScene.changelogRichTextLabel != null)
-        {
-            string sanitizedNotes = releaseNotes.Replace("\r", "").Replace("\b", "");
-            mainScene.changelogRichTextLabel.Text = $"[b]A new version ({version}) of Romm Frontend is available.[/b]\n\nRelease Notes:\n{sanitizedNotes}";
-            mainScene.changelogPopup.Visible = true;
-
-            if (mainScene.acceptUpdateBtn != null)
-            {
-                mainScene.acceptUpdateBtn.Text = "Install";
-            }
-            if (mainScene.cancelUpdateBtn != null)
-            {
-                mainScene.cancelUpdateBtn.Text = "Close";
-            }
-        }
+        mainScene.changelogPanel?.ShowUpdate(version, releaseNotes);
     }
 
     private void OnUpdateDownloadProgress(float progress)
@@ -87,7 +73,7 @@ public class MainSceneUpdaterHandler
 
     public void OnAcceptUpdatePressed()
     {
-        if (mainScene.changelogPopup != null) mainScene.changelogPopup.Visible = false;
+        mainScene.changelogPanel?.Close();
 
         if (!string.IsNullOrEmpty(pendingUpdateVersion))
         {
@@ -112,6 +98,6 @@ public class MainSceneUpdaterHandler
 
     public void OnCancelUpdatePressed()
     {
-        if (mainScene.changelogPopup != null) mainScene.changelogPopup.Visible = false;
+        mainScene.changelogPanel?.Close();
     }
 }

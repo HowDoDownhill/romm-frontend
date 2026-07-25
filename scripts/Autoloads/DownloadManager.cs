@@ -11,6 +11,8 @@ public partial class DownloadManager : Node
     [Signal]
     public delegate void DownloadCompletedEventHandler(string fileName, bool wasSuccessful);
 
+    private const double DiagnosticsLogIntervalSeconds = 2.0;
+
     private AppInstance appInstance;
 
     public override void _Ready()
@@ -27,6 +29,9 @@ public partial class DownloadManager : Node
         public System.Action<string> CompletionCallback { get; set; }
         public bool IsCancelled { get; set; }
         public string GameId { get; set; }
+        public ulong StartedAtMilliseconds { get; set; }
+        public double SecondsSinceDiagnosticsLog { get; set; }
+        public long BytesAtLastDiagnosticsLog { get; set; }
     }
 
     private List<ActiveDownloadEntry> activeDownloadEntries = new List<ActiveDownloadEntry>();
@@ -42,7 +47,8 @@ public partial class DownloadManager : Node
             FileName = destinationFilePath.GetFile(),
             DestinationPath = destinationFilePath,
             CompletionCallback = onDownloadComplete,
-            GameId = gameId
+            GameId = gameId,
+            StartedAtMilliseconds = Time.GetTicksMsec()
         };
 
         activeDownloadEntries.Add(downloadEntry);
@@ -59,25 +65,35 @@ public partial class DownloadManager : Node
             finalRequestHeaders = headerList.ToArray();
         }
 
+        httpRequest.RequestCompleted += (long resultCode, long responseCode, string[] responseHeaders, byte[] responseBody) =>
+        {
+            LogDownloadCompletionDiagnostics(downloadEntry, resultCode, responseCode, responseHeaders, responseBody);
+            HandleDownloadCompleted(downloadEntry, resultCode, responseCode);
+        };
+
         var requestError = httpRequest.Request(downloadUrl, finalRequestHeaders);
+
+        GD.Print($"[DownloadDiagnostics] start file={downloadEntry.FileName} url={downloadUrl} requestError={requestError} bodySizeLimit={httpRequest.BodySizeLimit} useThreads={httpRequest.UseThreads} timeoutSeconds={httpRequest.Timeout} maxRedirects={httpRequest.MaxRedirects} concurrentDownloads={activeDownloadEntries.Count}");
 
         if (requestError != Error.Ok)
         {
             GD.PrintErr($"HttpRequest failed to start for {downloadUrl}. Error: {requestError}");
             HandleDownloadCompleted(downloadEntry, (long)HttpRequest.Result.CantConnect, 0);
         }
-
-        httpRequest.RequestCompleted += (long resultCode, long responseCode, string[] responseHeaders, byte[] responseBody) =>
-        {
-            HandleDownloadCompleted(downloadEntry, resultCode, responseCode);
-        };
     }
 
     public override void _Process(double deltaTime)
     {
         foreach (var downloadEntry in activeDownloadEntries.ToList())
         {
-            if (downloadEntry.Request.GetHttpClientStatus() == HttpClient.Status.Body)
+            if (!GodotObject.IsInstanceValid(downloadEntry.Request))
+            {
+                continue;
+            }
+
+            var clientStatus = downloadEntry.Request.GetHttpClientStatus();
+
+            if (clientStatus == HttpClient.Status.Body)
             {
                 EmitSignal(SignalName.DownloadProgressUpdated,
                     downloadEntry.FileName,
@@ -85,7 +101,55 @@ public partial class DownloadManager : Node
                     downloadEntry.Request.GetBodySize(),
                     downloadEntry.GameId);
             }
+
+            LogDownloadProgressDiagnostics(downloadEntry, clientStatus, deltaTime);
         }
+    }
+
+    private void LogDownloadProgressDiagnostics(ActiveDownloadEntry downloadEntry, HttpClient.Status clientStatus, double deltaTime)
+    {
+        downloadEntry.SecondsSinceDiagnosticsLog += deltaTime;
+
+        if (downloadEntry.SecondsSinceDiagnosticsLog < DiagnosticsLogIntervalSeconds)
+        {
+            return;
+        }
+
+        long downloadedBytes = downloadEntry.Request.GetDownloadedBytes();
+        long bytesSinceLastLog = downloadedBytes - downloadEntry.BytesAtLastDiagnosticsLog;
+        double megabytesPerSecond = bytesSinceLastLog / downloadEntry.SecondsSinceDiagnosticsLog / (1024.0 * 1024.0);
+        double elapsedSeconds = (Time.GetTicksMsec() - downloadEntry.StartedAtMilliseconds) / 1000.0;
+
+        GD.Print($"[DownloadDiagnostics] progress file={downloadEntry.FileName} status={clientStatus} downloaded={downloadedBytes} reportedBodySize={downloadEntry.Request.GetBodySize()} onDisk={MeasureBytesOnDisk(downloadEntry.DestinationPath)} rate={megabytesPerSecond:F2}MB/s elapsed={elapsedSeconds:F0}s");
+
+        downloadEntry.BytesAtLastDiagnosticsLog = downloadedBytes;
+        downloadEntry.SecondsSinceDiagnosticsLog = 0.0;
+    }
+
+    private void LogDownloadCompletionDiagnostics(ActiveDownloadEntry downloadEntry, long resultCode, long responseCode, string[] responseHeaders, byte[] responseBody)
+    {
+        double elapsedSeconds = (Time.GetTicksMsec() - downloadEntry.StartedAtMilliseconds) / 1000.0;
+        long downloadedBytes = GodotObject.IsInstanceValid(downloadEntry.Request) ? downloadEntry.Request.GetDownloadedBytes() : -1;
+        long reportedBodySize = GodotObject.IsInstanceValid(downloadEntry.Request) ? downloadEntry.Request.GetBodySize() : -1;
+
+        GD.Print($"[DownloadDiagnostics] completed file={downloadEntry.FileName} result={(HttpRequest.Result)resultCode} responseCode={responseCode} downloaded={downloadedBytes} reportedBodySize={reportedBodySize} onDisk={MeasureBytesOnDisk(downloadEntry.DestinationPath)} inMemoryBody={responseBody?.Length ?? 0} elapsed={elapsedSeconds:F1}s cancelled={downloadEntry.IsCancelled}");
+
+        foreach (var responseHeader in responseHeaders ?? new string[0])
+        {
+            GD.Print($"[DownloadDiagnostics] responseHeader {responseHeader}");
+        }
+    }
+
+    private static long MeasureBytesOnDisk(string filePath)
+    {
+        using var fileHandle = Godot.FileAccess.Open(filePath, Godot.FileAccess.ModeFlags.Read);
+
+        if (fileHandle == null)
+        {
+            return -1;
+        }
+
+        return (long)fileHandle.GetLength();
     }
 
     public bool IsDownloading(string fileName)

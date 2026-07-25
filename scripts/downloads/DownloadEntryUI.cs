@@ -83,13 +83,8 @@ public partial class DownloadEntryUI : MarginContainer
 
     public void UpdateProgress(long current, long total)
     {
-        if (progressBar != null)
-        {
-            double percentage = total > 0 ? (double)current / total * 100 : 0;
-            progressBar.Value = percentage;
-        }
-        
-        SetStatus("Downloading...");
+        DownloadProgressDisplay.ApplyTo(progressBar, current, total);
+        SetStatus(DownloadProgressDisplay.DescribeProgress(current, total));
     }
 
     public void SetStatus(string status)

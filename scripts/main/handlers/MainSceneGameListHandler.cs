@@ -699,8 +699,7 @@ public partial class MainSceneGameListHandler
             if (mainScene.gameDownloadProgressBar != null)
             {
                 mainScene.gameDownloadProgressBar.Visible = true;
-                mainScene.gameDownloadProgressBar.MaxValue = totalBytes;
-                mainScene.gameDownloadProgressBar.Value = currentBytes;
+                DownloadProgressDisplay.ApplyTo(mainScene.gameDownloadProgressBar, currentBytes, totalBytes);
             }
         }
     }
