@@ -1,7 +1,9 @@
 using Godot;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.AccessControl;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
 
 public partial class DownloadManager : Node
 {
@@ -11,7 +13,10 @@ public partial class DownloadManager : Node
     [Signal]
     public delegate void DownloadCompletedEventHandler(string fileName, bool wasSuccessful);
 
+    private const int TransferBufferSizeBytes = 1024 * 1024;
     private const double DiagnosticsLogIntervalSeconds = 2.0;
+
+    private static readonly System.Net.Http.HttpClient transferClient = new System.Net.Http.HttpClient { Timeout = Timeout.InfiniteTimeSpan };
 
     private AppInstance appInstance;
 
@@ -23,62 +28,150 @@ public partial class DownloadManager : Node
 
     private class ActiveDownloadEntry
     {
-        public HttpRequest Request { get; set; }
-        public string FileName { get; set; }
-        public string DestinationPath { get; set; }
-        public System.Action<string> CompletionCallback { get; set; }
-        public bool IsCancelled { get; set; }
-        public string GameId { get; set; }
-        public ulong StartedAtMilliseconds { get; set; }
-        public double SecondsSinceDiagnosticsLog { get; set; }
-        public long BytesAtLastDiagnosticsLog { get; set; }
+        public string fileName;
+        public string destinationPath;
+        public System.Action<string> completionCallback;
+        public string gameId;
+        public CancellationTokenSource cancellationSource;
+        public ulong startedAtMilliseconds;
+        public long bytesDownloaded;
+        public long totalBytes;
+        public bool hasFinished;
+        public bool wasSuccessful;
+        public string failureReason;
+        public double secondsSinceDiagnosticsLog;
+        public long bytesAtLastDiagnosticsLog;
     }
 
     private List<ActiveDownloadEntry> activeDownloadEntries = new List<ActiveDownloadEntry>();
 
-    public void DownloadFile(string downloadUrl, string destinationFilePath, string[] requestHeaders, System.Action<string> onDownloadComplete, string gameId = null)
+    public void DownloadFile(string downloadUrl, string destinationFilePath, string[] requestHeaders, System.Action<string> onDownloadComplete, string gameId = null, long expectedTotalBytes = 0)
     {
-        var httpRequest = new HttpRequest();
-        AddChild(httpRequest);
-
         var downloadEntry = new ActiveDownloadEntry
         {
-            Request = httpRequest,
-            FileName = destinationFilePath.GetFile(),
-            DestinationPath = destinationFilePath,
-            CompletionCallback = onDownloadComplete,
-            GameId = gameId,
-            StartedAtMilliseconds = Time.GetTicksMsec()
+            fileName = destinationFilePath.GetFile(),
+            destinationPath = destinationFilePath,
+            completionCallback = onDownloadComplete,
+            gameId = gameId,
+            cancellationSource = new CancellationTokenSource(),
+            startedAtMilliseconds = Time.GetTicksMsec(),
+            totalBytes = expectedTotalBytes
         };
 
         activeDownloadEntries.Add(downloadEntry);
 
-        httpRequest.DownloadFile = destinationFilePath;
-        httpRequest.UseThreads = true;
+        GD.Print($"[Download] starting file={downloadEntry.fileName} url={downloadUrl} expectedTotalBytes={expectedTotalBytes}");
 
-        string[] finalRequestHeaders = requestHeaders ?? new string[0];
+        _ = TransferToDestinationAsync(downloadEntry, downloadUrl, requestHeaders);
+    }
 
-        if (!finalRequestHeaders.Any(header => header.StartsWith("User-Agent")))
+    private async Task TransferToDestinationAsync(ActiveDownloadEntry downloadEntry, string downloadUrl, string[] requestHeaders)
+    {
+        string globalDestinationPath = ProjectSettings.GlobalizePath(downloadEntry.destinationPath);
+        var cancellationToken = downloadEntry.cancellationSource.Token;
+
+        try
         {
-            var headerList = finalRequestHeaders.ToList();
-            headerList.Add("User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-            finalRequestHeaders = headerList.ToArray();
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Get, downloadUrl);
+
+            ApplyRequestHeaders(requestMessage, requestHeaders);
+
+            using var responseMessage = await transferClient
+                .SendAsync(requestMessage, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
+                .ConfigureAwait(false);
+
+            if (!responseMessage.IsSuccessStatusCode)
+            {
+                MarkDownloadFinished(downloadEntry, false, $"HTTP {(int)responseMessage.StatusCode} {responseMessage.ReasonPhrase}");
+                return;
+            }
+
+            long declaredContentLength = responseMessage.Content.Headers.ContentLength ?? 0;
+
+            if (declaredContentLength > 0)
+            {
+                Interlocked.Exchange(ref downloadEntry.totalBytes, declaredContentLength);
+            }
+
+            GD.Print($"[Download] responseReceived file={downloadEntry.fileName} status={(int)responseMessage.StatusCode} contentLength={declaredContentLength} contentEncoding={string.Join(",", responseMessage.Content.Headers.ContentEncoding)}");
+
+            using var responseStream = await responseMessage.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+            using var destinationStream = new System.IO.FileStream(globalDestinationPath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.Read, TransferBufferSizeBytes, true);
+
+            var transferBuffer = new byte[TransferBufferSizeBytes];
+            long bytesWritten = 0;
+
+            while (true)
+            {
+                int bytesRead = await responseStream.ReadAsync(transferBuffer, cancellationToken).ConfigureAwait(false);
+
+                if (bytesRead == 0)
+                {
+                    break;
+                }
+
+                await destinationStream.WriteAsync(transferBuffer, 0, bytesRead, cancellationToken).ConfigureAwait(false);
+
+                bytesWritten += bytesRead;
+                Interlocked.Exchange(ref downloadEntry.bytesDownloaded, bytesWritten);
+            }
+
+            await destinationStream.FlushAsync(cancellationToken).ConfigureAwait(false);
+
+            long expectedBytes = Interlocked.Read(ref downloadEntry.totalBytes);
+            bool receivedWholeBody = expectedBytes <= 0 || bytesWritten == expectedBytes;
+
+            MarkDownloadFinished(downloadEntry, receivedWholeBody, receivedWholeBody ? null : $"expected {expectedBytes} bytes but received {bytesWritten}");
         }
-
-        httpRequest.RequestCompleted += (long resultCode, long responseCode, string[] responseHeaders, byte[] responseBody) =>
+        catch (System.OperationCanceledException)
         {
-            LogDownloadCompletionDiagnostics(downloadEntry, resultCode, responseCode, responseHeaders, responseBody);
-            HandleDownloadCompleted(downloadEntry, resultCode, responseCode);
-        };
-
-        var requestError = httpRequest.Request(downloadUrl, finalRequestHeaders);
-
-        GD.Print($"[DownloadDiagnostics] start file={downloadEntry.FileName} url={downloadUrl} requestError={requestError} bodySizeLimit={httpRequest.BodySizeLimit} useThreads={httpRequest.UseThreads} timeoutSeconds={httpRequest.Timeout} maxRedirects={httpRequest.MaxRedirects} concurrentDownloads={activeDownloadEntries.Count}");
-
-        if (requestError != Error.Ok)
+            DeleteIncompleteFile(globalDestinationPath);
+            MarkDownloadFinished(downloadEntry, false, "cancelled");
+        }
+        catch (System.Exception transferException)
         {
-            GD.PrintErr($"HttpRequest failed to start for {downloadUrl}. Error: {requestError}");
-            HandleDownloadCompleted(downloadEntry, (long)HttpRequest.Result.CantConnect, 0);
+            DeleteIncompleteFile(globalDestinationPath);
+            MarkDownloadFinished(downloadEntry, false, transferException.Message);
+        }
+    }
+
+    private static void ApplyRequestHeaders(HttpRequestMessage requestMessage, string[] requestHeaders)
+    {
+        foreach (var requestHeader in requestHeaders ?? new string[0])
+        {
+            int separatorIndex = requestHeader.IndexOf(':');
+
+            if (separatorIndex <= 0)
+            {
+                continue;
+            }
+
+            string headerName = requestHeader.Substring(0, separatorIndex).Trim();
+            string headerValue = requestHeader.Substring(separatorIndex + 1).Trim();
+
+            requestMessage.Headers.TryAddWithoutValidation(headerName, headerValue);
+        }
+    }
+
+    private static void MarkDownloadFinished(ActiveDownloadEntry downloadEntry, bool wasSuccessful, string failureReason)
+    {
+        downloadEntry.failureReason = failureReason;
+        downloadEntry.wasSuccessful = wasSuccessful;
+        Volatile.Write(ref downloadEntry.hasFinished, true);
+    }
+
+    private static void DeleteIncompleteFile(string globalFilePath)
+    {
+        try
+        {
+            if (System.IO.File.Exists(globalFilePath))
+            {
+                System.IO.File.Delete(globalFilePath);
+            }
+        }
+        catch (System.Exception deleteException)
+        {
+            GD.PrintErr($"Could not remove incomplete download {globalFilePath}: {deleteException.Message}");
         }
     }
 
@@ -86,128 +179,87 @@ public partial class DownloadManager : Node
     {
         foreach (var downloadEntry in activeDownloadEntries.ToList())
         {
-            if (!GodotObject.IsInstanceValid(downloadEntry.Request))
+            long bytesDownloaded = Interlocked.Read(ref downloadEntry.bytesDownloaded);
+            long totalBytes = Interlocked.Read(ref downloadEntry.totalBytes);
+
+            if (Volatile.Read(ref downloadEntry.hasFinished))
             {
+                HandleDownloadFinished(downloadEntry, bytesDownloaded, totalBytes);
                 continue;
             }
 
-            var clientStatus = downloadEntry.Request.GetHttpClientStatus();
+            EmitSignal(SignalName.DownloadProgressUpdated, downloadEntry.fileName, bytesDownloaded, totalBytes, downloadEntry.gameId);
 
-            if (clientStatus == HttpClient.Status.Body)
-            {
-                EmitSignal(SignalName.DownloadProgressUpdated,
-                    downloadEntry.FileName,
-                    downloadEntry.Request.GetDownloadedBytes(),
-                    downloadEntry.Request.GetBodySize(),
-                    downloadEntry.GameId);
-            }
-
-            LogDownloadProgressDiagnostics(downloadEntry, clientStatus, deltaTime);
+            LogDownloadProgress(downloadEntry, bytesDownloaded, totalBytes, deltaTime);
         }
     }
 
-    private void LogDownloadProgressDiagnostics(ActiveDownloadEntry downloadEntry, HttpClient.Status clientStatus, double deltaTime)
+    private void LogDownloadProgress(ActiveDownloadEntry downloadEntry, long bytesDownloaded, long totalBytes, double deltaTime)
     {
-        downloadEntry.SecondsSinceDiagnosticsLog += deltaTime;
+        downloadEntry.secondsSinceDiagnosticsLog += deltaTime;
 
-        if (downloadEntry.SecondsSinceDiagnosticsLog < DiagnosticsLogIntervalSeconds)
+        if (downloadEntry.secondsSinceDiagnosticsLog < DiagnosticsLogIntervalSeconds)
         {
             return;
         }
 
-        long downloadedBytes = downloadEntry.Request.GetDownloadedBytes();
-        long bytesSinceLastLog = downloadedBytes - downloadEntry.BytesAtLastDiagnosticsLog;
-        double megabytesPerSecond = bytesSinceLastLog / downloadEntry.SecondsSinceDiagnosticsLog / (1024.0 * 1024.0);
-        double elapsedSeconds = (Time.GetTicksMsec() - downloadEntry.StartedAtMilliseconds) / 1000.0;
+        double megabytesPerSecond = (bytesDownloaded - downloadEntry.bytesAtLastDiagnosticsLog) / downloadEntry.secondsSinceDiagnosticsLog / (1024.0 * 1024.0);
+        double elapsedSeconds = (Time.GetTicksMsec() - downloadEntry.startedAtMilliseconds) / 1000.0;
 
-        GD.Print($"[DownloadDiagnostics] progress file={downloadEntry.FileName} status={clientStatus} downloaded={downloadedBytes} reportedBodySize={downloadEntry.Request.GetBodySize()} onDisk={MeasureBytesOnDisk(downloadEntry.DestinationPath)} rate={megabytesPerSecond:F2}MB/s elapsed={elapsedSeconds:F0}s");
+        GD.Print($"[Download] progress file={downloadEntry.fileName} downloaded={bytesDownloaded} total={totalBytes} rate={megabytesPerSecond:F2}MB/s elapsed={elapsedSeconds:F0}s");
 
-        downloadEntry.BytesAtLastDiagnosticsLog = downloadedBytes;
-        downloadEntry.SecondsSinceDiagnosticsLog = 0.0;
+        downloadEntry.bytesAtLastDiagnosticsLog = bytesDownloaded;
+        downloadEntry.secondsSinceDiagnosticsLog = 0.0;
     }
 
-    private void LogDownloadCompletionDiagnostics(ActiveDownloadEntry downloadEntry, long resultCode, long responseCode, string[] responseHeaders, byte[] responseBody)
+    private void HandleDownloadFinished(ActiveDownloadEntry downloadEntry, long bytesDownloaded, long totalBytes)
     {
-        double elapsedSeconds = (Time.GetTicksMsec() - downloadEntry.StartedAtMilliseconds) / 1000.0;
-        long downloadedBytes = GodotObject.IsInstanceValid(downloadEntry.Request) ? downloadEntry.Request.GetDownloadedBytes() : -1;
-        long reportedBodySize = GodotObject.IsInstanceValid(downloadEntry.Request) ? downloadEntry.Request.GetBodySize() : -1;
+        activeDownloadEntries.Remove(downloadEntry);
+        downloadEntry.cancellationSource.Dispose();
 
-        GD.Print($"[DownloadDiagnostics] completed file={downloadEntry.FileName} result={(HttpRequest.Result)resultCode} responseCode={responseCode} downloaded={downloadedBytes} reportedBodySize={reportedBodySize} onDisk={MeasureBytesOnDisk(downloadEntry.DestinationPath)} inMemoryBody={responseBody?.Length ?? 0} elapsed={elapsedSeconds:F1}s cancelled={downloadEntry.IsCancelled}");
+        double elapsedSeconds = (Time.GetTicksMsec() - downloadEntry.startedAtMilliseconds) / 1000.0;
 
-        foreach (var responseHeader in responseHeaders ?? new string[0])
+        if (downloadEntry.wasSuccessful)
         {
-            GD.Print($"[DownloadDiagnostics] responseHeader {responseHeader}");
+            GD.Print($"[Download] finished file={downloadEntry.fileName} downloaded={bytesDownloaded} total={totalBytes} elapsed={elapsedSeconds:F1}s");
+            downloadEntry.completionCallback?.Invoke(downloadEntry.destinationPath);
         }
-    }
-
-    private static long MeasureBytesOnDisk(string filePath)
-    {
-        using var fileHandle = Godot.FileAccess.Open(filePath, Godot.FileAccess.ModeFlags.Read);
-
-        if (fileHandle == null)
+        else
         {
-            return -1;
+            GD.PrintErr($"Download failed: {downloadEntry.fileName} ({downloadEntry.failureReason}) after {elapsedSeconds:F1}s");
+            DeleteIncompleteFile(ProjectSettings.GlobalizePath(downloadEntry.destinationPath));
         }
 
-        return (long)fileHandle.GetLength();
+        EmitSignal(SignalName.DownloadCompleted, downloadEntry.fileName, downloadEntry.wasSuccessful);
     }
 
     public bool IsDownloading(string fileName)
     {
-        return activeDownloadEntries.Any(entry => entry.FileName == fileName);
+        return activeDownloadEntries.Any(entry => entry.fileName == fileName);
+    }
+
+    public bool IsDownloadingGame(string gameId)
+    {
+        if (string.IsNullOrEmpty(gameId))
+        {
+            return false;
+        }
+
+        return activeDownloadEntries.Any(entry => entry.gameId == gameId);
     }
 
     public void CancelDownload(string fileName)
     {
-        var downloadEntryToCancel = activeDownloadEntries.FirstOrDefault(entry => entry.FileName == fileName);
+        var downloadEntryToCancel = activeDownloadEntries.FirstOrDefault(entry => entry.fileName == fileName);
 
-        if (downloadEntryToCancel != null)
+        if (downloadEntryToCancel == null)
         {
-            downloadEntryToCancel.IsCancelled = true;
-            downloadEntryToCancel.Request.CancelRequest();
-            
-            activeDownloadEntries.Remove(downloadEntryToCancel);
-            EmitSignal(SignalName.DownloadCompleted, downloadEntryToCancel.FileName, false);
-
-            var timer = GetTree().CreateTimer(2.0f);
-            timer.Timeout += () => 
-            {
-                if (FileAccess.FileExists(downloadEntryToCancel.DestinationPath))
-                {
-                    DirAccess.RemoveAbsolute(downloadEntryToCancel.DestinationPath);
-                }
-                if (GodotObject.IsInstanceValid(downloadEntryToCancel.Request))
-                {
-                    downloadEntryToCancel.Request.QueueFree();
-                }
-            };
-        }
-    }
-
-    private void HandleDownloadCompleted(ActiveDownloadEntry downloadEntry, long resultCode, long responseCode)
-    {
-        if (downloadEntry.IsCancelled) return;
-
-        bool wasSuccessful = resultCode == (long)HttpRequest.Result.Success && responseCode == 200;
-
-        if (wasSuccessful)
-        {
-            downloadEntry.CompletionCallback?.Invoke(downloadEntry.DestinationPath);
+            return;
         }
 
-        else
-        {
-            GD.PrintErr($"Download failed or was canceled: {downloadEntry.FileName}, Result: {resultCode}, Response Code: {responseCode}");
+        activeDownloadEntries.Remove(downloadEntryToCancel);
+        downloadEntryToCancel.cancellationSource.Cancel();
 
-            if (FileAccess.FileExists(downloadEntry.DestinationPath))
-            {
-                DirAccess.RemoveAbsolute(downloadEntry.DestinationPath);
-            }
-        }
-
-        EmitSignal(SignalName.DownloadCompleted, downloadEntry.FileName, wasSuccessful);
-
-        activeDownloadEntries.Remove(downloadEntry);
-        downloadEntry.Request.QueueFree();
+        EmitSignal(SignalName.DownloadCompleted, downloadEntryToCancel.fileName, false);
     }
 }

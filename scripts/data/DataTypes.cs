@@ -77,6 +77,9 @@ public class Game
     [JsonPropertyName("fs_name")]
     public string LocalFilename { get; set; }
 
+    [JsonPropertyName("fs_size_bytes")]
+    public long FileSizeBytes { get; set; }
+
     [JsonIgnore]
     public GameSystem System { get; set; }
 }

@@ -697,11 +697,8 @@ public partial class MainSceneGameListHandler
             AddToFlow(System.IO.Path.Combine(currentAssetsPath, "screenshots", $"{game.Id}_{i}.jpg"));
         }
 
-        bool isDownloading = false;
-        if (game.Files != null && game.Files.Any())
-        {
-            isDownloading = appInstance.downloadManager.IsDownloading(game.Files[0].FileName);
-        }
+        bool isDownloading = appInstance.downloadManager.IsDownloadingGame(game.Id.ToString());
+
         if (mainScene.gameDownloadProgressBar != null)
         {
             mainScene.gameDownloadProgressBar.Visible = isDownloading;
@@ -832,12 +829,7 @@ public partial class MainSceneGameListHandler
             return;
         }
 
-        bool isDownloading = false;
-
-        if (game.Files != null && game.Files.Any())
-        {
-            isDownloading = appInstance.downloadManager.IsDownloading(game.Files[0].FileName);
-        }
+        bool isDownloading = appInstance.downloadManager.IsDownloadingGame(game.Id.ToString());
 
         if (isGameDownloadedLocally)
         {

@@ -64,7 +64,8 @@ public class MainSceneDownloadHandler
             tempZipPath,
             appInstance.rommApi.GetAuthHeaders(),
             (path) => HandleRomDownloadCompletion(path, game),
-            game.Id.ToString());
+            game.Id.ToString(),
+            game.FileSizeBytes);
 
         mainScene.GameListHandler.UpdateDetailsPanelButtons(game);
     }
@@ -92,45 +93,77 @@ public class MainSceneDownloadHandler
             ? System.IO.Path.Combine(toolsDir, "7zip", "windows", "7za.exe")
             : System.IO.Path.Combine(toolsDir, "7zip", "linux", "7zz");
 
+        string globalTempZip = ProjectSettings.GlobalizePath(tempZipPath);
+        string globalFinalDir = ProjectSettings.GlobalizePath(finalDir);
+        bool isLinux = OS.HasFeature("linux") || OS.GetName() == "Linux" || OS.GetName() == "X11" || OS.GetName() == "Wayland";
+
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            ExtractDownloadedRom(sevenZipPath, globalTempZip, globalFinalDir, isLinux);
+
+            Callable.From(() => HandleExtractionFinished(tempZipPath, game)).CallDeferred();
+        });
+    }
+
+    private void ExtractDownloadedRom(string sevenZipPath, string globalTempZip, string globalFinalDir, bool isLinux)
+    {
         try
         {
-            if (OS.HasFeature("linux") || OS.GetName() == "Linux" || OS.GetName() == "X11" || OS.GetName() == "Wayland")
+            if (isLinux)
             {
-                OS.Execute("chmod", new string[] { "+x", sevenZipPath }, new Godot.Collections.Array());
+                RunProcessToCompletion("chmod", new string[] { "+x", sevenZipPath });
             }
-
-            string globalTempZip = ProjectSettings.GlobalizePath(tempZipPath);
-            string globalFinalDir = ProjectSettings.GlobalizePath(finalDir);
 
             string[] arguments = { "e", globalTempZip, $"-o{globalFinalDir}", "roms/*", "-r", "-y" };
 
-            int exitCode = OS.Execute(sevenZipPath, arguments, new Godot.Collections.Array());
+            int exitCode = RunProcessToCompletion(sevenZipPath, arguments);
 
-            if (exitCode == 0)
-            {
-                GD.Print($"Successfully extracted {tempZipPath} to {finalDir}");
-
-                if (OS.HasFeature("linux") || OS.GetName() == "Linux" || OS.GetName() == "X11" || OS.GetName() == "Wayland")
-                {
-                    OS.Execute("chmod", new string[] { "-R", "a+rwx", globalFinalDir }, new Godot.Collections.Array());
-                }
-            }
-            else
+            if (exitCode != 0)
             {
                 GD.PrintErr($"Failed to extract zip file. 7zip exit code: {exitCode}");
+                return;
             }
-        }
-        catch (System.Exception e)
-        {
-            GD.PrintErr($"Error extracting zip file: {e.Message}");
-        }
-        finally
-        {
-            if (Godot.FileAccess.FileExists(tempZipPath))
+
+            GD.Print($"Successfully extracted {globalTempZip} to {globalFinalDir}");
+
+            if (isLinux)
             {
-                DirAccess.RemoveAbsolute(tempZipPath);
-                GD.Print($"Deleted temporary file: {tempZipPath}");
+                RunProcessToCompletion("chmod", new string[] { "-R", "a+rwx", globalFinalDir });
             }
+        }
+        catch (System.Exception extractionException)
+        {
+            GD.PrintErr($"Error extracting zip file: {extractionException.Message}");
+        }
+    }
+
+    private static int RunProcessToCompletion(string executablePath, string[] arguments)
+    {
+        var startInfo = new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = executablePath,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        foreach (var argument in arguments)
+        {
+            startInfo.ArgumentList.Add(argument);
+        }
+
+        using var process = System.Diagnostics.Process.Start(startInfo);
+
+        process.WaitForExit();
+
+        return process.ExitCode;
+    }
+
+    private void HandleExtractionFinished(string tempZipPath, Game game)
+    {
+        if (Godot.FileAccess.FileExists(tempZipPath))
+        {
+            DirAccess.RemoveAbsolute(tempZipPath);
+            GD.Print($"Deleted temporary file: {tempZipPath}");
         }
 
         mainScene.GameListHandler.UpdateDetailsPanelButtons(game);
@@ -141,4 +174,5 @@ public class MainSceneDownloadHandler
     {
         mainScene.GameListHandler.RefreshGameList();
     }
+
 }
