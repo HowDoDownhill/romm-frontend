@@ -512,6 +512,7 @@ NOTE: launching the emulator from the exectuable from outside the app may restul
 focus_mode = 0
 theme_type_variation = &"FlatButton"
 theme_override_constants/icon_max_width = 48
+theme_override_font_sizes/font_size = 32
 theme_override_styles/normal = SubResource("StyleBoxEmpty_pu3yx")
 theme_override_styles/focus = SubResource("StyleBoxEmpty_r6p65")
 text = "Navigate Downloads"
@@ -536,6 +537,7 @@ NOTE: launching the emulator from the exectuable from outside the app may restul
 focus_mode = 0
 theme_type_variation = &"FlatButton"
 theme_override_constants/icon_max_width = 48
+theme_override_font_sizes/font_size = 32
 text = "Cancel Download"
 alignment = 0
 expand_icon = true
@@ -555,6 +557,7 @@ size_flags_vertical = 13
 focus_mode = 0
 theme_type_variation = &"FlatButton"
 theme_override_constants/icon_max_width = 48
+theme_override_font_sizes/font_size = 32
 text = "Game List"
 alignment = 0
 expand_icon = true
@@ -587,6 +590,7 @@ NOTE: launching the emulator from the exectuable from outside the app may restul
 focus_mode = 0
 theme_type_variation = &"FlatButton"
 theme_override_constants/icon_max_width = 48
+theme_override_font_sizes/font_size = 32
 theme_override_styles/normal = SubResource("StyleBoxEmpty_pu3yx")
 theme_override_styles/focus = SubResource("StyleBoxEmpty_r6p65")
 text = "Select"
@@ -611,6 +615,7 @@ NOTE: launching the emulator from the exectuable from outside the app may restul
 focus_mode = 0
 theme_type_variation = &"FlatButton"
 theme_override_constants/icon_max_width = 48
+theme_override_font_sizes/font_size = 32
 text = "Back"
 alignment = 0
 expand_icon = true
