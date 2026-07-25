@@ -1,0 +1,77 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/ChangelogPanel.cs" id="1_chglog"]
+[ext_resource type="Material" uid="uid://b822n10q6f56b" path="res://assets/materials/mica_panel.tres" id="2_mica"]
+
+[node name="ChangelogPanel" type="Control" node_paths=PackedStringArray("ContentRoot", "notesLabel", "acceptButton", "cancelButton")]
+visible = false
+custom_minimum_size = Vector2(600, 800)
+layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -20.0
+offset_top = -20.0
+offset_right = 20.0
+offset_bottom = 20.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_chglog")
+ContentRoot = NodePath("Panel")
+notesLabel = NodePath("Panel/MarginContainer/VBoxContainer/RichTextLabel")
+acceptButton = NodePath("Panel/MarginContainer/VBoxContainer/HBoxContainer/AcceptButton")
+cancelButton = NodePath("Panel/MarginContainer/VBoxContainer/HBoxContainer/CancelButton")
+
+[node name="Panel" type="Panel" parent="."]
+material = ExtResource("2_mica")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel/MarginContainer"]
+layout_mode = 2
+
+[node name="RichTextLabel" type="RichTextLabel" parent="Panel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="HBoxContainer" type="HBoxContainer" parent="Panel/MarginContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 8
+
+[node name="AcceptButton" type="Button" parent="Panel/MarginContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 8
+theme_override_font_sizes/font_size = 32
+text = "Install"
+expand_icon = true
+
+[node name="CancelButton" type="Button" parent="Panel/MarginContainer/VBoxContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 8
+theme_override_font_sizes/font_size = 32
+text = "Close"
+expand_icon = true

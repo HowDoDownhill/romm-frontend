@@ -2,15 +2,16 @@
 
 [ext_resource type="Script" path="res://scripts/ui/SystemCarousel.cs" id="1_sys_car"]
 
-[node name="SystemCarousel" type="HBoxContainer" node_paths=PackedStringArray("leftArrow", "systemIcon", "systemLabel", "rightArrow", "debounceTimer")]
+[node name="SystemCarousel" type="HBoxContainer" node_paths=PackedStringArray("leftArrow", "systemIcon", "systemLabel", "rightArrow", "debounceTimer", "slider")]
 size_flags_horizontal = 3
 alignment = 1
 script = ExtResource("1_sys_car")
 leftArrow = NodePath("LeftArrow")
-systemIcon = NodePath("SystemIcon")
-systemLabel = NodePath("SystemLabel")
+systemIcon = NodePath("IconViewport/Slider/SystemIcon")
+systemLabel = NodePath("IconViewport/Slider/SystemLabel")
 rightArrow = NodePath("RightArrow")
 debounceTimer = NodePath("DebounceTimer")
+slider = NodePath("IconViewport/Slider")
 
 [node name="LeftArrow" type="Label" parent="."]
 layout_mode = 2
@@ -19,17 +20,40 @@ theme_override_font_sizes/font_size = 48
 text = "< "
 vertical_alignment = 1
 
-[node name="SystemIcon" type="TextureRect" parent="."]
+[node name="IconViewport" type="Control" parent="."]
 custom_minimum_size = Vector2(64, 64)
+clip_contents = true
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="Slider" type="Control" parent="IconViewport"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="SystemIcon" type="TextureRect" parent="IconViewport/Slider"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 expand_mode = 1
 stretch_mode = 5
 
-[node name="SystemLabel" type="Label" parent="."]
-layout_mode = 2
-size_flags_horizontal = 3
+[node name="SystemLabel" type="Label" parent="IconViewport/Slider"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_font_sizes/font_size = 48
 horizontal_alignment = 1
 vertical_alignment = 1

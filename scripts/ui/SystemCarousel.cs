@@ -8,6 +8,11 @@ public partial class SystemCarousel : HBoxContainer
     [Export] private Label systemLabel;
     [Export] private Label rightArrow;
     [Export] private Timer debounceTimer;
+    [Export] private Control slider;
+
+    private const float SlideDuration = 0.16f;
+
+    private Tween slideTween;
 
     public List<GameSystem> Systems { get; private set; } = new List<GameSystem>();
     public int SelectedIndex { get; private set; } = -1;
@@ -82,7 +87,7 @@ public partial class SystemCarousel : HBoxContainer
         if (Systems.Count == 0) return;
         int newIndex = SelectedIndex + 1;
         if (newIndex >= Systems.Count) newIndex = 0;
-        SetSelectionWithTimer(newIndex);
+        SetSelectionWithTimer(newIndex, 1);
     }
 
     public void Previous()
@@ -90,25 +95,49 @@ public partial class SystemCarousel : HBoxContainer
         if (Systems.Count == 0) return;
         int newIndex = SelectedIndex - 1;
         if (newIndex < 0) newIndex = Systems.Count - 1;
-        SetSelectionWithTimer(newIndex);
+        SetSelectionWithTimer(newIndex, -1);
     }
 
-    public void SetSelectionSilently(int index)
+    private void SlideInFrom(int direction)
+    {
+        if (slider == null || direction == 0) return;
+
+        if (slideTween != null && slideTween.IsValid()) slideTween.Kill();
+
+        float travel = slider.Size.X > 0 ? slider.Size.X : 64f;
+
+        slider.Position = new Vector2(travel * direction, slider.Position.Y);
+
+        Color transparent = slider.Modulate;
+        transparent.A = 0f;
+        slider.Modulate = transparent;
+
+        slideTween = CreateTween().SetParallel(true)
+            .SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
+        slideTween.TweenProperty(slider, "position:x", 0f, SlideDuration);
+        slideTween.TweenProperty(slider, "modulate:a", 1f, SlideDuration);
+    }
+
+    public void SetSelectionSilently(int index, bool animate = false)
     {
         if (index >= 0 && index < Systems.Count)
         {
+            int direction = animate ? System.Math.Sign(index - SelectedIndex) : 0;
+
             SelectedIndex = index;
             UpdateVisuals();
+            SlideInFrom(direction);
             debounceTimer.Stop();
         }
     }
 
-    private void SetSelectionWithTimer(int index)
+    private void SetSelectionWithTimer(int index, int direction = 0)
     {
         if (index >= 0 && index < Systems.Count)
         {
             SelectedIndex = index;
             UpdateVisuals();
+            SlideInFrom(direction);
             debounceTimer.Start();
         }
     }

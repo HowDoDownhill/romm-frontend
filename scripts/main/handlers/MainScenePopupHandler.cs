@@ -51,13 +51,16 @@ public class MainScenePopupHandler
         bool isInstalled = !string.IsNullOrEmpty(mappedEmulator) && appInstance.emulatorManager.IsEmulatorInstalled(mappedEmulator);
         bool isInstalling = !string.IsNullOrEmpty(mappedEmulator) && appInstance.emulatorManager.IsEmulatorInstalling(mappedEmulator);
 
-        if (mainScene.UpdateEmulatorPopupOption is Button updateBtn)
+        Button updateBtn = mainScene.startMenuPanel?.updateEmulatorButton;
+        Button uninstallBtn = mainScene.startMenuPanel?.uninstallEmulatorButton;
+
+        if (updateBtn != null)
         {
             updateBtn.Disabled = !isInstalled || isInstalling;
             updateBtn.Text = isInstalling ? "Installing Emulator..." : "Update Emulator";
         }
 
-        if (mainScene.UninstallEmulatorPopupOption is Button uninstallBtn)
+        if (uninstallBtn != null)
         {
             uninstallBtn.Disabled = !isInstalled || isInstalling;
         }
@@ -185,20 +188,7 @@ public class MainScenePopupHandler
 
         mainScene.startMenuPanel?.Close();
 
-        if (mainScene.downloadProgressPopup != null)
-        {
-            mainScene.downloadProgressPopup.Open();
-
-            if (mainScene.downloadProgressLabel != null)
-            {
-                mainScene.downloadProgressLabel.Text = "Refreshing games...";
-            }
-
-            if (mainScene.downloadProgressBar != null)
-            {
-                mainScene.downloadProgressBar.Value = 0;
-            }
-        }
+        mainScene.progressPanel?.ShowStatus("Refreshing games...");
 
         GameSystem currentSystem = mainScene.GameListHandler.gameSystems[mainScene.GameListHandler.currentGameSystemIndex];
         List<Game> allGamesForSystem = new List<Game>();
@@ -219,10 +209,7 @@ public class MainScenePopupHandler
 
                 allGamesForSystem.AddRange(response.Games);
 
-                if (mainScene.downloadProgressLabel != null)
-                {
-                    mainScene.downloadProgressLabel.Text = $"Found {allGamesForSystem.Count} games...";
-                }
+                mainScene.progressPanel?.SetStatus($"Found {allGamesForSystem.Count} games...");
 
                 if (response.Games.Count < chunkSize)
                 {
@@ -245,22 +232,12 @@ public class MainScenePopupHandler
         mainScene.GameListHandler.games = appInstance.dataBus.gameCache;
         mainScene.GameListHandler.ApplyFiltersAndRefresh();
 
-        if (mainScene.downloadProgressBar != null)
-        {
-            mainScene.downloadProgressBar.Value = 100;
-        }
-
-        if (mainScene.downloadProgressLabel != null)
-        {
-            mainScene.downloadProgressLabel.Text = "Refresh complete!";
-        }
+        mainScene.progressPanel?.SetProgress(100);
+        mainScene.progressPanel?.SetStatus("Refresh complete!");
 
         await mainScene.ToSignal(mainScene.GetTree().CreateTimer(1.5f), "timeout");
 
-        if (mainScene.downloadProgressPopup != null)
-        {
-            mainScene.downloadProgressPopup.Close();
-        }
+        mainScene.progressPanel?.Close();
 
         mainScene.gameList?.GrabFocus();
     }

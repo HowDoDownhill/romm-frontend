@@ -8,6 +8,17 @@ public partial class StartMenuPanel : UiPanel
     [Export] public Control optionsList;
     [Export] public VBoxContainer biosList;
 
+    [ExportGroup("Options")]
+    [Export] public Button launchEmulatorButton;
+    [Export] public Button updateEmulatorButton;
+    [Export] public Button uninstallEmulatorButton;
+    [Export] public Button selectBiosButton;
+    [Export] public Button settingsButton;
+    [Export] public Button randomGameButton;
+    [Export] public Button refreshAllGamesButton;
+    [Export] public Button refreshCurrentSystemButton;
+    [Export] public Button quitButton;
+
     private Control focusBeforeBiosView;
 
     [Signal]

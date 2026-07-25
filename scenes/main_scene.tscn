@@ -6,8 +6,9 @@
 [ext_resource type="PackedScene" uid="uid://cew2a8jxcgu6t" path="res://scenes/games_list/game_list_entry.tscn" id="2_rt2n2"]
 [ext_resource type="Script" uid="uid://cwtykxfgbvhv6" path="res://scripts/ui/VerticalCarousel.cs" id="3_gubc5"]
 [ext_resource type="Script" uid="uid://dvfmg1ugxmmur" path="res://scripts/ui/UiPanel.cs" id="3_uipanel"]
-[ext_resource type="Script" uid="uid://co0qgvxrtg7qi" path="res://scripts/ui/ChangelogPanel.cs" id="3_chglog"]
-[ext_resource type="Script" uid="uid://bvyjn1xypupv8" path="res://scripts/ui/StartMenuPanel.cs" id="3_stmenu"]
+[ext_resource type="PackedScene" path="res://scenes/ui/panels/changelog_panel.tscn" id="8_chglogscene"]
+[ext_resource type="PackedScene" path="res://scenes/ui/panels/progress_panel.tscn" id="9_progressscene"]
+[ext_resource type="PackedScene" path="res://scenes/ui/panels/start_menu_panel.tscn" id="10_stmenuscene"]
 [ext_resource type="Script" path="res://scripts/ui/SettingsPanel.cs" id="3_setpanel"]
 [ext_resource type="Material" uid="uid://b822n10q6f56b" path="res://assets/materials/mica_panel.tres" id="3_mica"]
 [ext_resource type="PackedScene" uid="uid://cffanb3xjob1c" path="res://scenes/downloads_list/download_entry.tscn" id="4_pu3yx"]
@@ -43,13 +44,7 @@ script = ExtResource("7_18nlu")
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_r6p65"]
 
-[sub_resource type="Resource" id="Resource_c1pb6"]
-script = ExtResource("7_18nlu")
-
-[sub_resource type="Resource" id="Resource_6wevv"]
-script = ExtResource("7_18nlu")
-
-[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "systemCarousel", "gameList", "detailsPanelContainer", "gameMarquee", "gameDescription", "gameScreenshotsScroll", "gameScreenshotsFlow", "gameDownloadProgressBar", "gameListSection", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "LaunchEmulatorPopupOption", "UpdateEmulatorPopupOption", "UninstallEmulatorPopupOption", "SelectBiosPopupOption", "SettingsPopupOption", "RefreshGamesPopupOption", "RefreshCurrentSystemGamesPopupOption", "QuitPopupOption", "RandomGamePopupOption", "downloadProgressPopup", "downloadProgressLabel", "downloadProgressBar", "changelogPanel", "backgroundRect", "mainVBoxContainer", "startMenuPanel", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
+[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "systemCarousel", "gameList", "detailsPanel", "detailsPanelContainer", "gameMarquee", "gameDescription", "gameScreenshotsScroll", "gameScreenshotsFlow", "gameDownloadProgressBar", "gameListSection", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "progressPanel", "changelogPanel", "backgroundRect", "mainVBoxContainer", "startMenuPanel", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -63,6 +58,7 @@ headerContainer = NodePath("Background/VBoxContainer/HeaderContainer")
 systemCarousel = NodePath("Background/VBoxContainer/HeaderContainer/Panel/MarginContainer/SystemCarousel")
 gameList = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/GameList")
 gameListEntryScene = ExtResource("2_rt2n2")
+detailsPanel = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel")
 detailsPanelContainer = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel")
 gameMarquee = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/NameMargin/GameMarquee")
 gameDescription = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ScreenShotsContainer/HBoxContainer/RichTextLabel")
@@ -85,22 +81,11 @@ navHintBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/Dow
 cancelDownloadBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/DownloadsFooter/CancelDownloadContainer/CancelDownloadsButton")
 settingsSelectBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/SettingsFooter/SettingsSelectContainer/SettingsSelectButton")
 settingsBackBtn = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/SettingsFooter/SettingsBackContainer/SettingsBackButton")
-LaunchEmulatorPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/LaunchEmulatorButton")
-UpdateEmulatorPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/UpdateEmulatorButton")
-UninstallEmulatorPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/UninstallEmulatorButton")
-SelectBiosPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/SelectBiosButton")
-SettingsPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/SettingsButton")
-RefreshGamesPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/RefreshAllGamesButton")
-RefreshCurrentSystemGamesPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/RefreshCurrentSystemsGamesButton")
-QuitPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/QuitButton")
-RandomGamePopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/RandomGameButton")
-downloadProgressPopup = NodePath("Background/DownloadProgressPopup")
-downloadProgressLabel = NodePath("Background/DownloadProgressPopup/Panel/MarginContainer/VBoxContainer/LabelContianer/Label")
-downloadProgressBar = NodePath("Background/DownloadProgressPopup/Panel/MarginContainer/VBoxContainer/ProgressContainer/ProgressBar")
-changelogPanel = NodePath("Background/ChangelogContainer")
+progressPanel = NodePath("Background/ProgressPanel")
+changelogPanel = NodePath("Background/ChangelogPanel")
 backgroundRect = NodePath("Background")
 mainVBoxContainer = NodePath("Background/VBoxContainer")
-startMenuPanel = NodePath("Background/StartMenu")
+startMenuPanel = NodePath("Background/StartMenuPanel")
 settingsMenuContainer = NodePath("Background/VBoxContainer/SettingsMenuContainer")
 settingsSectionsTree = NodePath("Background/VBoxContainer/SettingsMenuContainer/HBoxContainer/SettingsTreePanel/MarginContainer/SettingsSectionsScroll/SettingsSections")
 sectionOptionsContainer = NodePath("Background/VBoxContainer/SettingsMenuContainer/HBoxContainer/Panel/MarginContainer/SectionOptions")
@@ -651,270 +636,8 @@ text = "Back"
 alignment = 0
 expand_icon = true
 
-[node name="StartMenu" type="Control" parent="Background" unique_id=1160206546 node_paths=PackedStringArray("ContentRoot", "menuView", "biosView", "optionsList", "biosList")]
-visible = false
-custom_minimum_size = Vector2(400, 600)
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -200.0
-offset_top = -300.0
-offset_right = 200.0
-offset_bottom = 300.0
-grow_horizontal = 2
-grow_vertical = 2
-script = ExtResource("3_stmenu")
-ContentRoot = NodePath("Panel")
-menuView = NodePath("Panel/StartMenuContainer")
-biosView = NodePath("Panel/BiosSelectorContainer")
-optionsList = NodePath("Panel/StartMenuContainer/StartMenu")
-biosList = NodePath("Panel/BiosSelectorContainer/SmoothScrollContainer/MarginContainer/BiosSelector")
+[node name="StartMenuPanel" parent="Background" unique_id=1160206546 instance=ExtResource("10_stmenuscene")]
 
-[node name="Panel" type="Panel" parent="Background/StartMenu" unique_id=1083749050]
-material = ExtResource("3_mica")
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 10.0
-offset_top = 10.0
-offset_right = -10.0
-offset_bottom = -10.0
-grow_horizontal = 2
-grow_vertical = 2
+[node name="ProgressPanel" parent="Background" unique_id=695295220 instance=ExtResource("9_progressscene")]
 
-[node name="StartMenuContainer" type="MarginContainer" parent="Background/StartMenu/Panel" unique_id=93641177]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 5
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
-
-[node name="StartMenu" type="VBoxContainer" parent="Background/StartMenu/Panel/StartMenuContainer" unique_id=32188184]
-layout_mode = 2
-theme_override_constants/separation = 5
-
-[node name="LaunchEmulatorButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=1299222623]
-layout_mode = 2
-text = "Launch Current Emulator"
-
-[node name="UpdateEmulatorButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=237474760]
-layout_mode = 2
-text = "Update Current Emulator"
-
-[node name="UninstallEmulatorButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=1883426247]
-layout_mode = 2
-text = "Uninstall Current Emulator"
-
-[node name="SelectBiosButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=1276947446]
-layout_mode = 2
-text = "Select Bios For Emulator"
-
-[node name="SettingsButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=357423038]
-layout_mode = 2
-text = "Settings"
-
-[node name="RandomGameButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=825955596]
-layout_mode = 2
-text = "Jump to Random Game"
-
-[node name="RefreshAllGamesButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=325705108]
-layout_mode = 2
-text = "Refresh All Games"
-
-[node name="RefreshCurrentSystemsGamesButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=1065288368]
-layout_mode = 2
-text = "Refresh Current System
-"
-
-[node name="QuitButton" type="Button" parent="Background/StartMenu/Panel/StartMenuContainer/StartMenu" unique_id=536888331]
-layout_mode = 2
-text = "Quit"
-
-[node name="BiosSelectorContainer" type="MarginContainer" parent="Background/StartMenu/Panel" unique_id=19963209]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 5
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
-
-[node name="SmoothScrollContainer" type="ScrollContainer" parent="Background/StartMenu/Panel/BiosSelectorContainer" unique_id=797902560]
-layout_mode = 2
-follow_focus = true
-script = ExtResource("6_c16ls")
-wheel_scroll_damper = SubResource("Resource_c1pb6")
-dragging_scroll_damper = SubResource("Resource_6wevv")
-metadata/_custom_type_script = "uid://bgqglerkcylxx"
-
-[node name="MarginContainer" type="MarginContainer" parent="Background/StartMenu/Panel/BiosSelectorContainer/SmoothScrollContainer" unique_id=1487848439]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 5
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
-metadata/_smooth_scroll_default_mouse_filter_set = true
-
-[node name="BiosSelector" type="VBoxContainer" parent="Background/StartMenu/Panel/BiosSelectorContainer/SmoothScrollContainer/MarginContainer" unique_id=1236763628]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 3
-metadata/_smooth_scroll_default_mouse_filter_set = true
-
-[node name="DownloadProgressPopup" type="Control" parent="Background" unique_id=695295220 node_paths=PackedStringArray("ContentRoot")]
-visible = false
-custom_minimum_size = Vector2(500, 100)
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -20.0
-offset_top = -20.0
-offset_right = 20.0
-offset_bottom = 20.0
-grow_horizontal = 2
-grow_vertical = 2
-script = ExtResource("3_uipanel")
-ContentRoot = NodePath("Panel")
-
-[node name="Panel" type="Panel" parent="Background/DownloadProgressPopup" unique_id=428372210]
-material = ExtResource("3_mica")
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 10.0
-offset_top = 10.0
-offset_right = -10.0
-offset_bottom = -10.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="MarginContainer" type="MarginContainer" parent="Background/DownloadProgressPopup/Panel" unique_id=949079432]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 5
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
-
-[node name="VBoxContainer" type="VBoxContainer" parent="Background/DownloadProgressPopup/Panel/MarginContainer" unique_id=949079431]
-layout_mode = 2
-theme_override_constants/separation = 0
-
-[node name="LabelContianer" type="MarginContainer" parent="Background/DownloadProgressPopup/Panel/MarginContainer/VBoxContainer" unique_id=1846967498]
-layout_mode = 2
-size_flags_vertical = 3
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 5
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
-
-[node name="Label" type="Label" parent="Background/DownloadProgressPopup/Panel/MarginContainer/VBoxContainer/LabelContianer" unique_id=1314148376]
-layout_mode = 2
-size_flags_vertical = 3
-text = "Test"
-vertical_alignment = 1
-
-[node name="ProgressContainer" type="MarginContainer" parent="Background/DownloadProgressPopup/Panel/MarginContainer/VBoxContainer" unique_id=1516397779]
-layout_mode = 2
-theme_override_constants/margin_top = 5
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
-
-[node name="ProgressBar" type="ProgressBar" parent="Background/DownloadProgressPopup/Panel/MarginContainer/VBoxContainer/ProgressContainer" unique_id=1179132155]
-layout_mode = 2
-size_flags_vertical = 8
-
-[node name="ChangelogContainer" type="Control" parent="Background" unique_id=664785356 node_paths=PackedStringArray("ContentRoot", "notesLabel", "acceptButton", "cancelButton")]
-visible = false
-custom_minimum_size = Vector2(600, 800)
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -20.0
-offset_top = -20.0
-offset_right = 20.0
-offset_bottom = 20.0
-grow_horizontal = 2
-grow_vertical = 2
-script = ExtResource("3_chglog")
-ContentRoot = NodePath("Panel")
-notesLabel = NodePath("Panel/MarginContainer/VBoxContainer/RichTextLabel")
-acceptButton = NodePath("Panel/MarginContainer/VBoxContainer/HBoxContainer/AcceptButton")
-cancelButton = NodePath("Panel/MarginContainer/VBoxContainer/HBoxContainer/CancelButton")
-
-[node name="Panel" type="Panel" parent="Background/ChangelogContainer" unique_id=1450288382]
-material = ExtResource("3_mica")
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 10.0
-offset_top = 10.0
-offset_right = -10.0
-offset_bottom = -10.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="MarginContainer" type="MarginContainer" parent="Background/ChangelogContainer/Panel" unique_id=846107793]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 5
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
-
-[node name="VBoxContainer" type="VBoxContainer" parent="Background/ChangelogContainer/Panel/MarginContainer" unique_id=2108610997]
-layout_mode = 2
-
-[node name="RichTextLabel" type="RichTextLabel" parent="Background/ChangelogContainer/Panel/MarginContainer/VBoxContainer" unique_id=1651234799]
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="HBoxContainer" type="HBoxContainer" parent="Background/ChangelogContainer/Panel/MarginContainer/VBoxContainer" unique_id=1669800469]
-layout_mode = 2
-size_flags_vertical = 8
-
-[node name="AcceptButton" type="Button" parent="Background/ChangelogContainer/Panel/MarginContainer/VBoxContainer/HBoxContainer" unique_id=898341432]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 8
-theme_override_font_sizes/font_size = 32
-text = "Install"
-expand_icon = true
-
-[node name="CancelButton" type="Button" parent="Background/ChangelogContainer/Panel/MarginContainer/VBoxContainer/HBoxContainer" unique_id=85801708]
-layout_mode = 2
-size_flags_horizontal = 3
-size_flags_vertical = 8
-theme_override_font_sizes/font_size = 32
-text = "Close"
-expand_icon = true
+[node name="ChangelogPanel" parent="Background" unique_id=664785356 instance=ExtResource("8_chglogscene")]

@@ -13,6 +13,7 @@ public partial class MainScene : Control
     [Export] public PackedScene gameListEntryScene;
 
     [ExportGroup("DetailsPanel")]
+    [Export] public Control detailsPanel;
     [Export] public VBoxContainer detailsPanelContainer;
     [Export] public TextureRect gameCover;
     [Export] public TextureRect gameMarquee;
@@ -44,22 +45,8 @@ public partial class MainScene : Control
     [Export] public Button settingsSelectBtn;
     [Export] public Button settingsBackBtn;
 
-    [ExportGroup("PopupOptions")]
-    [Export] public Node LaunchEmulatorPopupOption;
-    [Export] public Node UpdateEmulatorPopupOption;
-    [Export] public Node UninstallEmulatorPopupOption;
-    [Export] public Node SelectBiosPopupOption;
-    [Export] public Node SettingsPopupOption;
-    [Export] public Node RefreshGamesPopupOption;
-    [Export] public Node RefreshCurrentSystemGamesPopupOption;
-    [Export] public Node QuitPopupOption;
-    [Export] public Node RandomGamePopupOption;
-
     [ExportGroup("Update & Refresh UI")]
-    [Export] public UiPanel downloadProgressPopup;
-    [Export] public Label downloadProgressLabel;
-    [Export] public ProgressBar downloadProgressBar;
-
+    [Export] public ProgressPanel progressPanel;
     [Export] public ChangelogPanel changelogPanel;
 
     [ExportGroup("Panel Frost")]
@@ -159,7 +146,7 @@ public partial class MainScene : Control
             systemJumpPopup.Close();
             if (systemCarousel != null)
             {
-                systemCarousel.SetSelectionSilently(index);
+                systemCarousel.SetSelectionSilently(index, true);
             }
             GameListHandler.SelectSystemByIndex(index);
         };
@@ -172,15 +159,15 @@ public partial class MainScene : Control
             panelStack.Register(startMenuPanel);
             startMenuPanel.BiosViewRequested += PopupHandler.PopulateBiosSelector;
 
-            if (LaunchEmulatorPopupOption is Button launchBtn) launchBtn.Pressed += PopupHandler.OnLaunchEmulatorPressed;
-            if (UpdateEmulatorPopupOption is Button updateEmulatorBtn) updateEmulatorBtn.Pressed += PopupHandler.OnUpdateEmulatorPressed;
-            if (UninstallEmulatorPopupOption is Button uninstallEmulatorBtn) uninstallEmulatorBtn.Pressed += PopupHandler.OnUninstallEmulatorPressed;
-            if (SelectBiosPopupOption is Button biosBtn) biosBtn.Pressed += PopupHandler.OnSelectBiosMenuPressed;
-            if (SettingsPopupOption is Button settingsBtn) settingsBtn.Pressed += PopupHandler.OnSettingsMenuPressed;
-            if (RefreshGamesPopupOption is Button refreshBtn) refreshBtn.Pressed += PopupHandler.OnRefreshGamesPressed;
-            if (RefreshCurrentSystemGamesPopupOption is Button refreshSysBtn) refreshSysBtn.Pressed += PopupHandler.OnRefreshCurrentSystemGamesPressed;
-            if (QuitPopupOption is Button quitBtn) quitBtn.Pressed += PopupHandler.OnQuitPressed;
-            if (RandomGamePopupOption is Button randomGameBtn) randomGameBtn.Pressed += PopupHandler.OnRandomGamePressed;
+            if (startMenuPanel.launchEmulatorButton != null) startMenuPanel.launchEmulatorButton.Pressed += PopupHandler.OnLaunchEmulatorPressed;
+            if (startMenuPanel.updateEmulatorButton != null) startMenuPanel.updateEmulatorButton.Pressed += PopupHandler.OnUpdateEmulatorPressed;
+            if (startMenuPanel.uninstallEmulatorButton != null) startMenuPanel.uninstallEmulatorButton.Pressed += PopupHandler.OnUninstallEmulatorPressed;
+            if (startMenuPanel.selectBiosButton != null) startMenuPanel.selectBiosButton.Pressed += PopupHandler.OnSelectBiosMenuPressed;
+            if (startMenuPanel.settingsButton != null) startMenuPanel.settingsButton.Pressed += PopupHandler.OnSettingsMenuPressed;
+            if (startMenuPanel.refreshAllGamesButton != null) startMenuPanel.refreshAllGamesButton.Pressed += PopupHandler.OnRefreshGamesPressed;
+            if (startMenuPanel.refreshCurrentSystemButton != null) startMenuPanel.refreshCurrentSystemButton.Pressed += PopupHandler.OnRefreshCurrentSystemGamesPressed;
+            if (startMenuPanel.quitButton != null) startMenuPanel.quitButton.Pressed += PopupHandler.OnQuitPressed;
+            if (startMenuPanel.randomGameButton != null) startMenuPanel.randomGameButton.Pressed += PopupHandler.OnRandomGamePressed;
         }
 
         GetCache();

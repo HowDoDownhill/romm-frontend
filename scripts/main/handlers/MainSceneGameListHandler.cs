@@ -54,11 +54,21 @@ public partial class MainSceneGameListHandler
         Tween fadeOutTween = mainScene.CreateTween();
         Color glColorOut = mainScene.gameList.Modulate; glColorOut.A = 0.0f;
         fadeOutTween.TweenProperty(mainScene.gameList, "modulate", glColorOut, duration);
-        if (mainScene.detailsPanelContainer != null)
+        if (mainScene.detailsPanel != null)
         {
-            Color dpcColorOut = mainScene.detailsPanelContainer.Modulate; dpcColorOut.A = 0.0f;
-            fadeOutTween.Parallel().TweenProperty(mainScene.detailsPanelContainer, "modulate", dpcColorOut, duration);
+            Color dpcColorOut = mainScene.detailsPanel.Modulate; dpcColorOut.A = 0.0f;
+            fadeOutTween.Parallel().TweenProperty(mainScene.detailsPanel, "modulate", dpcColorOut, duration);
+            CentreDetailsPivot();
+            if (mainScene.detailsPanel != null) fadeOutTween.Parallel().TweenProperty(mainScene.detailsPanel, "scale", DetailsRestingScale, duration);
         }
+    }
+
+    private static readonly Vector2 DetailsRestingScale = new Vector2(0.98f, 0.98f);
+
+    private void CentreDetailsPivot()
+    {
+        if (mainScene.detailsPanel == null) return;
+        mainScene.detailsPanel.PivotOffset = mainScene.detailsPanel.Size / 2.0f;
     }
 
     public async void TransitionToSystem(int targetIndex)
@@ -79,9 +89,11 @@ public partial class MainSceneGameListHandler
         Color glColorOut = mainScene.gameList.Modulate; glColorOut.A = 0.0f;
         fadeOutTween.TweenProperty(mainScene.gameList, "modulate", glColorOut, duration);
 
-        if (mainScene.detailsPanelContainer != null) {
-            Color dpcColorOut = mainScene.detailsPanelContainer.Modulate; dpcColorOut.A = 0.0f;
-            fadeOutTween.Parallel().TweenProperty(mainScene.detailsPanelContainer, "modulate", dpcColorOut, duration);
+        if (mainScene.detailsPanel != null) {
+            Color dpcColorOut = mainScene.detailsPanel.Modulate; dpcColorOut.A = 0.0f;
+            fadeOutTween.Parallel().TweenProperty(mainScene.detailsPanel, "modulate", dpcColorOut, duration);
+            CentreDetailsPivot();
+            if (mainScene.detailsPanel != null) fadeOutTween.Parallel().TweenProperty(mainScene.detailsPanel, "scale", DetailsRestingScale, duration);
         }
 
         await mainScene.ToSignal(fadeOutTween, Tween.SignalName.Finished);
@@ -91,7 +103,7 @@ public partial class MainSceneGameListHandler
 
         var glModOut = mainScene.gameList.Modulate; glModOut.A = 0.0f; mainScene.gameList.Modulate = glModOut;
 
-        if (mainScene.detailsPanelContainer != null) { var dpcMod = mainScene.detailsPanelContainer.Modulate; dpcMod.A = 0.0f; mainScene.detailsPanelContainer.Modulate = dpcMod; }
+        if (mainScene.detailsPanel != null) { var dpcMod = mainScene.detailsPanel.Modulate; dpcMod.A = 0.0f; mainScene.detailsPanel.Modulate = dpcMod; }
 
         DoSelectSystemByIndex(targetIndex);
 
@@ -103,16 +115,22 @@ public partial class MainSceneGameListHandler
         Color glColorIn = mainScene.gameList.Modulate; glColorIn.A = 1.0f;
         fadeInTween.TweenProperty(mainScene.gameList, "modulate", glColorIn, duration);
 
-        if (mainScene.detailsPanelContainer != null) {
-            Color dpcColorIn = mainScene.detailsPanelContainer.Modulate; dpcColorIn.A = 1.0f;
-            fadeInTween.Parallel().TweenProperty(mainScene.detailsPanelContainer, "modulate", dpcColorIn, duration);
+        if (mainScene.detailsPanel != null) {
+            Color dpcColorIn = mainScene.detailsPanel.Modulate; dpcColorIn.A = 1.0f;
+            fadeInTween.Parallel().TweenProperty(mainScene.detailsPanel, "modulate", dpcColorIn, duration);
+            CentreDetailsPivot();
+            if (mainScene.detailsPanel != null)
+            {
+                mainScene.detailsPanel.Scale = DetailsRestingScale;
+                fadeInTween.Parallel().TweenProperty(mainScene.detailsPanel, "scale", Vector2.One, duration);
+            }
         }
 
         await mainScene.ToSignal(fadeInTween, Tween.SignalName.Finished);
 
         var glModIn = mainScene.gameList.Modulate; glModIn.A = 1.0f; mainScene.gameList.Modulate = glModIn;
 
-        if (mainScene.detailsPanelContainer != null) { var dpcMod = mainScene.detailsPanelContainer.Modulate; dpcMod.A = 1.0f; mainScene.detailsPanelContainer.Modulate = dpcMod; }
+        if (mainScene.detailsPanel != null) { var dpcMod = mainScene.detailsPanel.Modulate; dpcMod.A = 1.0f; mainScene.detailsPanel.Modulate = dpcMod; }
 
         isTransitioningSystem = false;
     }

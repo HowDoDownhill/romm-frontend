@@ -37,37 +37,25 @@ public class MainSceneUpdaterHandler
 
     private void OnUpdateDownloadProgress(float progress)
     {
-        if (mainScene.downloadProgressBar != null)
-        {
-            mainScene.downloadProgressBar.Value = progress * 100.0f;
-        }
+        mainScene.progressPanel?.SetProgress(progress * 100.0f);
     }
 
     private async void OnUpdateDownloadCompleted(bool success)
     {
         if (success)
         {
-            if (mainScene.downloadProgressLabel != null)
-            {
-                mainScene.downloadProgressLabel.Text = "Download complete. Restarting to apply update...";
-            }
+            mainScene.progressPanel?.SetStatus("Download complete. Restarting to apply update...");
 
             await mainScene.ToSignal(mainScene.GetTree().CreateTimer(3.0f), "timeout");
             appUpdater.ApplyUpdateAndRestart();
         }
         else
         {
-            if (mainScene.downloadProgressLabel != null)
-            {
-                mainScene.downloadProgressLabel.Text = "Failed to download update. Please try again later.";
-            }
+            mainScene.progressPanel?.SetStatus("Failed to download update. Please try again later.");
 
             await mainScene.ToSignal(mainScene.GetTree().CreateTimer(3.0f), "timeout");
 
-            if (mainScene.downloadProgressPopup != null)
-            {
-                mainScene.downloadProgressPopup.Close();
-            }
+            mainScene.progressPanel?.Close();
         }
     }
 
@@ -77,20 +65,7 @@ public class MainSceneUpdaterHandler
 
         if (!string.IsNullOrEmpty(pendingUpdateVersion))
         {
-            if (mainScene.downloadProgressPopup != null)
-            {
-                mainScene.downloadProgressPopup.Open();
-            }
-
-            if (mainScene.downloadProgressLabel != null)
-            {
-                mainScene.downloadProgressLabel.Text = "Downloading...";
-            }
-
-            if (mainScene.downloadProgressBar != null)
-            {
-                mainScene.downloadProgressBar.Value = 0;
-            }
+            mainScene.progressPanel?.ShowStatus("Downloading...");
 
             _ = appUpdater.DownloadUpdateAsync(pendingUpdateVersion);
         }

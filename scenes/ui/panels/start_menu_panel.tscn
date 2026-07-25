@@ -1,0 +1,145 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" uid="uid://bvyjn1xypupv8" path="res://scripts/ui/StartMenuPanel.cs" id="1_stmenu"]
+[ext_resource type="Material" uid="uid://b822n10q6f56b" path="res://assets/materials/mica_panel.tres" id="2_mica"]
+[ext_resource type="Script" uid="uid://bgqglerkcylxx" path="res://addons/SmoothScroll/smooth_scroll_container.gd" id="3_smooth"]
+[ext_resource type="Script" uid="uid://b7h0k2h2qwlqv" path="res://addons/SmoothScroll/scroll_damper/expo_scroll_damper.gd" id="4_damper"]
+
+[sub_resource type="Resource" id="Resource_wheel"]
+script = ExtResource("4_damper")
+
+[sub_resource type="Resource" id="Resource_drag"]
+script = ExtResource("4_damper")
+
+[node name="StartMenuPanel" type="Control" node_paths=PackedStringArray("ContentRoot", "menuView", "biosView", "optionsList", "biosList", "launchEmulatorButton", "updateEmulatorButton", "uninstallEmulatorButton", "selectBiosButton", "settingsButton", "randomGameButton", "refreshAllGamesButton", "refreshCurrentSystemButton", "quitButton")]
+visible = false
+custom_minimum_size = Vector2(400, 600)
+layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -200.0
+offset_top = -300.0
+offset_right = 200.0
+offset_bottom = 300.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_stmenu")
+ContentRoot = NodePath("Panel")
+menuView = NodePath("Panel/StartMenuContainer")
+biosView = NodePath("Panel/BiosSelectorContainer")
+optionsList = NodePath("Panel/StartMenuContainer/StartMenu")
+biosList = NodePath("Panel/BiosSelectorContainer/SmoothScrollContainer/MarginContainer/BiosSelector")
+launchEmulatorButton = NodePath("Panel/StartMenuContainer/StartMenu/LaunchEmulatorButton")
+updateEmulatorButton = NodePath("Panel/StartMenuContainer/StartMenu/UpdateEmulatorButton")
+uninstallEmulatorButton = NodePath("Panel/StartMenuContainer/StartMenu/UninstallEmulatorButton")
+selectBiosButton = NodePath("Panel/StartMenuContainer/StartMenu/SelectBiosButton")
+settingsButton = NodePath("Panel/StartMenuContainer/StartMenu/SettingsButton")
+randomGameButton = NodePath("Panel/StartMenuContainer/StartMenu/RandomGameButton")
+refreshAllGamesButton = NodePath("Panel/StartMenuContainer/StartMenu/RefreshAllGamesButton")
+refreshCurrentSystemButton = NodePath("Panel/StartMenuContainer/StartMenu/RefreshCurrentSystemsGamesButton")
+quitButton = NodePath("Panel/StartMenuContainer/StartMenu/QuitButton")
+
+[node name="Panel" type="Panel" parent="."]
+material = ExtResource("2_mica")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="StartMenuContainer" type="MarginContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="StartMenu" type="VBoxContainer" parent="Panel/StartMenuContainer"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="LaunchEmulatorButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+layout_mode = 2
+text = "Launch Current Emulator"
+
+[node name="UpdateEmulatorButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+layout_mode = 2
+text = "Update Current Emulator"
+
+[node name="UninstallEmulatorButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+layout_mode = 2
+text = "Uninstall Current Emulator"
+
+[node name="SelectBiosButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+layout_mode = 2
+text = "Select Bios For Emulator"
+
+[node name="SettingsButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+layout_mode = 2
+text = "Settings"
+
+[node name="RandomGameButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+layout_mode = 2
+text = "Jump to Random Game"
+
+[node name="RefreshAllGamesButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+layout_mode = 2
+text = "Refresh All Games"
+
+[node name="RefreshCurrentSystemsGamesButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+layout_mode = 2
+text = "Refresh Current System
+"
+
+[node name="QuitButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+layout_mode = 2
+text = "Quit"
+
+[node name="BiosSelectorContainer" type="MarginContainer" parent="Panel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="SmoothScrollContainer" type="ScrollContainer" parent="Panel/BiosSelectorContainer"]
+layout_mode = 2
+follow_focus = true
+script = ExtResource("3_smooth")
+wheel_scroll_damper = SubResource("Resource_wheel")
+dragging_scroll_damper = SubResource("Resource_drag")
+metadata/_custom_type_script = "uid://bgqglerkcylxx"
+
+[node name="MarginContainer" type="MarginContainer" parent="Panel/BiosSelectorContainer/SmoothScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+metadata/_smooth_scroll_default_mouse_filter_set = true
+
+[node name="BiosSelector" type="VBoxContainer" parent="Panel/BiosSelectorContainer/SmoothScrollContainer/MarginContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+metadata/_smooth_scroll_default_mouse_filter_set = true
