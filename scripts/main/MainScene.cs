@@ -55,7 +55,7 @@ public partial class MainScene : Control
     [Export] public Node RandomGamePopupOption;
 
     [ExportGroup("Update & Refresh UI")]
-    [Export] public Control downloadProgressPopup;
+    [Export] public UiPanel downloadProgressPopup;
     [Export] public Label downloadProgressLabel;
     [Export] public ProgressBar downloadProgressBar;
 

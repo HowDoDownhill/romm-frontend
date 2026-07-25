@@ -80,7 +80,7 @@ public class MainSceneUpdaterHandler
 
             if (mainScene.downloadProgressPopup != null)
             {
-                mainScene.downloadProgressPopup.Visible = false;
+                mainScene.downloadProgressPopup.Close();
             }
         }
     }
@@ -93,7 +93,7 @@ public class MainSceneUpdaterHandler
         {
             if (mainScene.downloadProgressPopup != null)
             {
-                mainScene.downloadProgressPopup.Visible = true;
+                mainScene.downloadProgressPopup.Open();
             }
 
             if (mainScene.downloadProgressLabel != null)

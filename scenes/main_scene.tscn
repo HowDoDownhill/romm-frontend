@@ -5,6 +5,7 @@
 [ext_resource type="Material" uid="uid://dhmv62s1oow6i" path="res://assets/materials/moving_background.tres" id="2_movbg"]
 [ext_resource type="PackedScene" uid="uid://cew2a8jxcgu6t" path="res://scenes/games_list/game_list_entry.tscn" id="2_rt2n2"]
 [ext_resource type="Script" uid="uid://cwtykxfgbvhv6" path="res://scripts/ui/VerticalCarousel.cs" id="3_gubc5"]
+[ext_resource type="Script" uid="uid://dvfmg1ugxmmur" path="res://scripts/ui/UiPanel.cs" id="3_uipanel"]
 [ext_resource type="Material" uid="uid://b822n10q6f56b" path="res://assets/materials/mica_panel.tres" id="3_mica"]
 [ext_resource type="PackedScene" uid="uid://cffanb3xjob1c" path="res://scenes/downloads_list/download_entry.tscn" id="4_pu3yx"]
 [ext_resource type="PackedScene" path="res://scenes/ui/system_carousel.tscn" id="5_6wevv"]
@@ -90,8 +91,8 @@ RefreshCurrentSystemGamesPopupOption = NodePath("Background/StartMenu/Panel/Star
 QuitPopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/QuitButton")
 RandomGamePopupOption = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu/RandomGameButton")
 downloadProgressPopup = NodePath("Background/DownloadProgressPopup")
-downloadProgressLabel = NodePath("Background/DownloadProgressPopup/Panel/VBoxContainer/LabelContianer/Label")
-downloadProgressBar = NodePath("Background/DownloadProgressPopup/Panel/VBoxContainer/ProgressContainer/ProgressBar")
+downloadProgressLabel = NodePath("Background/DownloadProgressPopup/Panel/MarginContainer/VBoxContainer/LabelContianer/Label")
+downloadProgressBar = NodePath("Background/DownloadProgressPopup/Panel/MarginContainer/VBoxContainer/ProgressContainer/ProgressBar")
 changelogPopup = NodePath("Background/ChangelogContainer")
 changelogRichTextLabel = NodePath("Background/ChangelogContainer/Panel/MarginContainer/VBoxContainer/RichTextLabel")
 acceptUpdateBtn = NodePath("Background/ChangelogContainer/Panel/MarginContainer/VBoxContainer/HBoxContainer/AcceptButton")
@@ -733,7 +734,7 @@ size_flags_horizontal = 3
 size_flags_vertical = 3
 metadata/_smooth_scroll_default_mouse_filter_set = true
 
-[node name="DownloadProgressPopup" type="MarginContainer" parent="Background" unique_id=695295220]
+[node name="DownloadProgressPopup" type="Control" parent="Background" unique_id=695295220 node_paths=PackedStringArray("ContentRoot")]
 visible = false
 custom_minimum_size = Vector2(500, 100)
 layout_mode = 1
@@ -748,25 +749,39 @@ offset_right = 20.0
 offset_bottom = 20.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 10
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 10
+script = ExtResource("3_uipanel")
+ContentRoot = NodePath("Panel")
 
 [node name="Panel" type="Panel" parent="Background/DownloadProgressPopup" unique_id=428372210]
 material = ExtResource("3_mica")
-layout_mode = 2
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="Background/DownloadProgressPopup/Panel" unique_id=949079431]
+[node name="MarginContainer" type="MarginContainer" parent="Background/DownloadProgressPopup/Panel" unique_id=949079432]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Background/DownloadProgressPopup/Panel/MarginContainer" unique_id=949079431]
+layout_mode = 2
 theme_override_constants/separation = 0
 
-[node name="LabelContianer" type="MarginContainer" parent="Background/DownloadProgressPopup/Panel/VBoxContainer" unique_id=1846967498]
+[node name="LabelContianer" type="MarginContainer" parent="Background/DownloadProgressPopup/Panel/MarginContainer/VBoxContainer" unique_id=1846967498]
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_constants/margin_left = 5
@@ -774,19 +789,19 @@ theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="Label" type="Label" parent="Background/DownloadProgressPopup/Panel/VBoxContainer/LabelContianer" unique_id=1314148376]
+[node name="Label" type="Label" parent="Background/DownloadProgressPopup/Panel/MarginContainer/VBoxContainer/LabelContianer" unique_id=1314148376]
 layout_mode = 2
 size_flags_vertical = 3
 text = "Test"
 vertical_alignment = 1
 
-[node name="ProgressContainer" type="MarginContainer" parent="Background/DownloadProgressPopup/Panel/VBoxContainer" unique_id=1516397779]
+[node name="ProgressContainer" type="MarginContainer" parent="Background/DownloadProgressPopup/Panel/MarginContainer/VBoxContainer" unique_id=1516397779]
 layout_mode = 2
 theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
-[node name="ProgressBar" type="ProgressBar" parent="Background/DownloadProgressPopup/Panel/VBoxContainer/ProgressContainer" unique_id=1179132155]
+[node name="ProgressBar" type="ProgressBar" parent="Background/DownloadProgressPopup/Panel/MarginContainer/VBoxContainer/ProgressContainer" unique_id=1179132155]
 layout_mode = 2
 size_flags_vertical = 8
 

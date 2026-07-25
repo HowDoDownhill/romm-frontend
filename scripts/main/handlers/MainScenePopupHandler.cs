@@ -220,7 +220,7 @@ public class MainScenePopupHandler
 
         if (mainScene.downloadProgressPopup != null)
         {
-            mainScene.downloadProgressPopup.Visible = true;
+            mainScene.downloadProgressPopup.Open();
 
             if (mainScene.downloadProgressLabel != null)
             {
@@ -292,7 +292,7 @@ public class MainScenePopupHandler
 
         if (mainScene.downloadProgressPopup != null)
         {
-            mainScene.downloadProgressPopup.Visible = false;
+            mainScene.downloadProgressPopup.Close();
         }
 
         mainScene.gameList?.GrabFocus();
