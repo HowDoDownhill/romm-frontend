@@ -7,6 +7,7 @@
 [ext_resource type="Script" uid="uid://cwtykxfgbvhv6" path="res://scripts/ui/VerticalCarousel.cs" id="3_gubc5"]
 [ext_resource type="Script" uid="uid://dvfmg1ugxmmur" path="res://scripts/ui/UiPanel.cs" id="3_uipanel"]
 [ext_resource type="Script" uid="uid://co0qgvxrtg7qi" path="res://scripts/ui/ChangelogPanel.cs" id="3_chglog"]
+[ext_resource type="Script" uid="uid://bvyjn1xypupv8" path="res://scripts/ui/StartMenuPanel.cs" id="3_stmenu"]
 [ext_resource type="Material" uid="uid://b822n10q6f56b" path="res://assets/materials/mica_panel.tres" id="3_mica"]
 [ext_resource type="PackedScene" uid="uid://cffanb3xjob1c" path="res://scenes/downloads_list/download_entry.tscn" id="4_pu3yx"]
 [ext_resource type="PackedScene" path="res://scenes/ui/system_carousel.tscn" id="5_6wevv"]
@@ -47,7 +48,7 @@ script = ExtResource("7_18nlu")
 [sub_resource type="Resource" id="Resource_6wevv"]
 script = ExtResource("7_18nlu")
 
-[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "systemCarousel", "gameList", "detailsPanelContainer", "gameMarquee", "gameDescription", "gameScreenshotsScroll", "gameScreenshotsFlow", "gameDownloadProgressBar", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "LaunchEmulatorPopupOption", "UpdateEmulatorPopupOption", "UninstallEmulatorPopupOption", "SelectBiosPopupOption", "SettingsPopupOption", "RefreshGamesPopupOption", "RefreshCurrentSystemGamesPopupOption", "QuitPopupOption", "RandomGamePopupOption", "downloadProgressPopup", "downloadProgressLabel", "downloadProgressBar", "changelogPanel", "backgroundRect", "mainVBoxContainer", "startMenu", "startMenuContainer", "biosSelectorContainer", "biosSelector", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
+[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "systemCarousel", "gameList", "detailsPanelContainer", "gameMarquee", "gameDescription", "gameScreenshotsScroll", "gameScreenshotsFlow", "gameDownloadProgressBar", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "LaunchEmulatorPopupOption", "UpdateEmulatorPopupOption", "UninstallEmulatorPopupOption", "SelectBiosPopupOption", "SettingsPopupOption", "RefreshGamesPopupOption", "RefreshCurrentSystemGamesPopupOption", "QuitPopupOption", "RandomGamePopupOption", "downloadProgressPopup", "downloadProgressLabel", "downloadProgressBar", "changelogPanel", "backgroundRect", "mainVBoxContainer", "startMenuPanel", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -97,10 +98,7 @@ downloadProgressBar = NodePath("Background/DownloadProgressPopup/Panel/MarginCon
 changelogPanel = NodePath("Background/ChangelogContainer")
 backgroundRect = NodePath("Background")
 mainVBoxContainer = NodePath("Background/VBoxContainer")
-startMenu = NodePath("Background/StartMenu/Panel/StartMenuContainer/StartMenu")
-startMenuContainer = NodePath("Background/StartMenu/Panel/StartMenuContainer")
-biosSelectorContainer = NodePath("Background/StartMenu/Panel/BiosSelectorContainer")
-biosSelector = NodePath("Background/StartMenu/Panel/BiosSelectorContainer/SmoothScrollContainer/MarginContainer/BiosSelector")
+startMenuPanel = NodePath("Background/StartMenu")
 settingsMenuContainer = NodePath("Background/VBoxContainer/SettingsMenuContainer")
 settingsSectionsTree = NodePath("Background/VBoxContainer/SettingsMenuContainer/HBoxContainer/SettingsTreePanel/MarginContainer/SettingsSectionsScroll/SettingsSections")
 sectionOptionsContainer = NodePath("Background/VBoxContainer/SettingsMenuContainer/HBoxContainer/Panel/MarginContainer/SectionOptions")
@@ -619,7 +617,7 @@ text = "Back"
 alignment = 0
 expand_icon = true
 
-[node name="StartMenu" type="MarginContainer" parent="Background" unique_id=1160206546]
+[node name="StartMenu" type="Control" parent="Background" unique_id=1160206546 node_paths=PackedStringArray("ContentRoot", "menuView", "biosView", "optionsList", "biosList")]
 visible = false
 custom_minimum_size = Vector2(400, 600)
 layout_mode = 1
@@ -634,14 +632,25 @@ offset_right = 200.0
 offset_bottom = 300.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 10
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 10
+script = ExtResource("3_stmenu")
+ContentRoot = NodePath("Panel")
+menuView = NodePath("Panel/StartMenuContainer")
+biosView = NodePath("Panel/BiosSelectorContainer")
+optionsList = NodePath("Panel/StartMenuContainer/StartMenu")
+biosList = NodePath("Panel/BiosSelectorContainer/SmoothScrollContainer/MarginContainer/BiosSelector")
 
 [node name="Panel" type="Panel" parent="Background/StartMenu" unique_id=1083749050]
 material = ExtResource("3_mica")
-layout_mode = 2
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="StartMenuContainer" type="MarginContainer" parent="Background/StartMenu/Panel" unique_id=93641177]
 layout_mode = 1

@@ -29,10 +29,7 @@ public class MainScenePopupHandler
             appInstance.emulatorManager.LaunchEmulatorWithoutGame(mappedEmulator, system);
         }
 
-        if (mainScene.startMenuRoot != null)
-        {
-            mainScene.startMenuRoot.Visible = false;
-        }
+        mainScene.startMenuPanel?.Close();
 
         mainScene.gameList?.GrabFocus();
     }
@@ -75,10 +72,7 @@ public class MainScenePopupHandler
             return;
         }
 
-        if (mainScene.startMenuRoot != null)
-        {
-            mainScene.startMenuRoot.Visible = false;
-        }
+        mainScene.startMenuPanel?.Close();
 
         mainScene.OpenReleasePicker(mappedEmulator);
     }
@@ -94,10 +88,7 @@ public class MainScenePopupHandler
 
         appInstance.emulatorManager.UninstallEmulator(mappedEmulator);
 
-        if (mainScene.startMenuRoot != null)
-        {
-            mainScene.startMenuRoot.Visible = false;
-        }
+        mainScene.startMenuPanel?.Close();
 
         if (mainScene.GameListHandler.currentlySelectedGame != null)
         {
@@ -109,29 +100,21 @@ public class MainScenePopupHandler
 
     public void OnSelectBiosMenuPressed()
     {
-        if (mainScene.startMenuContainer != null)
-        {
-            mainScene.startMenuContainer.Visible = false;
-        }
-
-        if (mainScene.biosSelectorContainer != null)
-        {
-            mainScene.biosSelectorContainer.Visible = true;
-        }
-
-        PopulateBiosSelector();
+        mainScene.startMenuPanel?.ShowBiosView();
     }
 
     public void PopulateBiosSelector()
     {
-        if (mainScene.biosSelector == null)
+        VBoxContainer biosList = mainScene.startMenuPanel?.biosList;
+
+        if (biosList == null)
         {
             return;
         }
 
-        foreach (Node child in mainScene.biosSelector.GetChildren())
+        foreach (Node child in biosList.GetChildren())
         {
-            mainScene.biosSelector.RemoveChild(child);
+            biosList.RemoveChild(child);
             child.QueueFree();
         }
 
@@ -163,29 +146,19 @@ public class MainScenePopupHandler
                 btn.Pressed += () =>
                 {
                     system.PrefferedFirmware = firmwareDir.PathJoin(fileName);
-
-                    if (mainScene.biosSelectorContainer != null)
-                    {
-                        mainScene.biosSelectorContainer.Visible = false;
-                    }
-
-                    if (mainScene.startMenuContainer != null)
-                    {
-                        mainScene.startMenuContainer.Visible = true;
-                    }
-                    (mainScene.SelectBiosPopupOption as Control)?.GrabFocus();
+                    mainScene.startMenuPanel?.ShowMenuView();
                 };
-                mainScene.biosSelector.AddChild(btn);
+                biosList.AddChild(btn);
             }
         }
         else
         {
             Label lbl = new Label();
             lbl.Text = "No bios/firmware found.";
-            mainScene.biosSelector.AddChild(lbl);
+            biosList.AddChild(lbl);
         }
 
-        if (mainScene.biosSelector.GetChildCount() > 0 && mainScene.biosSelector.GetChild(0) is Control firstChild)
+        if (biosList.GetChildCount() > 0 && biosList.GetChild(0) is Control firstChild)
         {
             firstChild.GrabFocus();
         }
@@ -193,10 +166,7 @@ public class MainScenePopupHandler
 
     public void OnSettingsMenuPressed()
     {
-        if (mainScene.startMenuRoot != null)
-        {
-            mainScene.startMenuRoot.Visible = false;
-        }
+        mainScene.startMenuPanel?.Close();
 
         mainScene.SettingsHandler.ToggleSettingsMenu();
     }
@@ -213,10 +183,7 @@ public class MainScenePopupHandler
             return;
         }
 
-        if (mainScene.startMenuRoot != null)
-        {
-            mainScene.startMenuRoot.Visible = false;
-        }
+        mainScene.startMenuPanel?.Close();
 
         if (mainScene.downloadProgressPopup != null)
         {
@@ -316,10 +283,7 @@ public class MainScenePopupHandler
                 mainScene.gameList.Call("Refresh");
             }
 
-            if (mainScene.startMenuRoot != null)
-            {
-                mainScene.startMenuRoot.Visible = false;
-            }
+            mainScene.startMenuPanel?.Close();
 
             mainScene.gameList?.GrabFocus();
         }

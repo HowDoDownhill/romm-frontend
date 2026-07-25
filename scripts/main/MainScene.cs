@@ -74,11 +74,7 @@ public partial class MainScene : Control
     [Export] public ColorRect backgroundRect;
     [Export] public VBoxContainer mainVBoxContainer;
 
-    [Export] public Control startMenu;
-    [Export] public Control startMenuContainer;
-    [Export] public Control biosSelectorContainer;
-    [Export] public VBoxContainer biosSelector;
-    public Control startMenuRoot;
+    [Export] public StartMenuPanel startMenuPanel;
 
     [Export] public MarginContainer settingsMenuContainer;
     [Export] public VBoxContainer settingsSectionsTree;
@@ -170,14 +166,10 @@ public partial class MainScene : Control
         appInstance.downloadManager.DownloadCompleted += DownloadHandler.OnDownloadCompleted;
         appInstance.emulatorManager.EmulatorInstallationCompleted += OnEmulatorInstallationCompleted;
 
-        if (startMenuContainer != null)
+        if (startMenuPanel != null)
         {
-            startMenuRoot = startMenuContainer.GetParent()?.GetParent() as Control;
-
-            if (startMenuRoot != null)
-            {
-                startMenuRoot.Visible = false;
-            }
+            panelStack.Register(startMenuPanel);
+            startMenuPanel.BiosViewRequested += PopupHandler.PopulateBiosSelector;
 
             if (LaunchEmulatorPopupOption is Button launchBtn) launchBtn.Pressed += PopupHandler.OnLaunchEmulatorPressed;
             if (UpdateEmulatorPopupOption is Button updateEmulatorBtn) updateEmulatorBtn.Pressed += PopupHandler.OnUpdateEmulatorPressed;
@@ -425,21 +417,17 @@ public partial class MainScene : Control
             return;
         }
 
-        if (startMenuRoot != null)
+        if (startMenuPanel == null) return;
+
+        if (startMenuPanel.IsOpen)
         {
-            if (startMenuRoot.Visible)
-            {
-                startMenuRoot.Visible = false;
-                gameList?.GrabFocus();
-            }
-            else if (downloadsListContainer == null || !downloadsListContainer.Visible)
-            {
-                startMenuRoot.Visible = true;
-                if (startMenuContainer != null) startMenuContainer.Visible = true;
-                if (biosSelectorContainer != null) biosSelectorContainer.Visible = false;
-                PopupHandler.RefreshEmulatorMenuOptions();
-                if (LaunchEmulatorPopupOption is Control launchBtn) launchBtn.GrabFocus();
-            }
+            startMenuPanel.Close();
+        }
+        else if (downloadsListContainer == null || !downloadsListContainer.Visible)
+        {
+            startMenuPanel.ShowMenuView();
+            PopupHandler.RefreshEmulatorMenuOptions();
+            startMenuPanel.Open();
         }
     }
 
@@ -630,7 +618,7 @@ public partial class MainScene : Control
             return;
         }
 
-        bool isAnyPopupVisible = (startMenuRoot != null && startMenuRoot.Visible) ||
+        bool isAnyPopupVisible = panelStack.HasOpenPanel ||
                                  (settingsMenuContainer != null && settingsMenuContainer.Visible) ||
                                  (downloadsListContainer != null && downloadsListContainer.Visible);
 
@@ -659,49 +647,6 @@ public partial class MainScene : Control
                 GameListHandler.lastKeystrokeTime = currentTime;
                 GameListHandler.isFuzzySearchDirty = true;
             }
-        }
-
-        if (startMenuRoot != null && startMenuRoot.Visible)
-        {
-            if (@event.IsActionPressed("ui_cancel") || @event.IsActionPressed("Back"))
-            {
-                if (biosSelectorContainer != null && biosSelectorContainer.Visible)
-                {
-                    biosSelectorContainer.Visible = false;
-                    if (startMenuContainer != null) startMenuContainer.Visible = true;
-                    (SelectBiosPopupOption as Control)?.GrabFocus();
-                }
-                else
-                {
-                    startMenuRoot.Visible = false;
-                    gameList?.GrabFocus();
-                }
-                GetViewport().SetInputAsHandled();
-                return;
-            }
-            else if (@event.IsActionPressed("ui_up", true) || @event.IsActionPressed("MoveUp"))
-            {
-                SettingsHandler.CycleFocusInContainer(biosSelectorContainer != null && biosSelectorContainer.Visible ? biosSelectorContainer : startMenu, -1);
-                GetViewport().SetInputAsHandled();
-                return;
-            }
-            else if (@event.IsActionPressed("ui_down", true) || @event.IsActionPressed("MoveDown"))
-            {
-                SettingsHandler.CycleFocusInContainer(biosSelectorContainer != null && biosSelectorContainer.Visible ? biosSelectorContainer : startMenu, 1);
-                GetViewport().SetInputAsHandled();
-                return;
-            }
-            else if (@event.IsActionPressed("ui_accept") || @event.IsActionPressed("Select"))
-            {
-                var focusOwner = GetViewport().GuiGetFocusOwner();
-                if (focusOwner is BaseButton btn && !btn.Disabled)
-                {
-                    btn.EmitSignal(BaseButton.SignalName.Pressed);
-                    GetViewport().SetInputAsHandled();
-                }
-                return;
-            }
-            return;
         }
 
         if (settingsMenuContainer != null && settingsMenuContainer.Visible)
@@ -955,10 +900,9 @@ public partial class MainScene : Control
 
     private bool IsAnyMenuOpen()
     {
-        return (startMenuRoot != null && startMenuRoot.Visible)
+        return panelStack.HasOpenPanel
             || (settingsMenuContainer != null && settingsMenuContainer.Visible)
-            || (downloadsListContainer != null && downloadsListContainer.Visible)
-            || panelStack.HasOpenPanel;
+            || (downloadsListContainer != null && downloadsListContainer.Visible);
     }
 
     private bool IsMouseOverGameList()
