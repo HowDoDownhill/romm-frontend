@@ -23,8 +23,9 @@ public partial class MainScene : Control
     [Export] public GridContainer gameScreenshotsFlow;
     [Export] public ProgressBar gameDownloadProgressBar;
 
-    [ExportGroup("DowloadsList")]
-    [Export] public MarginContainer downloadsListContainer;
+    [ExportGroup("Sections")]
+    [Export] public UiPanel gameListSection;
+    [Export] public UiPanel downloadsListContainer;
     [Export] public DownloadProgressUI downloadProgressUI;
 
     [ExportGroup("Footer Buttons & Containers")]
@@ -76,7 +77,7 @@ public partial class MainScene : Control
 
     [Export] public StartMenuPanel startMenuPanel;
 
-    [Export] public MarginContainer settingsMenuContainer;
+    [Export] public UiPanel settingsMenuContainer;
     [Export] public VBoxContainer settingsSectionsTree;
     [Export] public VBoxContainer sectionOptionsContainer;
 
@@ -186,9 +187,10 @@ public partial class MainScene : Control
 
         if (settingsMenuContainer != null)
         {
-            settingsMenuContainer.Visible = false;
             SettingsHandler.SetupSettingsTree();
         }
+
+        SectionHandler.Initialise();
 
         if (changelogPanel != null)
         {
@@ -411,7 +413,7 @@ public partial class MainScene : Control
 
     private void ToggleStartMenu()
     {
-        if (settingsMenuContainer != null && settingsMenuContainer.Visible)
+        if (settingsMenuContainer != null && settingsMenuContainer.IsOpen)
         {
             SettingsHandler.ToggleSettingsMenu();
             return;
@@ -423,7 +425,7 @@ public partial class MainScene : Control
         {
             startMenuPanel.Close();
         }
-        else if (downloadsListContainer == null || !downloadsListContainer.Visible)
+        else if (downloadsListContainer == null || !downloadsListContainer.IsOpen)
         {
             startMenuPanel.ShowMenuView();
             PopupHandler.RefreshEmulatorMenuOptions();
@@ -619,8 +621,8 @@ public partial class MainScene : Control
         }
 
         bool isAnyPopupVisible = panelStack.HasOpenPanel ||
-                                 (settingsMenuContainer != null && settingsMenuContainer.Visible) ||
-                                 (downloadsListContainer != null && downloadsListContainer.Visible);
+                                 (settingsMenuContainer != null && settingsMenuContainer.IsOpen) ||
+                                 (downloadsListContainer != null && downloadsListContainer.IsOpen);
 
         if (!isAnyPopupVisible && @event is InputEventKey keyEvent && keyEvent.Pressed)
         {
@@ -649,7 +651,7 @@ public partial class MainScene : Control
             }
         }
 
-        if (settingsMenuContainer != null && settingsMenuContainer.Visible)
+        if (settingsMenuContainer != null && settingsMenuContainer.IsOpen)
         {
             var focusOwner = GetViewport().GuiGetFocusOwner();
 
@@ -752,7 +754,7 @@ public partial class MainScene : Control
             return;
         }
 
-        if(@event.IsActionPressed("CylceSystemUp") && (downloadsListContainer == null || !downloadsListContainer.Visible))
+        if(@event.IsActionPressed("CylceSystemUp") && (downloadsListContainer == null || !downloadsListContainer.IsOpen))
         {
             rightBumperPressedTime = Time.GetTicksMsec();
             return;
@@ -772,7 +774,7 @@ public partial class MainScene : Control
             return;
         }
 
-        if (@event.IsActionPressed("CycleSystemDown") && (downloadsListContainer == null || !downloadsListContainer.Visible))
+        if (@event.IsActionPressed("CycleSystemDown") && (downloadsListContainer == null || !downloadsListContainer.IsOpen))
         {
             leftBumperPressedTime = Time.GetTicksMsec();
             return;
@@ -794,21 +796,21 @@ public partial class MainScene : Control
 
         if (IsControllerEvent(@event))
         {
-            if (@event.IsActionPressed("Select") && (downloadsListContainer == null || !downloadsListContainer.Visible))
+            if (@event.IsActionPressed("Select") && (downloadsListContainer == null || !downloadsListContainer.IsOpen))
             {
                 OnPlayDownloadButtonPressed();
                 GetViewport().SetInputAsHandled();
                 return;
             }
 
-            if (@event.IsActionPressed("ToggleInstalled") && (downloadsListContainer == null || !downloadsListContainer.Visible))
+            if (@event.IsActionPressed("ToggleInstalled") && (downloadsListContainer == null || !downloadsListContainer.IsOpen))
             {
                 OnFilterInstalledGamesPressed();
                 GetViewport().SetInputAsHandled();
                 return;
             }
 
-            if (@event.IsActionPressed("DeleteGame") && (downloadsListContainer == null || !downloadsListContainer.Visible))
+            if (@event.IsActionPressed("DeleteGame") && (downloadsListContainer == null || !downloadsListContainer.IsOpen))
             {
                 if (deleteBtn != null && !deleteBtn.Disabled && deleteBtn.Visible)
                 {
@@ -827,7 +829,7 @@ public partial class MainScene : Control
 
             if (@event.IsActionPressed("CancelDownload"))
             {
-                if (downloadsListContainer != null && downloadsListContainer.Visible)
+                if (downloadsListContainer != null && downloadsListContainer.IsOpen)
                 {
                     DownloadHandler.OnCancelDownloadPressed();
                     GetViewport().SetInputAsHandled();
@@ -838,7 +840,7 @@ public partial class MainScene : Control
 
         if (@event.IsActionPressed("ui_up", true) || @event.IsActionPressed("MoveUp"))
         {
-            if (downloadsListContainer != null && downloadsListContainer.Visible)
+            if (downloadsListContainer != null && downloadsListContainer.IsOpen)
             {
                 if (downloadProgressUI is DownloadProgressUI dpUI)
                 {
@@ -851,7 +853,7 @@ public partial class MainScene : Control
 
         if (@event.IsActionPressed("ui_down", true) || @event.IsActionPressed("MoveDown"))
         {
-            if (downloadsListContainer != null && downloadsListContainer.Visible)
+            if (downloadsListContainer != null && downloadsListContainer.IsOpen)
             {
                 if (downloadProgressUI is DownloadProgressUI dpUI)
                 {
@@ -901,8 +903,8 @@ public partial class MainScene : Control
     private bool IsAnyMenuOpen()
     {
         return panelStack.HasOpenPanel
-            || (settingsMenuContainer != null && settingsMenuContainer.Visible)
-            || (downloadsListContainer != null && downloadsListContainer.Visible);
+            || (settingsMenuContainer != null && settingsMenuContainer.IsOpen)
+            || (downloadsListContainer != null && downloadsListContainer.IsOpen);
     }
 
     private bool IsMouseOverGameList()
@@ -980,7 +982,7 @@ public partial class MainScene : Control
 
     private void OpenSystemJumpPopup()
     {
-        if (systemJumpPopup != null && !systemJumpPopup.IsOpen && (downloadsListContainer == null || !downloadsListContainer.Visible))
+        if (systemJumpPopup != null && !systemJumpPopup.IsOpen && (downloadsListContainer == null || !downloadsListContainer.IsOpen))
         {
             systemJumpPopup.Populate(GameListHandler.gameSystems, GameListHandler.currentGameSystemIndex);
             systemJumpPopup.Open();

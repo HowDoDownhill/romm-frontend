@@ -186,8 +186,8 @@ public partial class MainSceneGameListHandler
         {
             OnGameSelected(0L);
 
-            if (mainScene.downloadsListContainer != null && !mainScene.downloadsListContainer.Visible &&
-                (mainScene.settingsMenuContainer == null || !mainScene.settingsMenuContainer.Visible))
+            if (mainScene.downloadsListContainer != null && !mainScene.downloadsListContainer.IsOpen &&
+                (mainScene.settingsMenuContainer == null || !mainScene.settingsMenuContainer.IsOpen))
             {
                 mainScene.gameList.GrabFocus();
             }

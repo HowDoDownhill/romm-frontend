@@ -48,7 +48,7 @@ script = ExtResource("7_18nlu")
 [sub_resource type="Resource" id="Resource_6wevv"]
 script = ExtResource("7_18nlu")
 
-[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "systemCarousel", "gameList", "detailsPanelContainer", "gameMarquee", "gameDescription", "gameScreenshotsScroll", "gameScreenshotsFlow", "gameDownloadProgressBar", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "LaunchEmulatorPopupOption", "UpdateEmulatorPopupOption", "UninstallEmulatorPopupOption", "SelectBiosPopupOption", "SettingsPopupOption", "RefreshGamesPopupOption", "RefreshCurrentSystemGamesPopupOption", "QuitPopupOption", "RandomGamePopupOption", "downloadProgressPopup", "downloadProgressLabel", "downloadProgressBar", "changelogPanel", "backgroundRect", "mainVBoxContainer", "startMenuPanel", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
+[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "systemCarousel", "gameList", "detailsPanelContainer", "gameMarquee", "gameDescription", "gameScreenshotsScroll", "gameScreenshotsFlow", "gameDownloadProgressBar", "gameListSection", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "LaunchEmulatorPopupOption", "UpdateEmulatorPopupOption", "UninstallEmulatorPopupOption", "SelectBiosPopupOption", "SettingsPopupOption", "RefreshGamesPopupOption", "RefreshCurrentSystemGamesPopupOption", "QuitPopupOption", "RandomGamePopupOption", "downloadProgressPopup", "downloadProgressLabel", "downloadProgressBar", "changelogPanel", "backgroundRect", "mainVBoxContainer", "startMenuPanel", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -68,6 +68,7 @@ gameDescription = NodePath("Background/VBoxContainer/GamesListContainer/HBoxCont
 gameScreenshotsScroll = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ScreenShotsContainer/HBoxContainer/SmoothScrollContainer")
 gameScreenshotsFlow = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ScreenShotsContainer/HBoxContainer/SmoothScrollContainer/VBoxContainer")
 gameDownloadProgressBar = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/DownloadProgressContainer/ProgressBar")
+gameListSection = NodePath("Background/VBoxContainer/GamesListContainer")
 downloadsListContainer = NodePath("Background/VBoxContainer/DownloadsPageContainer")
 downloadProgressUI = NodePath("Background/VBoxContainer/DownloadsPageContainer/DownloadsPage")
 gameListFooter = NodePath("Background/VBoxContainer/FooterButtonsContainer/Panel/GameListFooter")
@@ -150,17 +151,27 @@ theme_override_constants/margin_bottom = 5
 [node name="SystemCarousel" parent="Background/VBoxContainer/HeaderContainer/Panel/MarginContainer" unique_id=590191861 instance=ExtResource("5_6wevv")]
 layout_mode = 2
 
-[node name="GamesListContainer" type="MarginContainer" parent="Background/VBoxContainer" unique_id=749665635]
+[node name="GamesListContainer" type="Control" parent="Background/VBoxContainer" unique_id=749665635 node_paths=PackedStringArray("ContentRoot")]
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 10
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 10
+script = ExtResource("3_uipanel")
+Transition = 2
+RestingScale = 0.98
+UseMica = false
+ShadowSize = 0
+ContentRoot = NodePath("HBoxContainer")
 
 [node name="HBoxContainer" type="HBoxContainer" parent="Background/VBoxContainer/GamesListContainer" unique_id=2086912777]
-layout_mode = 2
-size_flags_vertical = 3
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_constants/separation = 10
 
 [node name="GameList" type="Control" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer" unique_id=2095098638]
@@ -245,17 +256,28 @@ theme_override_constants/margin_bottom = 5
 [node name="ProgressBar" type="ProgressBar" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/DownloadProgressContainer" unique_id=728023740]
 layout_mode = 2
 
-[node name="DownloadsPageContainer" type="MarginContainer" parent="Background/VBoxContainer" unique_id=1554522468]
+[node name="DownloadsPageContainer" type="Control" parent="Background/VBoxContainer" unique_id=1554522468 node_paths=PackedStringArray("ContentRoot")]
 visible = false
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 10
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 10
+script = ExtResource("3_uipanel")
+Transition = 2
+RestingScale = 0.98
+UseMica = false
+ShadowSize = 0
+ContentRoot = NodePath("DownloadsPage")
 
 [node name="DownloadsPage" parent="Background/VBoxContainer/DownloadsPageContainer" unique_id=141579046 node_paths=PackedStringArray("downloadsVBox") instance=ExtResource("2_6l7je")]
-layout_mode = 2
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
 downloadsVBox = NodePath("VBoxContainer2")
 downloadEntryScene = ExtResource("4_pu3yx")
 
@@ -268,17 +290,28 @@ grow_horizontal = 2
 grow_vertical = 2
 size_flags_vertical = 3
 
-[node name="SettingsMenuContainer" type="MarginContainer" parent="Background/VBoxContainer" unique_id=803032780]
+[node name="SettingsMenuContainer" type="Control" parent="Background/VBoxContainer" unique_id=803032780 node_paths=PackedStringArray("ContentRoot")]
 visible = false
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 10
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 10
+script = ExtResource("3_uipanel")
+Transition = 2
+RestingScale = 0.98
+UseMica = false
+ShadowSize = 0
+ContentRoot = NodePath("HBoxContainer")
 
 [node name="HBoxContainer" type="HBoxContainer" parent="Background/VBoxContainer/SettingsMenuContainer" unique_id=1387841732]
-layout_mode = 2
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -10.0
+grow_horizontal = 2
+grow_vertical = 2
 
 [node name="SettingsTreePanel" type="Panel" parent="Background/VBoxContainer/SettingsMenuContainer/HBoxContainer" unique_id=1546846272]
 material = ExtResource("3_mica")

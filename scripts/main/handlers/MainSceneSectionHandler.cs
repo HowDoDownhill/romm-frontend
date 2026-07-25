@@ -9,20 +9,53 @@ public class MainSceneSectionHandler
         Settings
     }
 
-    private const float TransitionDuration = 0.18f;
     private const float FooterDuration = 0.12f;
-    private const float EnterScale = 0.98f;
+
+    private static readonly Section[] AllSections = { Section.GameList, Section.Downloads, Section.Settings };
 
     private readonly MainScene mainScene;
-    private Tween tween;
+    private Tween footerTween;
 
     public Section CurrentSection { get; private set; } = Section.GameList;
-
-    public bool IsTransitioning { get; private set; }
 
     public MainSceneSectionHandler(MainScene mainScene)
     {
         this.mainScene = mainScene;
+    }
+
+    public bool IsTransitioning
+    {
+        get
+        {
+            foreach (Section section in AllSections)
+            {
+                if (PanelFor(section)?.IsBusy == true) return true;
+            }
+            return false;
+        }
+    }
+
+    public void Initialise()
+    {
+        foreach (Section section in AllSections)
+        {
+            UiPanel panel = PanelFor(section);
+            if (panel == null) continue;
+
+            if (section == CurrentSection) panel.Open(false);
+            else panel.Close(false);
+        }
+
+        ApplyFooters(CurrentSection, CurrentSection, false);
+
+        foreach (Section section in AllSections)
+        {
+            UiPanel panel = PanelFor(section);
+            if (panel == null) continue;
+
+            Section arrived = section;
+            panel.Opened += () => GrabFocusFor(arrived);
+        }
     }
 
     public void ToggleSettings()
@@ -35,15 +68,34 @@ public class MainSceneSectionHandler
         ShowSection(CurrentSection == Section.Downloads ? Section.GameList : Section.Downloads);
     }
 
-    private Control GameListContainer => mainScene.gameList?.GetParent()?.GetParent<Control>();
+    public void ShowSection(Section target, bool animate = true)
+    {
+        if (target == CurrentSection && !IsTransitioning) return;
 
-    private Control ContainerFor(Section section)
+        Section previous = CurrentSection;
+        CurrentSection = target;
+
+        mainScene.UpdateHeaderLabel();
+
+        foreach (Section section in AllSections)
+        {
+            UiPanel panel = PanelFor(section);
+            if (panel == null) continue;
+
+            if (section == target) panel.Open(animate);
+            else panel.Close(animate);
+        }
+
+        ApplyFooters(target, previous, animate);
+    }
+
+    private UiPanel PanelFor(Section section)
     {
         switch (section)
         {
             case Section.Downloads: return mainScene.downloadsListContainer;
             case Section.Settings: return mainScene.settingsMenuContainer;
-            default: return GameListContainer;
+            default: return mainScene.gameListSection;
         }
     }
 
@@ -57,119 +109,77 @@ public class MainSceneSectionHandler
         }
     }
 
-    public void ShowSection(Section target, bool animate = true)
+    private void ApplyFooters(Section target, Section previous, bool animate)
     {
-        if (target == CurrentSection && !IsTransitioning)
+        if (footerTween != null && footerTween.IsValid())
         {
+            footerTween.Kill();
+        }
+        footerTween = null;
+
+        Control incoming = FooterFor(target);
+        Control outgoing = FooterFor(previous);
+
+        foreach (Section section in AllSections)
+        {
+            Control footer = FooterFor(section);
+            if (footer == null || footer == incoming || footer == outgoing) continue;
+            SetVisible(footer, false);
+        }
+
+        if (incoming == null) return;
+
+        if (!animate)
+        {
+            if (outgoing != null && outgoing != incoming) SetVisible(outgoing, false);
+            SetVisible(incoming, true);
             return;
         }
 
-        Section previous = CurrentSection;
-        CurrentSection = target;
+        incoming.Visible = true;
+        SetAlpha(incoming, 0f);
 
-        if (tween != null && tween.IsValid())
-        {
-            tween.Kill();
-        }
-        tween = null;
-        ResetAllSections(target);
-
-        Control outgoing = ContainerFor(previous);
-        Control incoming = ContainerFor(target);
-        Control outgoingFooter = FooterFor(previous);
-        Control incomingFooter = FooterFor(target);
-
-        mainScene.UpdateHeaderLabel();
-
-        if (!animate || incoming == null)
-        {
-            FinishTransition(target, outgoing, outgoingFooter);
-            return;
-        }
-
-        PrepareIncoming(incoming);
-        PrepareIncoming(incomingFooter);
-
-        IsTransitioning = true;
-        tween = mainScene.CreateTween().SetParallel(true).SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
+        footerTween = mainScene.CreateTween().SetParallel(true)
+            .SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
 
         if (outgoing != null && outgoing != incoming)
         {
-            tween.TweenProperty(outgoing, "modulate:a", 0.0f, TransitionDuration);
-        }
-        if (outgoingFooter != null && outgoingFooter != incomingFooter)
-        {
-            tween.TweenProperty(outgoingFooter, "modulate:a", 0.0f, FooterDuration);
+            footerTween.TweenProperty(outgoing, "modulate:a", 0f, FooterDuration);
         }
 
-        tween.TweenProperty(incoming, "modulate:a", 1.0f, TransitionDuration);
-        tween.TweenProperty(incoming, "scale", Vector2.One, TransitionDuration);
-        if (incomingFooter != null)
-        {
-            tween.TweenProperty(incomingFooter, "modulate:a", 1.0f, FooterDuration);
-        }
-
-        tween.Chain().TweenCallback(Callable.From(() => FinishTransition(target, outgoing, outgoingFooter)));
+        footerTween.TweenProperty(incoming, "modulate:a", 1f, FooterDuration);
+        footerTween.Chain().TweenCallback(Callable.From(() => SettleFooters(target)));
     }
 
-    private void PrepareIncoming(Control control)
+    private void SettleFooters(Section target)
     {
-        if (control == null) return;
+        footerTween = null;
 
-        control.Visible = true;
-        Color transparent = control.Modulate;
-        transparent.A = 0f;
-        control.Modulate = transparent;
-        control.PivotOffset = control.Size / 2f;
-        control.Scale = new Vector2(EnterScale, EnterScale);
-    }
-
-    private void ResetAllSections(Section keepVisible)
-    {
-        foreach (Section section in new[] { Section.GameList, Section.Downloads, Section.Settings })
+        foreach (Section section in AllSections)
         {
-            if (section == keepVisible) continue;
-            RestoreControl(ContainerFor(section), false);
-            RestoreControl(FooterFor(section), false);
+            Control footer = FooterFor(section);
+            if (footer == null) continue;
+            SetVisible(footer, section == target);
         }
     }
 
-    private static void RestoreControl(Control control, bool visible)
+    private static void SetVisible(Control control, bool visible)
     {
-        if (control == null) return;
-
-        Color opaque = control.Modulate;
-        opaque.A = 1f;
-        control.Modulate = opaque;
-        control.Scale = Vector2.One;
+        SetAlpha(control, 1f);
         control.Visible = visible;
     }
 
-    private void FinishTransition(Section target, Control outgoing, Control outgoingFooter)
+    private static void SetAlpha(Control control, float alpha)
     {
-        IsTransitioning = false;
-        tween = null;
-
-        Control incoming = ContainerFor(target);
-        Control incomingFooter = FooterFor(target);
-
-        if (outgoing != null && outgoing != incoming)
-        {
-            RestoreControl(outgoing, false);
-        }
-        if (outgoingFooter != null && outgoingFooter != incomingFooter)
-        {
-            RestoreControl(outgoingFooter, false);
-        }
-
-        RestoreControl(incoming, true);
-        RestoreControl(incomingFooter, true);
-
-        GrabFocusFor(target);
+        Color tint = control.Modulate;
+        tint.A = alpha;
+        control.Modulate = tint;
     }
 
     private void GrabFocusFor(Section target)
     {
+        if (target != CurrentSection) return;
+
         if (target == Section.Settings)
         {
             mainScene.SettingsHandler.FocusFirstSettingsEntry();

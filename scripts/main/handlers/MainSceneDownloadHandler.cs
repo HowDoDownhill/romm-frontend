@@ -15,10 +15,7 @@ public class MainSceneDownloadHandler
 
     public void SetupDownloadsList()
     {
-        if (mainScene.downloadsListContainer != null)
-        {
-            mainScene.downloadsListContainer.Visible = false;
-        }
+        mainScene.downloadsListContainer?.Close(false);
     }
 
     public void SwapLists()

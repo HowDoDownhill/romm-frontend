@@ -65,7 +65,7 @@ public partial class UiPanel : Control
         }
     }
 
-    public void Open()
+    public void Open(bool animate = true)
     {
         if (State == PanelState.Open || State == PanelState.Opening) return;
 
@@ -76,7 +76,7 @@ public partial class UiPanel : Control
 
         Control scaleTarget = ScaleTarget;
 
-        if (Transition == PanelTransition.None)
+        if (!animate || Transition == PanelTransition.None)
         {
             SetModulateAlpha(1.0f);
             scaleTarget.Scale = Vector2.One;
@@ -104,7 +104,7 @@ public partial class UiPanel : Control
         activeTween.Chain().TweenCallback(Callable.From(FinishOpen));
     }
 
-    public void Close()
+    public void Close(bool animate = true)
     {
         if (State == PanelState.Closed || State == PanelState.Closing) return;
 
@@ -114,7 +114,7 @@ public partial class UiPanel : Control
 
         Control scaleTarget = ScaleTarget;
 
-        if (Transition == PanelTransition.None)
+        if (!animate || Transition == PanelTransition.None)
         {
             FinishClose();
             return;
