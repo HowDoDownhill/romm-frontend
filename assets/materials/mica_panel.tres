@@ -6,3 +6,4 @@
 shader = ExtResource("1_mica")
 shader_parameter/blur_radius = 150.0
 shader_parameter/mix_color = Color(0, 0, 0, 0.4)
+shader_parameter/luminosity_floor = 0.14

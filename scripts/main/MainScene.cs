@@ -64,6 +64,9 @@ public partial class MainScene : Control
     [Export] public Button acceptUpdateBtn;
     [Export] public Button cancelUpdateBtn;
 
+    [ExportGroup("Panel Frost")]
+    [Export(PropertyHint.Range, "0,1,0.01")] public float panelLuminosityFloor = 0.14f;
+
     [ExportGroup("Panel Shadow")]
     [Export(PropertyHint.Range, "0,120,1")] public int panelShadowSize = MicaShadow.DefaultSize;
     [Export] public Color panelShadowColor = MicaShadow.DefaultColor;
@@ -251,6 +254,7 @@ public partial class MainScene : Control
                 Color tint = GetDarkestColor(colors.Bg, colors.Primary, colors.Secondary);
                 tint.A = colors.Panel.A;
                 panelMaterial.SetShaderParameter("mix_color", tint);
+                panelMaterial.SetShaderParameter("luminosity_floor", panelLuminosityFloor);
             }
 
             systemJumpPopup?.ApplyTheme(colors.Secondary);

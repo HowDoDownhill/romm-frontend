@@ -7,6 +7,11 @@ uniform sampler2D screen_texture : hint_screen_texture, repeat_disable, filter_l
 // Blur radius in screen pixels. Larger = only broad color survives, no shape.
 uniform float blur_radius : hint_range(0.0, 150.0) = 45.0;
 uniform vec4 mix_color : source_color = vec4(0.0, 0.0, 0.0, 0.4);
+// Minimum luminance the finished panel is allowed to sit at. Both the blurred backdrop and the
+// theme tint are dark, so over dark content the panel collapses toward black and text on it stops
+// reading. Lifting to a floor (rather than adding a flat brightness) leaves panels over bright
+// content untouched, which is the same job Acrylic's luminosity layer does.
+uniform float luminosity_floor : hint_range(0.0, 1.0) = 0.0;
 // NOTE: panel edge treatment is NOT drawn here. Anything reconstructed from UV derivatives ends up
 // ~1px asymmetric (top/left vs bottom/right) because of sub-pixel rasterization, and this shader
 // forces alpha to 1.0 so a stylebox shadow drawn by the panel itself would render as an opaque
@@ -50,5 +55,11 @@ void fragment() {
     // through via normal alpha blending and visually cancels the frost — the panel must be opaque
     // so the only thing seen is the blurred screen + tint.
     vec3 frosted = mix(blurred.rgb, mix_color.rgb, mix_color.a);
+
+    // Applied after the tint so the floor is a guarantee about the final panel, not an input the
+    // tint can undo.
+    float lum = dot(frosted, vec3(0.2126, 0.7152, 0.0722));
+    frosted += max(0.0, luminosity_floor - lum);
+
     COLOR = vec4(frosted, 1.0);
 }
