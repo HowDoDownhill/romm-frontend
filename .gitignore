@@ -44,8 +44,6 @@ releases/*
 /assets/covers_2d/
 /assets/covers_3d/
 /assets/marquees/
-/docs/
-docs/
 
 roms/
 bios/
@@ -70,6 +68,5 @@ assets/screenshots/
 # AI Agent and Context Files
 .cursorrules
 .windsurfrules
-docs/
 CLAUDE.md
 AGENTS.md
