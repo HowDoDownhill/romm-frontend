@@ -24,10 +24,19 @@ public class MainScenePopupHandler
         var system = mainScene.GameListHandler.gameSystems[mainScene.GameListHandler.currentGameSystemIndex];
         string mappedEmulator = appInstance.emulatorManager.GetMappedEmulator(system.Slug);
 
-        if (!string.IsNullOrEmpty(mappedEmulator))
+        if (string.IsNullOrEmpty(mappedEmulator))
         {
-            appInstance.emulatorManager.LaunchEmulatorWithoutGame(mappedEmulator, system);
+            return;
         }
+
+        if (!appInstance.emulatorManager.IsEmulatorInstalled(mappedEmulator))
+        {
+            mainScene.startMenuPanel?.Close();
+            mainScene.OpenReleasePicker(mappedEmulator);
+            return;
+        }
+
+        appInstance.emulatorManager.LaunchEmulatorWithoutGame(mappedEmulator, system);
 
         mainScene.startMenuPanel?.Close();
 
@@ -51,8 +60,31 @@ public class MainScenePopupHandler
         bool isInstalled = !string.IsNullOrEmpty(mappedEmulator) && appInstance.emulatorManager.IsEmulatorInstalled(mappedEmulator);
         bool isInstalling = !string.IsNullOrEmpty(mappedEmulator) && appInstance.emulatorManager.IsEmulatorInstalling(mappedEmulator);
 
+        Button launchBtn = mainScene.startMenuPanel?.launchEmulatorButton;
         Button updateBtn = mainScene.startMenuPanel?.updateEmulatorButton;
         Button uninstallBtn = mainScene.startMenuPanel?.uninstallEmulatorButton;
+
+        if (launchBtn != null)
+        {
+            string emulatorDisplayName = string.IsNullOrEmpty(mappedEmulator) ? null : appInstance.emulatorManager.GetEmulatorDisplayName(mappedEmulator);
+
+            launchBtn.Disabled = string.IsNullOrEmpty(mappedEmulator) || isInstalling;
+
+            if (isInstalling)
+            {
+                launchBtn.Text = $"Installing {emulatorDisplayName}...";
+            }
+
+            else if (string.IsNullOrEmpty(mappedEmulator))
+            {
+                launchBtn.Text = "No Emulator For This System";
+            }
+
+            else
+            {
+                launchBtn.Text = isInstalled ? $"Launch {emulatorDisplayName}" : $"Install {emulatorDisplayName}";
+            }
+        }
 
         if (updateBtn != null)
         {

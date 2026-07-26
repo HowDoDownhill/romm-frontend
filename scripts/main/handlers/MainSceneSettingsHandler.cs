@@ -6,6 +6,7 @@ public class MainSceneSettingsHandler
 {
     private MainScene mainScene;
     private AppInstance appInstance;
+    private static readonly char[] GodotReservedNodeNameCharacters = new[] { '/', ':', '@', '"', '%', '.', '$' };
     private static readonly PackedScene settingsListEntryScene = GD.Load<PackedScene>("res://scenes/settings_list/settings_list_entry.tscn");
     private static readonly PackedScene settingsSectionNavEntryScene = GD.Load<PackedScene>("res://scenes/settings_list/settings_section_nav_entry.tscn");
 
@@ -463,7 +464,7 @@ public class MainSceneSettingsHandler
     private void GeneratePlatformSettingsForm(GameSystem system)
     {
         if (mainScene.sectionOptionsContainer == null) return;
-        string nodeName = system.Name.Replace(" ", "");
+        string nodeName = BuildSectionNodeName(system.Name);
         if (mainScene.sectionOptionsContainer.HasNode(nodeName)) return;
 
         MarginContainer formContainer = new MarginContainer();
@@ -535,7 +536,7 @@ public class MainSceneSettingsHandler
             emulatorOptionButton.Select(selectedIdx);
             if (allEmulators.ContainsKey(currentPref))
             {
-                GenerateEmulatorSettingsUI(currentPref, allEmulators[currentPref], emulatorSettingsContainer);
+                GenerateEmulatorSettingsUI(currentPref, allEmulators[currentPref], emulatorSettingsContainer, system.Slug);
                 mainScene.InputHandler.GeneratePlatformControllerMappingsUI(system.Slug, allEmulators[currentPref], controllerMappingsContainer);
             }
 
@@ -545,24 +546,41 @@ public class MainSceneSettingsHandler
                 appInstance.configManager.SavePreferredEmulator(system.Slug, selectedSlug);
                 if (allEmulators.ContainsKey(selectedSlug))
                 {
-                    GenerateEmulatorSettingsUI(selectedSlug, allEmulators[selectedSlug], emulatorSettingsContainer);
+                    GenerateEmulatorSettingsUI(selectedSlug, allEmulators[selectedSlug], emulatorSettingsContainer, system.Slug);
                     mainScene.InputHandler.GeneratePlatformControllerMappingsUI(system.Slug, allEmulators[selectedSlug], controllerMappingsContainer);
                 }
             };
         }
     }
 
-    private void GenerateEmulatorSettingsUI(string slug, EmulatorMeta meta, Control parentContainer)
+    private void GenerateEmulatorSettingsUI(string slug, EmulatorMeta meta, Control parentContainer, string systemSlug = null)
     {
         foreach (Node child in parentContainer.GetChildren())
         {
             child.QueueFree();
         }
 
-        if (meta.SettingsFields == null) return;
+        var selectableCores = meta.GetSelectableCores(systemSlug);
+        var emulatorsHoldingSaves = systemSlug == null
+            ? new List<string>()
+            : appInstance.emulatorManager.GetEmulatorsHoldingSavesForSystem(systemSlug, slug);
+
+        if (meta.SettingsFields == null && selectableCores.Count == 0 && emulatorsHoldingSaves.Count == 0) return;
 
         VBoxContainer vbox = new VBoxContainer();
         parentContainer.AddChild(vbox);
+
+        if (emulatorsHoldingSaves.Count > 0)
+        {
+            AddSavesStayWithOtherEmulatorWarning(vbox, meta.Name, emulatorsHoldingSaves);
+        }
+
+        if (selectableCores.Count > 0)
+        {
+            AddCoreSelector(vbox, meta, systemSlug, selectableCores);
+        }
+
+        if (meta.SettingsFields == null) return;
 
         var userSettings = appInstance.emulatorManager.LoadEmulatorSettings(slug);
 
@@ -628,6 +646,72 @@ public class MainSceneSettingsHandler
         }
     }
 
+    private void AddSavesStayWithOtherEmulatorWarning(VBoxContainer vbox, string selectedEmulatorDisplayName, List<string> emulatorsHoldingSaves)
+    {
+        Label warningLabel = new Label();
+        warningLabel.Text = $"{string.Join(" and ", emulatorsHoldingSaves)} already has saves for this system. "
+            + $"{selectedEmulatorDisplayName} keeps its own saves, so those will not carry over.";
+        warningLabel.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        warningLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        warningLabel.AddThemeColorOverride("font_color", new Color(1f, 0.78f, 0.35f, 1f));
+
+        var warningEntry = settingsListEntryScene.Instantiate<SettingsListEntry>();
+        warningEntry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(warningLabel);
+        vbox.AddChild(warningEntry);
+    }
+
+    private void AddCoreSelector(VBoxContainer vbox, EmulatorMeta meta, string systemSlug, List<string> selectableCores)
+    {
+        HBoxContainer coreBox = new HBoxContainer();
+        Label coreLabel = new Label();
+        coreLabel.Text = "Core";
+        coreLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        coreBox.AddChild(coreLabel);
+
+        CarouselButton coreOptionButton = new CarouselButton();
+        string selectedCore = appInstance.emulatorManager.ResolveSelectedCore(meta, systemSlug);
+        int selectedCoreIndex = 0;
+
+        for (int coreIndex = 0; coreIndex < selectableCores.Count; coreIndex++)
+        {
+            coreOptionButton.AddItem(selectableCores[coreIndex], coreIndex);
+            coreOptionButton.SetItemMetadata(coreIndex, selectableCores[coreIndex]);
+
+            if (selectableCores[coreIndex] == selectedCore)
+            {
+                selectedCoreIndex = coreIndex;
+            }
+        }
+
+        coreOptionButton.Select(selectedCoreIndex);
+
+        coreOptionButton.ItemSelected += (long index) =>
+        {
+            appInstance.configManager.SavePreferredCore(systemSlug, coreOptionButton.GetItemMetadata((int)index).AsString());
+        };
+
+        coreBox.AddChild(coreOptionButton);
+
+        var coreEntry = settingsListEntryScene.Instantiate<SettingsListEntry>();
+        coreEntry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(coreBox);
+        vbox.AddChild(coreEntry);
+    }
+
+    private static string BuildSectionNodeName(string sectionName)
+    {
+        var nodeNameBuilder = new System.Text.StringBuilder();
+
+        foreach (char sectionNameCharacter in sectionName ?? "")
+        {
+            if (!char.IsWhiteSpace(sectionNameCharacter) && Array.IndexOf(GodotReservedNodeNameCharacters, sectionNameCharacter) < 0)
+            {
+                nodeNameBuilder.Append(sectionNameCharacter);
+            }
+        }
+
+        return nodeNameBuilder.Length == 0 ? "Section" : nodeNameBuilder.ToString();
+    }
+
     private void OnSettingsTreeItemSelected(string sectionName)
     {
         if (mainScene.settingsSectionsTree == null || mainScene.sectionOptionsContainer == null)
@@ -643,7 +727,7 @@ public class MainSceneSettingsHandler
             }
         }
 
-        string nodeName = sectionName.Replace(" ", "");
+        string nodeName = BuildSectionNodeName(sectionName);
         var activePanel = mainScene.sectionOptionsContainer.GetNodeOrNull<Control>(nodeName);
 
         if (activePanel != null)

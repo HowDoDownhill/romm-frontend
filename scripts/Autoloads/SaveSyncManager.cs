@@ -42,18 +42,34 @@ public partial class SaveSyncManager : Node
         }
 
         var clientSaves = new List<ClientSaveState>();
+        var emulatorScopedServerSaveIds = new HashSet<int>();
         var serverSavesJson = await appInstance.rommApi.GetSavesAsync(game.Id);
-        
+        string mappedEmulatorName = GetMappedEmulatorForGame(game);
+        var emulatorMetadata = GetEmulatorMetadataForGame(game);
+
         if (serverSavesJson.ValueKind == JsonValueKind.Array)
         {
             foreach (var serverSave in serverSavesJson.EnumerateArray())
             {
+                if (!ServerSaveBelongsToEmulator(serverSave, mappedEmulatorName))
+                {
+                    continue;
+                }
+
+                if (serverSave.TryGetProperty("file_name", out var syncFilterNameProp)
+                    && !ShouldSyncSavedFile(emulatorMetadata, syncFilterNameProp.GetString()))
+                {
+                    continue;
+                }
+
                 if (serverSave.TryGetProperty("file_name", out var fileNameProp) &&
                     serverSave.TryGetProperty("id", out var serverSaveIdProp))
                 {
                     string fileName = fileNameProp.GetString();
                     int serverSaveId = serverSaveIdProp.GetInt32();
-                    
+                    emulatorScopedServerSaveIds.Add(serverSaveId);
+
+
                     bool fileExistsLocally = false;
                     long fileSizeBytes = 0;
                     DateTime updatedAt = DateTime.MinValue;
@@ -136,6 +152,18 @@ public partial class SaveSyncManager : Node
             {
                 if (op.Action == "download" && op.ServerSaveId.HasValue)
                 {
+                    if (!emulatorScopedServerSaveIds.Contains(op.ServerSaveId.Value))
+                    {
+                        GD.Print($"Skipping save {op.FileName} for {game.Name}: it belongs to another emulator.");
+                        continue;
+                    }
+
+                    if (!ShouldSyncSavedFile(emulatorMetadata, op.FileName))
+                    {
+                        GD.Print($"Skipping {op.FileName} for {game.Name}: it is not save data.");
+                        continue;
+                    }
+
                     string downloadUrl = appInstance.rommApi.GetSaveDownloadUrl(op.ServerSaveId.Value, op.FileName);
                     string tempDownloadPath = Path.Combine(savesDirs[0], "temp_op_" + op.FileName);
                     
@@ -211,6 +239,8 @@ public partial class SaveSyncManager : Node
         }
 
         int opsCompleted = 0;
+        string mappedEmulatorName = GetMappedEmulatorForGame(game);
+        var emulatorMetadata = GetEmulatorMetadataForGame(game);
 
         var modifiedTopLevelItemsPerDir = new Dictionary<string, HashSet<string>>();
 
@@ -261,6 +291,11 @@ public partial class SaveSyncManager : Node
 
             foreach (string topLevelItem in kvp.Value)
             {
+                if (!ShouldSyncSavedFile(emulatorMetadata, topLevelItem))
+                {
+                    continue;
+                }
+
                 string itemFullPath = Path.Combine(savesDir, topLevelItem);
 
                 if (System.IO.Directory.Exists(itemFullPath))
@@ -276,7 +311,7 @@ public partial class SaveSyncManager : Node
                     ZipFile.CreateFromDirectory(itemFullPath, tempZipPath);
                     
                     GD.Print($"Uploading zipped folder save for {game.Name}: {zipFileName}");
-                    bool success = await appInstance.rommApi.UploadSaveAsync(game.Id, tempZipPath);
+                    bool success = await appInstance.rommApi.UploadSaveAsync(game.Id, tempZipPath, mappedEmulatorName);
 
                     if (success)
                     {
@@ -289,7 +324,7 @@ public partial class SaveSyncManager : Node
                 else if (System.IO.File.Exists(itemFullPath))
                 {
                     GD.Print($"Uploading modified save for {game.Name}: {topLevelItem}");
-                    bool success = await appInstance.rommApi.UploadSaveAsync(game.Id, itemFullPath);
+                    bool success = await appInstance.rommApi.UploadSaveAsync(game.Id, itemFullPath, mappedEmulatorName);
 
                     if (success)
                     {
@@ -330,6 +365,103 @@ public partial class SaveSyncManager : Node
         preLaunchSnapshot = null;
     }
 
+    private EmulatorMeta GetEmulatorMetadataForGame(Game game)
+    {
+        string mappedEmulatorName = GetMappedEmulatorForGame(game);
+        return string.IsNullOrEmpty(mappedEmulatorName) ? null : appInstance.emulatorManager.LoadEmulatorMetadataFromDisk(mappedEmulatorName);
+    }
+
+    private static string ResolveSaveItemName(string savedFileName)
+    {
+        return savedFileName != null && savedFileName.EndsWith(".folder.zip")
+            ? savedFileName.Substring(0, savedFileName.Length - ".folder.zip".Length)
+            : savedFileName;
+    }
+
+    private static bool ShouldSyncSavedFile(EmulatorMeta emulatorMetadata, string savedFileName)
+    {
+        return emulatorMetadata == null || emulatorMetadata.ShouldSyncSaveItem(ResolveSaveItemName(savedFileName));
+    }
+
+    private string GetMappedEmulatorForGame(Game game)
+    {
+        return game?.System == null ? null : appInstance.emulatorManager.GetMappedEmulator(game.System.Slug);
+    }
+
+    private static bool ServerSaveBelongsToEmulator(JsonElement serverSave, string emulatorSlug)
+    {
+        if (!serverSave.TryGetProperty("emulator", out var emulatorProperty) || emulatorProperty.ValueKind != JsonValueKind.String)
+        {
+            return true;
+        }
+
+        return string.Equals(emulatorProperty.GetString(), emulatorSlug, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string[] ResolveSyncScopedSavesDirs(EmulatorMeta emulatorMetadata, string platformSlug)
+    {
+        var syncSavePatterns = emulatorMetadata?.GetSyncSavePatterns(platformSlug);
+
+        if (syncSavePatterns == null || syncSavePatterns.Count == 0)
+        {
+            return null;
+        }
+
+        string currentOperatingSystem = OS.GetName().ToLower();
+
+        if (emulatorMetadata.EmulatorDirName == null || !emulatorMetadata.EmulatorDirName.ContainsKey(currentOperatingSystem))
+        {
+            return null;
+        }
+
+        string emulatorInstallDirectory = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorMetadata.EmulatorDirName[currentOperatingSystem]);
+        var matchedSavesDirs = new List<string>();
+
+        foreach (string syncSavePattern in syncSavePatterns)
+        {
+            matchedSavesDirs.AddRange(ExpandDirectoryPattern(emulatorInstallDirectory, syncSavePattern.Replace("{system_slug}", platformSlug)));
+        }
+
+        return matchedSavesDirs.ToArray();
+    }
+
+    private static List<string> ExpandDirectoryPattern(string rootDirectory, string relativePattern)
+    {
+        var matchedDirectories = new List<string> { rootDirectory };
+
+        foreach (string patternSegment in relativePattern.Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            var nextMatchedDirectories = new List<string>();
+
+            foreach (string currentDirectory in matchedDirectories)
+            {
+                if (!System.IO.Directory.Exists(currentDirectory))
+                {
+                    continue;
+                }
+
+                if (patternSegment.Contains('*') || patternSegment.Contains('?'))
+                {
+                    nextMatchedDirectories.AddRange(System.IO.Directory.GetDirectories(currentDirectory, patternSegment));
+                }
+
+                else
+                {
+                    string childDirectory = Path.Combine(currentDirectory, patternSegment);
+
+                    if (System.IO.Directory.Exists(childDirectory))
+                    {
+                        nextMatchedDirectories.Add(childDirectory);
+                    }
+                }
+            }
+
+            matchedDirectories = nextMatchedDirectories;
+        }
+
+        return matchedDirectories;
+    }
+
     private string[] GetSavesDirsForGame(Game game)
     {
         string platformSlug = game.System.Slug;
@@ -340,6 +472,13 @@ public partial class SaveSyncManager : Node
         if (!string.IsNullOrEmpty(mappedEmulatorName))
         {
             var emulatorMetadata = appInstance.emulatorManager.LoadEmulatorMetadataFromDisk(mappedEmulatorName);
+
+            string[] syncScopedSavesDirs = ResolveSyncScopedSavesDirs(emulatorMetadata, platformSlug);
+
+            if (syncScopedSavesDirs != null)
+            {
+                return syncScopedSavesDirs;
+            }
 
             if (emulatorMetadata != null && emulatorMetadata.RelativeSavePath != null)
             {

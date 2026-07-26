@@ -406,7 +406,8 @@ public partial class RomMAPI : Node
 
             else
             {
-                GD.PrintErr($"NegotiateSyncAsync failed: {response.StatusCode}");
+                string errorBody = await response.Content.ReadAsStringAsync();
+                GD.PrintErr($"NegotiateSyncAsync failed: {response.StatusCode} - {errorBody}");
             }
         }
 
@@ -431,7 +432,8 @@ public partial class RomMAPI : Node
                 return true;
             }
 
-            GD.PrintErr($"CompleteSyncAsync failed: {response.StatusCode}");
+            string errorBody = await response.Content.ReadAsStringAsync();
+            GD.PrintErr($"CompleteSyncAsync failed: {response.StatusCode} for session {sessionId} - sent {json} - got {errorBody}");
         }
 
         catch (Exception ex)
@@ -442,7 +444,7 @@ public partial class RomMAPI : Node
         return false;
     }
 
-    public async Task<bool> UploadSaveAsync(int romId, string filePath)
+    public async Task<bool> UploadSaveAsync(int romId, string filePath, string emulatorSlug = null)
     {
         try
         {
@@ -453,7 +455,8 @@ public partial class RomMAPI : Node
             fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("application/octet-stream");
             formData.Add(fileContent, "saveFile", System.IO.Path.GetFileName(filePath));
 
-            var response = await httpClient.PostAsync($"{apiHostUrl}/api/saves?rom_id={romId}", formData);
+            string emulatorQuery = string.IsNullOrEmpty(emulatorSlug) ? "" : $"&emulator={Uri.EscapeDataString(emulatorSlug)}";
+            var response = await httpClient.PostAsync($"{apiHostUrl}/api/saves?rom_id={romId}{emulatorQuery}", formData);
 
             if (response.IsSuccessStatusCode)
             {

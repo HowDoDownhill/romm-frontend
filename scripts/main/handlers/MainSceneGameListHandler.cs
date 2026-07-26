@@ -1174,19 +1174,24 @@ public partial class MainSceneGameListHandler
         {
             string mappedEmulator = appInstance.emulatorManager.GetMappedEmulator(game.PlatformSlug);
 
-            if (appInstance.emulatorManager.IsEmulatorInstalled(mappedEmulator))
+            if (appInstance.emulatorManager.IsEmulatorInstalling(mappedEmulator))
             {
-                mainScene.actionBtn.Text = "Play";
+                mainScene.actionBtn.Text = $"Installing {appInstance.emulatorManager.GetEmulatorDisplayName(mappedEmulator)}...";
+                mainScene.actionBtn.Disabled = true;
+            }
+            else if (!appInstance.emulatorManager.IsEmulatorInstalled(mappedEmulator))
+            {
+                mainScene.actionBtn.Text = $"Install {appInstance.emulatorManager.GetEmulatorDisplayName(mappedEmulator)}";
                 mainScene.actionBtn.Disabled = false;
             }
-            else if (appInstance.emulatorManager.IsEmulatorInstalling(mappedEmulator))
+            else if (!appInstance.emulatorManager.IsSelectedCoreInstalled(mappedEmulator, game.PlatformSlug))
             {
-                mainScene.actionBtn.Text = "Installing Emulator...";
-                mainScene.actionBtn.Disabled = true;
+                mainScene.actionBtn.Text = "Install Core";
+                mainScene.actionBtn.Disabled = false;
             }
             else
             {
-                mainScene.actionBtn.Text = "Install Emulator";
+                mainScene.actionBtn.Text = "Play";
                 mainScene.actionBtn.Disabled = false;
             }
         }

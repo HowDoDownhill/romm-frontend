@@ -9,6 +9,7 @@ public partial class ConfigManager : Node
     public string RomsPath { get; private set; }
     public string BiosPath { get; private set; }
     public string EmulatorsPath { get; private set; }
+    public string SavesPath { get; private set; }
     public string DownloadsPath { get; private set; }
     public string InstallScriptsPath { get; private set; }
     public string ToolsPath { get; private set; }
@@ -170,6 +171,8 @@ public partial class ConfigManager : Node
 
     public System.Collections.Generic.Dictionary<string, string> PreferredEmulators { get; private set; } = new System.Collections.Generic.Dictionary<string, string>();
 
+    public System.Collections.Generic.Dictionary<string, string> PreferredCores { get; private set; } = new System.Collections.Generic.Dictionary<string, string>();
+
     public System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<int, System.Collections.Generic.Dictionary<string, string>>> PlatformInputMappings { get; private set; } = new System.Collections.Generic.Dictionary<string, System.Collections.Generic.Dictionary<int, System.Collections.Generic.Dictionary<string, string>>>();
 
     private AppInstance appInstance;
@@ -179,10 +182,27 @@ public partial class ConfigManager : Node
         "roms",
         "bios",
         "emulators",
+        "saves",
         "downloads",
         "install_scripts",
         "tools",
         "assets",
+        "assets/covers_3d",
+        "assets/covers_2d",
+        "assets/marquees",
+        "assets/covers_fallback",
+        "assets/screenshots"
+    };
+
+    private static readonly string[] subdirectoriesHoldingNonProjectFiles = new string[]
+    {
+        "roms",
+        "bios",
+        "emulators",
+        "saves",
+        "downloads",
+        "install_scripts",
+        "tools",
         "assets/covers_3d",
         "assets/covers_2d",
         "assets/marquees",
@@ -229,6 +249,16 @@ public partial class ConfigManager : Node
                 DirAccess.MakeDirAbsolute(fullDirectoryPath);
             }
         }
+
+        foreach (string subdirectoryRelativePath in subdirectoriesHoldingNonProjectFiles)
+        {
+            string godotIgnoreFilePath = ApplicationRootDirectory + "/" + subdirectoryRelativePath + "/.gdignore";
+
+            if (!FileAccess.FileExists(godotIgnoreFilePath))
+            {
+                using var godotIgnoreFile = FileAccess.Open(godotIgnoreFilePath, FileAccess.ModeFlags.Write);
+            }
+        }
     }
 
     private string DeriveDefaultPath(string subdirectory) => $"{ApplicationRootDirectory}/{subdirectory}/";
@@ -257,6 +287,7 @@ public partial class ConfigManager : Node
         RomsPath = ResolveRelocatablePath("RomsPath", "roms");
         BiosPath = ResolveRelocatablePath("BiosPath", "bios");
         EmulatorsPath = ResolveRelocatablePath("EmulatorsPath", "emulators");
+        SavesPath = ResolveRelocatablePath("SavesPath", "saves");
     }
 
     private void WriteRelocatablePathValue(string key, string currentValue, string subdirectory)
@@ -301,6 +332,14 @@ public partial class ConfigManager : Node
             foreach (string key in configurationFile.GetSectionKeys("PreferredEmulators"))
             {
                 PreferredEmulators[key] = (string)configurationFile.GetValue("PreferredEmulators", key);
+            }
+        }
+
+        if (configurationFile.HasSection("PreferredCores"))
+        {
+            foreach (string key in configurationFile.GetSectionKeys("PreferredCores"))
+            {
+                PreferredCores[key] = (string)configurationFile.GetValue("PreferredCores", key);
             }
         }
 
@@ -356,6 +395,7 @@ public partial class ConfigManager : Node
         WriteRelocatablePathValue("RomsPath", RomsPath, "roms");
         WriteRelocatablePathValue("BiosPath", BiosPath, "bios");
         WriteRelocatablePathValue("EmulatorsPath", EmulatorsPath, "emulators");
+        WriteRelocatablePathValue("SavesPath", SavesPath, "saves");
         foreach (string deprecatedPathKey in new[] { "DownloadsPath", "InstallScriptsPath", "ToolsPath", "AssetsPath" })
         {
             if (configurationFile.HasSectionKey("Paths", deprecatedPathKey))
@@ -380,6 +420,14 @@ public partial class ConfigManager : Node
             foreach (var kvp in PreferredEmulators)
             {
                 configurationFile.SetValue("PreferredEmulators", kvp.Key, kvp.Value);
+            }
+        }
+
+        if (PreferredCores != null)
+        {
+            foreach (var kvp in PreferredCores)
+            {
+                configurationFile.SetValue("PreferredCores", kvp.Key, kvp.Value);
             }
         }
 
@@ -484,6 +532,12 @@ public partial class ConfigManager : Node
     public void SavePreferredEmulator(string systemSlug, string emulatorSlug)
     {
         PreferredEmulators[systemSlug] = emulatorSlug;
+        SaveConfig();
+    }
+
+    public void SavePreferredCore(string systemSlug, string coreName)
+    {
+        PreferredCores[systemSlug] = coreName;
         SaveConfig();
     }
 

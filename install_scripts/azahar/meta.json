@@ -17,6 +17,9 @@
       "user/nand"
     ]
   },
+  "sync_save_path": {
+    "new-nintendo-3ds": "user/sdmc/Nintendo 3DS/*/*/title/00040000"
+  },
   "preserve_on_reinstall": [
     "user/config/qt-config.ini"
   ],

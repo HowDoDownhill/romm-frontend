@@ -134,7 +134,124 @@ public static class UniversalInstaller
             }
         }
 
+        if (!await DownloadExtraFiles(appInstance, emulatorName, installRecipe, emulatorTargetDirectory))
+        {
+            return false;
+        }
+
         CopyDefaultConfigurations(appInstance, emulatorName, emulatorTargetDirectory);
+        SaveStore.LinkEmulatorSaveDirectories(appInstance, emulatorName, emulatorMetadata, currentOperatingSystem, null);
+
+        return true;
+    }
+
+    public static async Task<bool> EnsureCoreInstalled(AppInstance appInstance, string emulatorName, EmulatorMeta emulatorMetadata, string coreName, string currentOperatingSystem)
+    {
+        string coreRelativePath = emulatorMetadata.ResolveCoreRelativePath(coreName, currentOperatingSystem);
+
+        if (coreRelativePath == null)
+        {
+            return true;
+        }
+
+        string emulatorInstallDirectory = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorMetadata.EmulatorDirName[currentOperatingSystem]);
+        string coreFilePath = Path.GetFullPath(Path.Combine(emulatorInstallDirectory, coreRelativePath.Replace('/', Path.DirectorySeparatorChar)));
+
+        if (File.Exists(coreFilePath))
+        {
+            return true;
+        }
+
+        string coreDownloadUrl = emulatorMetadata.ResolveCoreDownloadUrl(coreName, currentOperatingSystem);
+
+        if (string.IsNullOrEmpty(coreDownloadUrl))
+        {
+            GD.PrintErr($"No core download URL for {coreName} on {currentOperatingSystem}.");
+            return false;
+        }
+
+        string coreDirectoryPath = Path.GetDirectoryName(coreFilePath);
+        Directory.CreateDirectory(coreDirectoryPath);
+
+        string temporaryArchiveFilePath = Path.Combine(appInstance.configManager.DownloadsPath, $"{emulatorName}core.archive");
+        GD.Print($"Downloading the {coreName} core for {emulatorName}...");
+
+        if (!await DownloadFileAsync(coreDownloadUrl, temporaryArchiveFilePath))
+        {
+            GD.PrintErr($"Failed to download the {coreName} core from {coreDownloadUrl}.");
+            return false;
+        }
+
+        bool extractionSucceeded = await ExtractArchiveAsync(appInstance, temporaryArchiveFilePath, coreDirectoryPath);
+        try { File.Delete(temporaryArchiveFilePath); } catch { }
+
+        if (!extractionSucceeded || !File.Exists(coreFilePath))
+        {
+            GD.PrintErr($"The {coreName} core did not extract to {coreFilePath}.");
+            return false;
+        }
+
+        GD.Print($"Installed the {coreName} core for {emulatorName}.");
+        return true;
+    }
+
+    private static async Task<bool> DownloadExtraFiles(AppInstance appInstance, string emulatorName, InstallRecipe installRecipe, string emulatorTargetDirectory)
+    {
+        if (installRecipe.ExtraDownloads == null || installRecipe.ExtraDownloads.Count == 0)
+        {
+            return true;
+        }
+
+        for (int extraDownloadIndex = 0; extraDownloadIndex < installRecipe.ExtraDownloads.Count; extraDownloadIndex++)
+        {
+            var extraDownload = installRecipe.ExtraDownloads[extraDownloadIndex];
+
+            if (string.IsNullOrWhiteSpace(extraDownload.Url))
+            {
+                continue;
+            }
+
+            string destinationDirectory = string.IsNullOrWhiteSpace(extraDownload.Destination)
+                ? emulatorTargetDirectory
+                : Path.Combine(emulatorTargetDirectory, extraDownload.Destination.Replace('/', Path.DirectorySeparatorChar));
+
+            Directory.CreateDirectory(destinationDirectory);
+
+            string downloadedFileName = extraDownload.Url.Split('/').LastOrDefault();
+            string temporaryFilePath = Path.Combine(appInstance.configManager.DownloadsPath, $"{emulatorName}extra{extraDownloadIndex}.archive");
+
+            if (!await DownloadFileAsync(extraDownload.Url, temporaryFilePath))
+            {
+                GD.PrintErr($"Failed to download {extraDownload.Url} for {emulatorName}.");
+                return false;
+            }
+
+            if (extraDownload.Extract)
+            {
+                bool extractionSucceeded = await ExtractArchiveAsync(appInstance, temporaryFilePath, destinationDirectory);
+                File.Delete(temporaryFilePath);
+
+                if (!extractionSucceeded)
+                {
+                    GD.PrintErr($"Failed to extract {downloadedFileName} for {emulatorName}.");
+                    return false;
+                }
+            }
+
+            else
+            {
+                string destinationFilePath = Path.Combine(destinationDirectory, downloadedFileName);
+
+                if (File.Exists(destinationFilePath))
+                {
+                    File.Delete(destinationFilePath);
+                }
+
+                File.Move(temporaryFilePath, destinationFilePath);
+            }
+
+            GD.Print($"Installed extra download {downloadedFileName} for {emulatorName}.");
+        }
 
         return true;
     }
@@ -278,6 +395,41 @@ public static class UniversalInstaller
         return releaseOptions;
     }
 
+    private static List<long> SplitVersionSegments(string versionLabel)
+    {
+        var versionSegments = new List<long>();
+
+        foreach (Match numberMatch in Regex.Matches(versionLabel ?? "", @"\d+"))
+        {
+            if (long.TryParse(numberMatch.Value, out long segmentValue))
+            {
+                versionSegments.Add(segmentValue);
+            }
+        }
+
+        return versionSegments;
+    }
+
+    private static int CompareVersionLabelsDescending(string firstVersionLabel, string secondVersionLabel)
+    {
+        var firstSegments = SplitVersionSegments(firstVersionLabel);
+        var secondSegments = SplitVersionSegments(secondVersionLabel);
+        int segmentCount = Math.Max(firstSegments.Count, secondSegments.Count);
+
+        for (int segmentIndex = 0; segmentIndex < segmentCount; segmentIndex++)
+        {
+            long firstSegment = segmentIndex < firstSegments.Count ? firstSegments[segmentIndex] : 0;
+            long secondSegment = segmentIndex < secondSegments.Count ? secondSegments[segmentIndex] : 0;
+
+            if (firstSegment != secondSegment)
+            {
+                return secondSegment.CompareTo(firstSegment);
+            }
+        }
+
+        return string.Compare(secondVersionLabel, firstVersionLabel, StringComparison.OrdinalIgnoreCase);
+    }
+
     private static async Task<List<ReleaseOption>> ListScrapedReleases(InstallRecipe installRecipe)
     {
         var releaseOptions = new List<ReleaseOption>();
@@ -309,6 +461,8 @@ public static class UniversalInstaller
                         DownloadUrl = downloadUrl
                     });
                 }
+
+                releaseOptions.Sort((firstOption, secondOption) => CompareVersionLabelsDescending(firstOption.VersionLabel, secondOption.VersionLabel));
             }
 
             else if (!string.IsNullOrEmpty(installRecipe.LinkRegex))
@@ -511,6 +665,12 @@ public static class UniversalInstaller
                 continue;
             }
 
+            if (SaveStore.IsDirectoryLink(subdirectoryPath))
+            {
+                try { Directory.Delete(subdirectoryPath); } catch (Exception exception) { GD.PrintErr($"Failed to delete link {subdirectoryPath}: {exception.Message}"); }
+                continue;
+            }
+
             if (ancestorsOfPreservedPaths.Contains(fullSubdirectoryPath))
             {
                 ClearDirectoryPreservingPaths(subdirectoryPath, relativePathsToPreserve
@@ -522,7 +682,7 @@ public static class UniversalInstaller
                 continue;
             }
 
-            try { Directory.Delete(subdirectoryPath, true); } catch (Exception exception) { GD.PrintErr($"Failed to delete {subdirectoryPath}: {exception.Message}"); }
+            try { SaveStore.DeleteDirectoryTreeWithoutFollowingLinks(subdirectoryPath); } catch (Exception exception) { GD.PrintErr($"Failed to delete {subdirectoryPath}: {exception.Message}"); }
         }
     }
 
@@ -533,14 +693,19 @@ public static class UniversalInstaller
             Directory.CreateDirectory(targetDirectory);
         }
 
-        foreach (string directoryPath in Directory.GetDirectories(sourceDirectory, "*", SearchOption.AllDirectories))
+        foreach (string filePath in Directory.GetFiles(sourceDirectory))
         {
-            Directory.CreateDirectory(directoryPath.Replace(sourceDirectory, targetDirectory));
+            File.Copy(filePath, Path.Combine(targetDirectory, Path.GetFileName(filePath)), true);
         }
 
-        foreach (string filePath in Directory.GetFiles(sourceDirectory, "*.*", SearchOption.AllDirectories))
+        foreach (string subdirectoryPath in Directory.GetDirectories(sourceDirectory))
         {
-            File.Copy(filePath, filePath.Replace(sourceDirectory, targetDirectory), true);
+            if (SaveStore.IsDirectoryLink(subdirectoryPath))
+            {
+                continue;
+            }
+
+            CopyDirectoryRecursively(subdirectoryPath, Path.Combine(targetDirectory, new DirectoryInfo(subdirectoryPath).Name));
         }
     }
 }
