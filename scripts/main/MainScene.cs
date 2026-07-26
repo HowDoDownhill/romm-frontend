@@ -811,6 +811,8 @@ public partial class MainScene : Control
 
     public override void _Process(double delta)
     {
+        GameListHandler?.ProcessPendingDetailsRefresh();
+        GameListHandler?.ProcessPendingScreenshotLoads();
         GameListHandler?.ProcessPendingImageLoads();
 
         ulong currentTime = Time.GetTicksMsec();

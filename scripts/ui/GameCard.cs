@@ -69,6 +69,12 @@ public partial class GameCard : Control, ICarouselItem
         Body.Modulate = modulate;
     }
 
+    public void ResetReveal()
+    {
+        revealed = false;
+        SetBodyAlpha(0.0f);
+    }
+
     private bool revealed;
     private Tween revealTween;
 
