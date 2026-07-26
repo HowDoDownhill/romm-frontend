@@ -52,11 +52,18 @@ Directories are created on startup if missing.
 | `RomsPath` | `roms/` | downloaded ROMs |
 | `BiosPath` | `bios/` | firmware and BIOS files |
 | `EmulatorsPath` | `emulators/` | installed emulators |
+| `SavesPath` | `saves/` | central save store, one subdirectory per emulator |
 | `DownloadsPath` | `downloads/` | in-progress downloads |
 | `InstallScriptsPath` | `install_scripts/` | emulator recipes |
 | `ToolsPath` | `tools/` | bundled tools (7-Zip) |
 | `AssetsPath` | `assets/` | cached boxart and screenshots |
-| `SavesPath` | `saves/` | save-sync staging |
+
+Only `RomsPath`, `BiosPath`, `EmulatorsPath`, and `SavesPath` are relocatable; the rest are always
+resolved relative to the application root.
+
+Each emulator's save directory is replaced with a link into `SavesPath`, so save data physically
+lives in the store rather than inside the emulator's install directory and survives reinstalling or
+uninstalling the emulator. See `docs/DESIGN-NOTES.md` for the details.
 
 ### `[RomM]`
 
