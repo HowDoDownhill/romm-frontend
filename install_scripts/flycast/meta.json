@@ -20,6 +20,10 @@
   "relative_save_path": {
     "dc": "data"
   },
+  "sync_include": [
+    "*vmu_save*.bin",
+    "dc_nvmem.bin"
+  ],
   "launch_env": {
     "linux": {
       "XDG_CONFIG_HOME": "{emulator_dir}/config",

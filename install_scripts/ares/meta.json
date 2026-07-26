@@ -18,7 +18,11 @@
     "macos": "bios"
   },
   "relative_save_path": {
-    "default": "saves"
+    "nes": "saves/Famicom",
+    "genesis": "saves/Mega Drive",
+    "segacd": "saves/Mega CD",
+    "sms": "saves/Master System",
+    "sega32": "saves/Mega 32X"
   },
   "preserve_on_reinstall": [
     "settings.bml"

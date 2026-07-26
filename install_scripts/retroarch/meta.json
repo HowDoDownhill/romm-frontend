@@ -1,0 +1,214 @@
+{
+  "name": "RetroArch",
+  "executable_name": {
+    "windows": "retroarch.exe",
+    "linux": "retroarch"
+  },
+  "emulator_dir_name": {
+    "windows": "retroarch",
+    "linux": "retroarch",
+    "macos": "retroarch"
+  },
+  "emulator_bios_path": {
+    "windows": "system",
+    "linux": "system",
+    "macos": "system"
+  },
+  "relative_save_path": {
+    "default": "saves"
+  },
+  "preserve_on_reinstall": [
+    "retroarch.cfg",
+    "cores",
+    "states",
+    "system"
+  ],
+  "install_recipe": {
+    "windows": {
+      "type": "web_scrape",
+      "list_url": "https://buildbot.libretro.com/stable/",
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)/",
+      "url_template": "https://buildbot.libretro.com/stable/{version}/windows/x86_64/RetroArch.7z",
+      "extract": true,
+      "extract_folder_regex": "RetroArch-*"
+    },
+    "linux": {
+      "type": "web_scrape",
+      "list_url": "https://buildbot.libretro.com/stable/",
+      "version_regex": "(\\d+\\.\\d+\\.\\d+)/",
+      "url_template": "https://buildbot.libretro.com/stable/{version}/linux/x86_64/RetroArch.7z",
+      "extract": true,
+      "extract_folder_regex": "RetroArch-*"
+    }
+  },
+  "launch_args_with_game": "--config retroarch.cfg {system} {settings} \"{rom_path}\"",
+  "launch_args_without_game": "--config retroarch.cfg",
+  "settings_fields": [
+    {
+      "id": "fullscreen",
+      "label": "Start in Fullscreen",
+      "type": "boolean",
+      "default_value_bool": true,
+      "launch_arg_true": "-f",
+      "launch_arg_false": ""
+    }
+  ],
+  "core_launch_arg": "-L \"{core_path}\"",
+  "system_cores": {
+    "nes": [
+      "mesen",
+      "nestopia"
+    ],
+    "snes": [
+      "snes9x",
+      "bsnes_mercury_balanced",
+      "mesen-s"
+    ],
+    "gb": [
+      "gambatte",
+      "sameboy",
+      "mgba"
+    ],
+    "gbc": [
+      "gambatte",
+      "sameboy",
+      "mgba"
+    ],
+    "gba": [
+      "mgba",
+      "vbam"
+    ],
+    "genesis": [
+      "genesis_plus_gx",
+      "picodrive"
+    ],
+    "sms": [
+      "genesis_plus_gx",
+      "picodrive"
+    ],
+    "segacd": [
+      "genesis_plus_gx",
+      "picodrive"
+    ],
+    "sega32": [
+      "picodrive"
+    ],
+    "nds": [
+      "melonds",
+      "melondsds"
+    ],
+    "psx": [
+      "swanstation",
+      "mednafen_psx_hw"
+    ],
+    "psp": [
+      "ppsspp"
+    ],
+    "n64": [
+      "mupen64plus_next",
+      "parallel_n64"
+    ],
+    "dc": [
+      "flycast"
+    ],
+    "saturn": [
+      "mednafen_saturn",
+      "kronos",
+      "yabasanshiro"
+    ],
+    "game-gear": [
+      "genesis_plus_gx"
+    ],
+    "sg-1000": [
+      "genesis_plus_gx"
+    ],
+    "pce": [
+      "mednafen_pce",
+      "mednafen_pce_fast"
+    ],
+    "pcfx": [
+      "mednafen_pcfx"
+    ],
+    "neogeoaes": [
+      "fbneo"
+    ],
+    "neogeomvs": [
+      "fbneo"
+    ],
+    "arcade": [
+      "fbneo",
+      "mame2003_plus"
+    ],
+    "neo-geo-pocket": [
+      "mednafen_ngp"
+    ],
+    "neo-geo-pocket-color": [
+      "mednafen_ngp"
+    ],
+    "atari2600": [
+      "stella"
+    ],
+    "atari5200": [
+      "atari800"
+    ],
+    "atari7800": [
+      "prosystem"
+    ],
+    "lynx": [
+      "mednafen_lynx",
+      "handy"
+    ],
+    "jaguar": [
+      "virtualjaguar"
+    ],
+    "wonderswan": [
+      "mednafen_wswan"
+    ],
+    "wonderswan-color": [
+      "mednafen_wswan"
+    ],
+    "virtual-boy": [
+      "mednafen_vb"
+    ],
+    "3do": [
+      "opera"
+    ],
+    "colecovision": [
+      "gearcoleco",
+      "bluemsx"
+    ],
+    "intellivision": [
+      "freeintv"
+    ],
+    "msx": [
+      "bluemsx",
+      "fmsx"
+    ],
+    "msx2": [
+      "bluemsx",
+      "fmsx"
+    ],
+    "c64": [
+      "vice_x64"
+    ],
+    "amiga": [
+      "puae"
+    ],
+    "vectrex": [
+      "vecx"
+    ],
+    "nintendo-dsi": [
+      "melonds",
+      "melondsds"
+    ]
+  },
+  "core_directory": "cores",
+  "core_file_name": {
+    "windows": "{core}_libretro.dll",
+    "linux": "{core}_libretro.so"
+  },
+  "core_download_url": {
+    "windows": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/{core}_libretro.dll.zip",
+    "linux": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/{core}_libretro.so.zip"
+  }
+}

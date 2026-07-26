@@ -465,6 +465,47 @@ public class EmulatorMeta
     [JsonPropertyName("preserve_on_reinstall")]
     public List<string> PreserveOnReinstall { get; set; }
 
+    [JsonPropertyName("sync_include")]
+    public List<string> SyncInclude { get; set; }
+
+    [JsonPropertyName("sync_save_path")]
+    public Dictionary<string, JsonElement> SyncSavePath { get; set; }
+
+    public List<string> GetSyncSavePatterns(string systemSlug)
+    {
+        var syncSavePatterns = new List<string>();
+
+        if (SyncSavePath == null)
+        {
+            return syncSavePatterns;
+        }
+
+        if (!SyncSavePath.TryGetValue(systemSlug ?? "", out JsonElement syncSavePathElement)
+            && !SyncSavePath.TryGetValue("default", out syncSavePathElement))
+        {
+            return syncSavePatterns;
+        }
+
+        if (syncSavePathElement.ValueKind == JsonValueKind.String)
+        {
+            syncSavePatterns.Add(syncSavePathElement.GetString());
+        }
+
+        else if (syncSavePathElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var syncSavePathArrayElement in syncSavePathElement.EnumerateArray())
+            {
+                if (syncSavePathArrayElement.ValueKind == JsonValueKind.String)
+                {
+                    syncSavePatterns.Add(syncSavePathArrayElement.GetString());
+                }
+            }
+        }
+
+        return syncSavePatterns;
+    }
+
+
     [JsonPropertyName("launch_args_with_game")]
     public string LaunchArgsWithGame { get; set; }
 
@@ -475,7 +516,96 @@ public class EmulatorMeta
     public Dictionary<string, Dictionary<string, string>> LaunchEnv { get; set; }
 
     [JsonPropertyName("system_flags")]
-    public Dictionary<string, string> SystemFlags { get; set; }
+    public Dictionary<string, JsonElement> SystemFlags { get; set; }
+
+    [JsonPropertyName("system_cores")]
+    public Dictionary<string, List<string>> SystemCores { get; set; }
+
+    [JsonPropertyName("core_launch_arg")]
+    public string CoreLaunchArg { get; set; }
+
+    [JsonPropertyName("core_directory")]
+    public string CoreDirectory { get; set; }
+
+    [JsonPropertyName("core_file_name")]
+    public JsonElement CoreFileName { get; set; }
+
+    [JsonPropertyName("core_download_url")]
+    public JsonElement CoreDownloadUrl { get; set; }
+
+    public string ResolveSaveDirectoryForSystem(string systemSlug)
+    {
+        if (RelativeSavePath == null)
+        {
+            return null;
+        }
+
+        if (!RelativeSavePath.TryGetValue(systemSlug ?? "", out JsonElement savePathElement)
+            && !RelativeSavePath.TryGetValue("default", out savePathElement))
+        {
+            return null;
+        }
+
+        if (savePathElement.ValueKind == JsonValueKind.String)
+        {
+            return savePathElement.GetString();
+        }
+
+        foreach (var savePathArrayElement in savePathElement.EnumerateArray())
+        {
+            if (savePathArrayElement.ValueKind == JsonValueKind.String)
+            {
+                return savePathArrayElement.GetString();
+            }
+        }
+
+        return null;
+    }
+
+    public List<string> GetSelectableCores(string systemSlug)
+    {
+        if (SystemCores != null && !string.IsNullOrEmpty(systemSlug) && SystemCores.TryGetValue(systemSlug, out var selectableCores))
+        {
+            return selectableCores;
+        }
+
+        return new List<string>();
+    }
+
+    public string ResolveCoreRelativePath(string coreName, string operatingSystem)
+    {
+        string coreFileNameTemplate = EmulatorSettingField.ResolveOsScopedValue(CoreFileName, operatingSystem);
+
+        if (string.IsNullOrEmpty(coreFileNameTemplate) || string.IsNullOrEmpty(coreName))
+        {
+            return null;
+        }
+
+        string coreFileName = coreFileNameTemplate.Replace("{core}", coreName);
+
+        return string.IsNullOrEmpty(CoreDirectory) ? coreFileName : CoreDirectory + "/" + coreFileName;
+    }
+
+    public string ResolveCoreDownloadUrl(string coreName, string operatingSystem)
+    {
+        string coreDownloadUrlTemplate = EmulatorSettingField.ResolveOsScopedValue(CoreDownloadUrl, operatingSystem);
+
+        if (string.IsNullOrEmpty(coreDownloadUrlTemplate) || string.IsNullOrEmpty(coreName))
+        {
+            return null;
+        }
+
+        return coreDownloadUrlTemplate.Replace("{core}", coreName);
+    }
+
+    public string ResolveCoreLaunchArgument(string coreName, string operatingSystem)
+    {
+        string coreRelativePath = ResolveCoreRelativePath(coreName, operatingSystem);
+
+        return string.IsNullOrEmpty(CoreLaunchArg) || coreRelativePath == null
+            ? null
+            : CoreLaunchArg.Replace("{core_path}", coreRelativePath);
+    }
 
     [JsonPropertyName("install_recipe")]
     public Dictionary<string, InstallRecipe> InstallRecipe { get; set; }
@@ -515,6 +645,26 @@ public class EmulatorMeta
         }
 
         return savePaths;
+    }
+
+    public bool ShouldSyncSaveItem(string saveItemName)
+    {
+        if (SyncInclude == null)
+        {
+            return true;
+        }
+
+        foreach (string includePattern in SyncInclude)
+        {
+            string escapedPattern = "^" + System.Text.RegularExpressions.Regex.Escape(includePattern).Replace("\\*", ".*").Replace("\\?", ".") + "$";
+
+            if (System.Text.RegularExpressions.Regex.IsMatch(saveItemName ?? "", escapedPattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public List<string> GetPreservePaths()
@@ -580,7 +730,7 @@ public class EmulatorSettingField
 
     public string ResolveConfigKey(string operatingSystem) => ResolveOsScopedValue(ConfigKey, operatingSystem);
 
-    private static string ResolveOsScopedValue(JsonElement fieldValue, string operatingSystem)
+    public static string ResolveOsScopedValue(JsonElement fieldValue, string operatingSystem)
     {
         if (fieldValue.ValueKind == JsonValueKind.String)
         {
@@ -632,6 +782,21 @@ public class InstallRecipe
 
     [JsonPropertyName("tag_regex")]
     public string TagRegex { get; set; }
+
+    [JsonPropertyName("extra_downloads")]
+    public List<ExtraDownload> ExtraDownloads { get; set; }
+}
+
+public class ExtraDownload
+{
+    [JsonPropertyName("url")]
+    public string Url { get; set; }
+
+    [JsonPropertyName("destination")]
+    public string Destination { get; set; }
+
+    [JsonPropertyName("extract")]
+    public bool Extract { get; set; } = true;
 }
 
 public class ReleaseOption
@@ -733,6 +898,29 @@ public partial class EmulatorManager : Node
 
         InitializeFilePaths();
         LoadOrGenerateEmulatorMap();
+        LinkInstalledEmulatorSaveDirectoriesIntoStore();
+    }
+
+    private void LinkInstalledEmulatorSaveDirectoriesIntoStore()
+    {
+        if (!Directory.Exists(appInstance.configManager.InstallScriptsPath))
+        {
+            return;
+        }
+
+        string currentOperatingSystem = OS.GetName().ToLower();
+
+        foreach (string recipeDirectoryPath in Directory.GetDirectories(appInstance.configManager.InstallScriptsPath))
+        {
+            string emulatorName = new DirectoryInfo(recipeDirectoryPath).Name;
+
+            if (!IsEmulatorInstalled(emulatorName))
+            {
+                continue;
+            }
+
+            SaveStore.LinkEmulatorSaveDirectories(appInstance, emulatorName, LoadEmulatorMetadataFromDisk(emulatorName), currentOperatingSystem, null);
+        }
     }
 
     public override void _Process(double delta)
@@ -804,6 +992,18 @@ public partial class EmulatorManager : Node
             {
                 systemToEmulatorMap[defaultMapping.Key] = defaultMapping.Value;
                 addedSystemSlugs.Add(defaultMapping.Key);
+                continue;
+            }
+
+            var mappedEmulators = systemToEmulatorMap[defaultMapping.Key];
+
+            foreach (string defaultEmulatorName in defaultMapping.Value)
+            {
+                if (!mappedEmulators.Contains(defaultEmulatorName))
+                {
+                    mappedEmulators.Add(defaultEmulatorName);
+                    addedSystemSlugs.Add($"{defaultMapping.Key}:{defaultEmulatorName}");
+                }
             }
         }
 
@@ -1113,6 +1313,63 @@ public partial class EmulatorManager : Node
         return fullExecutablePath != null && System.IO.File.Exists(fullExecutablePath);
     }
 
+    public List<string> GetEmulatorsHoldingSavesForSystem(string systemSlug, string excludedEmulatorName)
+    {
+        var emulatorsHoldingSaves = new List<string>();
+
+        foreach (string candidateEmulatorName in GetSupportedEmulators(systemSlug))
+        {
+            if (candidateEmulatorName == excludedEmulatorName)
+            {
+                continue;
+            }
+
+            string relativeSaveDirectory = LoadEmulatorMetadataFromDisk(candidateEmulatorName)?.ResolveSaveDirectoryForSystem(systemSlug);
+
+            if (string.IsNullOrEmpty(relativeSaveDirectory))
+            {
+                continue;
+            }
+
+            string saveDirectory = Path.Combine(appInstance.configManager.SavesPath, candidateEmulatorName, relativeSaveDirectory.Replace('/', Path.DirectorySeparatorChar));
+
+            if (Directory.Exists(saveDirectory) && Directory.EnumerateFiles(saveDirectory, "*", SearchOption.AllDirectories).Any())
+            {
+                emulatorsHoldingSaves.Add(GetEmulatorDisplayName(candidateEmulatorName));
+            }
+        }
+
+        return emulatorsHoldingSaves;
+    }
+
+    public string GetEmulatorDisplayName(string emulatorName)
+    {
+        return LoadEmulatorMetadataFromDisk(emulatorName)?.Name ?? emulatorName;
+    }
+
+    public bool IsSelectedCoreInstalled(string emulatorName, string systemSlug)
+    {
+        var emulatorMetadata = LoadEmulatorMetadataFromDisk(emulatorName);
+        string selectedCore = ResolveSelectedCore(emulatorMetadata, systemSlug);
+
+        if (selectedCore == null)
+        {
+            return true;
+        }
+
+        string currentOperatingSystem = OS.GetName().ToLower();
+        string coreRelativePath = emulatorMetadata.ResolveCoreRelativePath(selectedCore, currentOperatingSystem);
+
+        if (coreRelativePath == null || emulatorMetadata.EmulatorDirName == null || !emulatorMetadata.EmulatorDirName.ContainsKey(currentOperatingSystem))
+        {
+            return true;
+        }
+
+        string emulatorInstallDirectory = Path.Combine(appInstance.configManager.EmulatorsPath, emulatorMetadata.EmulatorDirName[currentOperatingSystem]);
+
+        return System.IO.File.Exists(Path.Combine(emulatorInstallDirectory, coreRelativePath.Replace('/', Path.DirectorySeparatorChar)));
+    }
+
     public async Task<List<ReleaseOption>> GetAvailableReleases(string emulatorName)
     {
         var emulatorMetadata = LoadEmulatorMetadataFromDisk(emulatorName);
@@ -1188,6 +1445,13 @@ public partial class EmulatorManager : Node
         if (emulatorMetadata == null)
         {
             GD.PrintErr($"Emulator recipe not found for: {emulatorName}");
+            EmitSignal(SignalName.EmulatorInstallationCompleted, emulatorName, false);
+            return;
+        }
+
+        if (IsEmulatorRunning)
+        {
+            GD.PrintErr($"Cannot install {emulatorName} while an emulator is running. Close it and try again.");
             EmitSignal(SignalName.EmulatorInstallationCompleted, emulatorName, false);
             return;
         }
@@ -1308,6 +1572,23 @@ public partial class EmulatorManager : Node
         return launchArguments + " " + settingsArguments;
     }
 
+    public string ResolveSelectedCore(EmulatorMeta emulatorMetadata, string systemSlug)
+    {
+        var selectableCores = emulatorMetadata?.GetSelectableCores(systemSlug);
+
+        if (selectableCores == null || selectableCores.Count == 0)
+        {
+            return null;
+        }
+
+        if (appInstance.configManager.PreferredCores.TryGetValue(systemSlug, out string preferredCore) && selectableCores.Contains(preferredCore))
+        {
+            return preferredCore;
+        }
+
+        return selectableCores[0];
+    }
+
     private string ResolveSystemPlaceholder(string launchArguments, EmulatorMeta emulatorMetadata, string systemSlug)
     {
         if (launchArguments == null || !launchArguments.Contains("{system}"))
@@ -1315,12 +1596,13 @@ public partial class EmulatorManager : Node
             return launchArguments;
         }
 
-        string systemFragment = "";
+        string currentOperatingSystem = OS.GetName().ToLower();
+        string systemFragment = emulatorMetadata.ResolveCoreLaunchArgument(ResolveSelectedCore(emulatorMetadata, systemSlug), currentOperatingSystem) ?? "";
 
-        if (emulatorMetadata.SystemFlags != null && !string.IsNullOrEmpty(systemSlug)
-            && emulatorMetadata.SystemFlags.TryGetValue(systemSlug, out string mappedFragment))
+        if (string.IsNullOrEmpty(systemFragment) && emulatorMetadata.SystemFlags != null && !string.IsNullOrEmpty(systemSlug)
+            && emulatorMetadata.SystemFlags.TryGetValue(systemSlug, out JsonElement mappedFragment))
         {
-            systemFragment = mappedFragment;
+            systemFragment = EmulatorSettingField.ResolveOsScopedValue(mappedFragment, currentOperatingSystem) ?? "";
         }
 
         if (string.IsNullOrEmpty(systemFragment))
@@ -1505,6 +1787,16 @@ public partial class EmulatorManager : Node
                 return;
             }
 
+            SaveStore.LinkEmulatorSaveDirectories(appInstance, mappedEmulatorName, emulatorMetadata, currentOperatingSystem, game.System.Slug);
+
+            string selectedCore = ResolveSelectedCore(emulatorMetadata, game.System.Slug);
+
+            if (selectedCore != null && !await UniversalInstaller.EnsureCoreInstalled(appInstance, mappedEmulatorName, emulatorMetadata, selectedCore, currentOperatingSystem))
+            {
+                GD.PrintErr($"Cannot launch {game.Name}: the {selectedCore} core is not installed and could not be downloaded.");
+                return;
+            }
+
             if (game.Files == null || game.Files.Count == 0)
             {
                 GD.PrintErr("Game has no files.");
@@ -1669,6 +1961,8 @@ public partial class EmulatorManager : Node
                 return;
             }
 
+            SaveStore.LinkEmulatorSaveDirectories(appInstance, emulatorName, emulatorMetadata, currentOperatingSystem, currentGameSystem?.Slug);
+
             string launchArguments = emulatorMetadata.LaunchArgsWithoutGame;
             launchArguments = ResolveSystemPlaceholder(launchArguments, emulatorMetadata, currentGameSystem?.Slug);
 
@@ -1706,24 +2000,51 @@ public partial class EmulatorManager : Node
         {
             {"ngc", new List<string>{"dolphin"}},
             {"wii", new List<string>{"dolphin"}},
-            {"snes", new List<string>{"snes9x"}},
-            {"n64", new List<string>{"gopher64"}},
-            {"nes", new List<string>{"ares"}},
-            {"gb", new List<string>{"mGBA"}},
-            {"gbc", new List<string>{"mGBA"}},
-            {"gba", new List<string>{"mGBA"}},
-            {"nds", new List<string>{"melonDS"}},
+            {"snes", new List<string>{"retroarch", "snes9x"}},
+            {"n64", new List<string>{"retroarch", "gopher64"}},
+            {"nes", new List<string>{"retroarch", "ares"}},
+            {"gb", new List<string>{"retroarch", "mGBA"}},
+            {"gbc", new List<string>{"retroarch", "mGBA"}},
+            {"gba", new List<string>{"retroarch", "mGBA"}},
+            {"nds", new List<string>{"retroarch", "melonDS"}},
             {"new-nintendo-3ds", new List<string>{"azahar"}},
-            {"psx", new List<string>{"duckstation"}},
+            {"psx", new List<string>{"retroarch", "duckstation"}},
             {"ps2", new List<string>{"pcsx2"}},
             {"ps3", new List<string>{"rpcs3"}},
             {"ps4", new List<string>{"shadPS4"}},
-            {"psp", new List<string>{"ppsspp"}},
-            {"sega32", new List<string>{"ares"}},
-            {"segacd", new List<string>{"ares"}},
-            {"sms", new List<string>{"ares"}},
-            {"genesis", new List<string>{"ares"}},
-            {"dc", new List<string>{"flycast"}}
+            {"psp", new List<string>{"ppsspp", "retroarch"}},
+            {"sega32", new List<string>{"retroarch", "ares"}},
+            {"segacd", new List<string>{"retroarch", "ares"}},
+            {"sms", new List<string>{"retroarch", "ares"}},
+            {"genesis", new List<string>{"retroarch", "ares"}},
+            {"dc", new List<string>{"flycast", "retroarch"}},
+            {"saturn", new List<string>{"retroarch"}},
+            {"game-gear", new List<string>{"retroarch"}},
+            {"sg-1000", new List<string>{"retroarch"}},
+            {"pce", new List<string>{"retroarch"}},
+            {"pcfx", new List<string>{"retroarch"}},
+            {"neogeoaes", new List<string>{"retroarch"}},
+            {"neogeomvs", new List<string>{"retroarch"}},
+            {"arcade", new List<string>{"retroarch"}},
+            {"neo-geo-pocket", new List<string>{"retroarch"}},
+            {"neo-geo-pocket-color", new List<string>{"retroarch"}},
+            {"atari2600", new List<string>{"retroarch"}},
+            {"atari5200", new List<string>{"retroarch"}},
+            {"atari7800", new List<string>{"retroarch"}},
+            {"lynx", new List<string>{"retroarch"}},
+            {"jaguar", new List<string>{"retroarch"}},
+            {"wonderswan", new List<string>{"retroarch"}},
+            {"wonderswan-color", new List<string>{"retroarch"}},
+            {"virtual-boy", new List<string>{"retroarch"}},
+            {"3do", new List<string>{"retroarch"}},
+            {"colecovision", new List<string>{"retroarch"}},
+            {"intellivision", new List<string>{"retroarch"}},
+            {"msx", new List<string>{"retroarch"}},
+            {"msx2", new List<string>{"retroarch"}},
+            {"c64", new List<string>{"retroarch"}},
+            {"amiga", new List<string>{"retroarch"}},
+            {"vectrex", new List<string>{"retroarch"}},
+            {"nintendo-dsi", new List<string>{"retroarch"}}
         };
     }
 
