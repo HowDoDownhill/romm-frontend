@@ -10,7 +10,7 @@ using System.Linq;
 
 public partial class AppUpdater : Node
 {
-    public const string CurrentVersion = "v1.0.11";
+    public const string CurrentVersion = "v1.0.13";
     private const string RepoOwner = "HowDoDownhill";
     private const string RepoName = "romm-frontend";
 
