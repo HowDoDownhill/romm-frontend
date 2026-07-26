@@ -1490,6 +1490,13 @@ public partial class EmulatorManager : Node
         }
     }
 
+    public static bool IsUsableFirmwarePath(string firmwarePath)
+    {
+        return !string.IsNullOrEmpty(firmwarePath)
+            && Path.IsPathRooted(firmwarePath)
+            && System.IO.File.Exists(firmwarePath);
+    }
+
     private string ResolveFirmwarePath(GameSystem gameSystem)
     {
         if (gameSystem == null)
@@ -1497,7 +1504,7 @@ public partial class EmulatorManager : Node
             return null;
         }
 
-        if (!string.IsNullOrEmpty(gameSystem.PrefferedFirmware))
+        if (IsUsableFirmwarePath(gameSystem.PrefferedFirmware))
         {
             return Path.GetFullPath(gameSystem.PrefferedFirmware);
         }

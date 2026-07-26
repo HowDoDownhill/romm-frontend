@@ -258,7 +258,7 @@ public partial class LoadingScreen : Control
 
                 system.AvailableFirmwares = availableFirmwares;
 
-                if (string.IsNullOrEmpty(system.PrefferedFirmware) && system.AvailableFirmwares.Any())
+                if (!EmulatorManager.IsUsableFirmwarePath(system.PrefferedFirmware) && system.AvailableFirmwares.Any())
                 {
                     system.PrefferedFirmware = system.AvailableFirmwares.First().FullPath;
                 }

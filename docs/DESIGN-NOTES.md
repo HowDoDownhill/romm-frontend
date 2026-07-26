@@ -24,6 +24,25 @@ a dedicated updater — notably ares' `settings.bml`, which is indentation-based
 corrupted by INI-style writes. The extension exclusion list keeps this correct regardless of
 ordering, but the ordering is still load-bearing and there are two lists that must agree.
 
+### A cached firmware path must be re-validated, not just null-checked
+`GameSystem.PrefferedFirmware` is an absolute path, and `GameSystem` is serialized into
+`systems.cache` next to the executable. The scan that fills it in only ran when the field was
+**empty**, so a stored path was kept forever even once it pointed nowhere.
+
+That breaks in two ways. Move the app to another drive or folder and firmware silently resolves to
+the old location. Worse, carry the cache to another platform: a Windows value like
+`E:/Projects/romm-frontend/bios/nes/disksys.rom` is **not rooted on Linux** — `:` has no meaning
+there — so `Path.GetFullPath` resolves it against the working directory and yields
+`<app dir>/E:/Projects/romm-frontend/bios/nes/disksys.rom`. Measured under WSL. A literal `E:`
+directory then appears beside the executable and accumulates a duplicate of the whole tree; one
+release build had grown a 316 MB copy of `bios` that way.
+
+`IsUsableFirmwarePath` requires the path to be non-empty, rooted **and** to exist, and both the
+consumer (`ResolveFirmwarePath`) and the producer (the firmware scan on the loading screen) go
+through it, so a stale value is re-derived instead of followed. This mirrors how
+`ResolveRelocatablePath` already treats stored directory overrides: honour them only if they still
+exist, otherwise fall back to the derived default.
+
 ### Executable resolution falls back to regex
 Emulator executables resolve by literal `executable_name` first, then by a per-OS
 `executable_regex`. The fallback exists for version-stamped release filenames (AppImages in
