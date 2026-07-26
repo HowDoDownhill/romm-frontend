@@ -441,7 +441,7 @@ public partial class MainScene : Control
 
         string emulatorName = appInstance.emulatorManager.GetMappedEmulator(GameListHandler.currentlySelectedGame.PlatformSlug);
 
-        if (actionBtn.Text == "Install Emulator")
+        if (!appInstance.emulatorManager.IsEmulatorInstalled(emulatorName))
         {
             actionBtn.Disabled = true;
             OpenReleasePicker(emulatorName);
