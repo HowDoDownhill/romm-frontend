@@ -37,6 +37,16 @@ public partial class MainSceneGameListHandler
     {
         InvalidateCachedAssetTextures(gameId);
 
+        if ((assetType == "box3d" || assetType == "box2d") && cardByGameId.TryGetValue(gameId, out GameCard card))
+        {
+            cardsWithLoadedCover.Remove(card);
+
+            if (card.Visible)
+            {
+                RequestImageLoad(card);
+            }
+        }
+
         if (currentlySelectedGame == null || currentlySelectedGame.Id != gameId)
         {
             return;
@@ -349,7 +359,6 @@ public partial class MainSceneGameListHandler
 
     private const double ImageLoadBudgetMs = 4.0;
     private readonly List<GameCard> pendingImageLoads = new List<GameCard>();
-    private readonly Dictionary<GameCard, Action> imageLoaders = new Dictionary<GameCard, Action>();
 
     private void RequestImageLoad(GameCard entry)
     {
@@ -378,10 +387,7 @@ public partial class MainSceneGameListHandler
                 break;
             }
 
-            if (imageLoaders.TryGetValue(entry, out Action load))
-            {
-                load();
-            }
+            LoadCoverForCard(entry);
 
             if (frameBudget.Elapsed.TotalMilliseconds >= ImageLoadBudgetMs)
             {
@@ -423,125 +429,16 @@ public partial class MainSceneGameListHandler
         appInstance.assetManager.ClearPendingAssetDownloads();
 
         pendingImageLoads.Clear();
-        imageLoaders.Clear();
 
-        foreach (Node child in mainScene.gameList.GetChildren())
+        currentSystemControllerIcon = ResolveSystemControllerIcon();
+
+        EnsureGameCardPoolSize(currentlyShownGames.Count);
+
+        cardByGameId.Clear();
+
+        for (int i = 0; i < currentlyShownGames.Count && i < pooledGameCards.Count; i++)
         {
-            mainScene.gameList.RemoveChild(child);
-            child.QueueFree();
-        }
-
-        Texture2D systemControllerIcon = null;
-
-        if (currentGameSystemIndex >= 0 && currentGameSystemIndex < gameSystems.Count)
-        {
-            var system = gameSystems[currentGameSystemIndex];
-            string searchSlug = !string.IsNullOrEmpty(system.IgdbSlug) ? system.IgdbSlug : system.Slug;
-            if (!string.IsNullOrEmpty(searchSlug))
-            {
-                systemControllerIcon = FindPlatformIcon(searchSlug, "res://assets/platforms/", new[] { ".svg", ".png" });
-            }
-        }
-
-        for (int i = 0; i < currentlyShownGames.Count; i++)
-        {
-            var game = currentlyShownGames[i];
-
-            if (mainScene.gameListEntryScene == null)
-            {
-                continue;
-            }
-
-            GameCard entry = mainScene.gameListEntryScene.Instantiate<GameCard>();
-            entry.FocusMode = Control.FocusModeEnum.All;
-            entry.Title = game.Name;
-            entry.SetCover(mainScene.placeholderTexture, true);
-
-            bool textureLoaded = false;
-
-            void TryLoadImage()
-            {
-                if (textureLoaded) return;
-
-                string assetsPath = appInstance.configManager.AssetsPath;
-                string path3d = System.IO.Path.Combine(assetsPath, "covers_3d", $"{game.Id}.png");
-                string path2d = System.IO.Path.Combine(assetsPath, "covers_2d", $"{game.Id}.png");
-
-                ImageTexture loadedTex = SafeLoadTexture(path2d) ?? SafeLoadTexture(path3d);
-
-                if (loadedTex == null)
-                {
-                    foreach (var ext in new[] { ".png", ".jpg", ".webp" })
-                    {
-                        string p = System.IO.Path.Combine(assetsPath, "covers_fallback", $"{game.Id}{ext}");
-                        if (Godot.FileAccess.FileExists(p))
-                        {
-                            loadedTex = SafeLoadTexture(p);
-                            break;
-                        }
-                    }
-                }
-
-                if (loadedTex != null)
-                {
-                    entry.SetCover(loadedTex, false);
-                    textureLoaded = true;
-                }
-                else
-                {
-                    appInstance.assetManager.RequestGameAssets(game);
-                }
-
-                entry.SetInstalledIcon(CheckIfGameIsDownloaded(game) ? systemControllerIcon : null);
-
-                entry.Reveal();
-
-                if (textureLoaded && mainScene.gameList.HasMethod("UpdateLayout"))
-                {
-                    bool isAnimating = (bool)mainScene.gameList.Get("IsAnimating");
-                    if (!isAnimating)
-                    {
-                        mainScene.gameList.CallDeferred("UpdateLayout", false);
-                    }
-                }
-            }
-
-            void TryUnloadImage()
-            {
-                appInstance.assetManager.CancelGameAssets(game.Id);
-
-                if (!textureLoaded) return;
-                entry.SetCover(mainScene.placeholderTexture, true);
-                textureLoaded = false;
-            }
-
-            entry.Visible = false;
-            imageLoaders[entry] = TryLoadImage;
-            entry.VisibilityChanged += () =>
-            {
-                if (entry.Visible) RequestImageLoad(entry);
-                else TryUnloadImage();
-            };
-
-            AssetManager.AssetDownloadedEventHandler onAssetDownloaded = null;
-            onAssetDownloaded = (downloadedGameId, assetType) =>
-            {
-                if (downloadedGameId == game.Id && (assetType == "box3d" || assetType == "box2d"))
-                {
-                    textureLoaded = false;
-                    if (entry.Visible) RequestImageLoad(entry);
-                }
-            };
-            appInstance.assetManager.AssetDownloaded += onAssetDownloaded;
-
-            entry.TreeExiting += () =>
-            {
-                appInstance.assetManager.AssetDownloaded -= onAssetDownloaded;
-                appInstance.assetManager.CancelGameAssets(game.Id);
-                imageLoaders.Remove(entry);
-            };
-
-            mainScene.gameList.AddChild(entry);
+            BindCardToGame(pooledGameCards[i], currentlyShownGames[i]);
         }
 
         if (mainScene.gameList.HasMethod("Refresh"))
@@ -560,6 +457,168 @@ public partial class MainSceneGameListHandler
         if (mainScene.detailsPanelContainer != null)
         {
             mainScene.detailsPanelContainer.Visible = currentlyShownGames.Count > 0;
+        }
+    }
+
+    private readonly List<GameCard> pooledGameCards = new List<GameCard>();
+    private readonly Dictionary<GameCard, Game> gameByCard = new Dictionary<GameCard, Game>();
+    private readonly Dictionary<int, GameCard> cardByGameId = new Dictionary<int, GameCard>();
+    private readonly HashSet<GameCard> cardsWithLoadedCover = new HashSet<GameCard>();
+    private readonly Dictionary<string, Texture2D> platformIconsBySlug = new Dictionary<string, Texture2D>();
+    private Texture2D currentSystemControllerIcon;
+
+    private Texture2D ResolveSystemControllerIcon()
+    {
+        if (currentGameSystemIndex < 0 || currentGameSystemIndex >= gameSystems.Count)
+        {
+            return null;
+        }
+
+        var system = gameSystems[currentGameSystemIndex];
+        string searchSlug = !string.IsNullOrEmpty(system.IgdbSlug) ? system.IgdbSlug : system.Slug;
+
+        if (string.IsNullOrEmpty(searchSlug))
+        {
+            return null;
+        }
+
+        if (platformIconsBySlug.TryGetValue(searchSlug, out Texture2D cachedIcon))
+        {
+            return cachedIcon;
+        }
+
+        Texture2D icon = FindPlatformIcon(searchSlug, "res://assets/platforms/", new[] { ".svg", ".png" });
+        platformIconsBySlug[searchSlug] = icon;
+        return icon;
+    }
+
+    private void EnsureGameCardPoolSize(int requiredCardCount)
+    {
+        while (pooledGameCards.Count > requiredCardCount)
+        {
+            int lastIndex = pooledGameCards.Count - 1;
+            GameCard surplusCard = pooledGameCards[lastIndex];
+            pooledGameCards.RemoveAt(lastIndex);
+
+            if (gameByCard.TryGetValue(surplusCard, out Game boundGame))
+            {
+                appInstance.assetManager.CancelGameAssets(boundGame.Id);
+            }
+
+            gameByCard.Remove(surplusCard);
+            cardsWithLoadedCover.Remove(surplusCard);
+
+            mainScene.gameList.RemoveChild(surplusCard);
+            surplusCard.QueueFree();
+        }
+
+        if (mainScene.gameListEntryScene == null)
+        {
+            return;
+        }
+
+        while (pooledGameCards.Count < requiredCardCount)
+        {
+            GameCard card = mainScene.gameListEntryScene.Instantiate<GameCard>();
+            card.FocusMode = Control.FocusModeEnum.All;
+            card.Visible = false;
+            card.VisibilityChanged += () => OnCardVisibilityChanged(card);
+
+            pooledGameCards.Add(card);
+            mainScene.gameList.AddChild(card);
+        }
+    }
+
+    private void BindCardToGame(GameCard card, Game game)
+    {
+        gameByCard[card] = game;
+        cardByGameId[game.Id] = card;
+        cardsWithLoadedCover.Remove(card);
+
+        card.Title = game.Name;
+        card.SetCover(mainScene.placeholderTexture, true);
+        card.SetInstalledIcon(null);
+        card.ResetReveal();
+
+        if (card.Visible)
+        {
+            RequestImageLoad(card);
+        }
+    }
+
+    private void OnCardVisibilityChanged(GameCard card)
+    {
+        if (!GodotObject.IsInstanceValid(card))
+        {
+            return;
+        }
+
+        if (card.Visible)
+        {
+            RequestImageLoad(card);
+            return;
+        }
+
+        if (gameByCard.TryGetValue(card, out Game game))
+        {
+            appInstance.assetManager.CancelGameAssets(game.Id);
+        }
+
+        if (cardsWithLoadedCover.Remove(card))
+        {
+            card.SetCover(mainScene.placeholderTexture, true);
+        }
+    }
+
+    private void LoadCoverForCard(GameCard card)
+    {
+        if (!GodotObject.IsInstanceValid(card) || cardsWithLoadedCover.Contains(card))
+        {
+            return;
+        }
+
+        if (!gameByCard.TryGetValue(card, out Game game))
+        {
+            return;
+        }
+
+        ImageTexture coverTexture = GetOrLoadAssetTexture(CoverTwoDimensionalAssetPath(game.Id))
+            ?? GetOrLoadAssetTexture(CoverThreeDimensionalAssetPath(game.Id));
+
+        if (coverTexture == null)
+        {
+            foreach (string fallbackPath in CoverFallbackAssetPaths(game.Id))
+            {
+                coverTexture = GetOrLoadAssetTexture(fallbackPath);
+
+                if (coverTexture != null)
+                {
+                    break;
+                }
+            }
+        }
+
+        if (coverTexture != null)
+        {
+            card.SetCover(coverTexture, false);
+            cardsWithLoadedCover.Add(card);
+        }
+        else
+        {
+            appInstance.assetManager.RequestGameAssets(game);
+        }
+
+        card.SetInstalledIcon(CheckIfGameIsDownloaded(game) ? currentSystemControllerIcon : null);
+        card.Reveal();
+
+        if (cardsWithLoadedCover.Contains(card) && mainScene.gameList.HasMethod("UpdateLayout"))
+        {
+            bool isAnimating = (bool)mainScene.gameList.Get("IsAnimating");
+
+            if (!isAnimating)
+            {
+                mainScene.gameList.CallDeferred("UpdateLayout", false);
+            }
         }
     }
 
