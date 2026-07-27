@@ -64,15 +64,29 @@ public class MainScenePopupHandler
         Button updateBtn = mainScene.startMenuPanel?.updateEmulatorButton;
         Button uninstallBtn = mainScene.startMenuPanel?.uninstallEmulatorButton;
 
+        bool isLaunching = appInstance.emulatorManager.IsEmulatorLaunching;
+        bool isRunning = appInstance.emulatorManager.IsEmulatorRunning;
+        bool isBusy = isInstalling || isLaunching || isRunning;
+
         if (launchBtn != null)
         {
             string emulatorDisplayName = string.IsNullOrEmpty(mappedEmulator) ? null : appInstance.emulatorManager.GetEmulatorDisplayName(mappedEmulator);
 
-            launchBtn.Disabled = string.IsNullOrEmpty(mappedEmulator) || isInstalling;
+            launchBtn.Disabled = string.IsNullOrEmpty(mappedEmulator) || isBusy;
 
             if (isInstalling)
             {
                 launchBtn.Text = $"Installing {emulatorDisplayName}...";
+            }
+
+            else if (isLaunching)
+            {
+                launchBtn.Text = "Starting...";
+            }
+
+            else if (isRunning)
+            {
+                launchBtn.Text = "Running";
             }
 
             else if (string.IsNullOrEmpty(mappedEmulator))
@@ -88,13 +102,13 @@ public class MainScenePopupHandler
 
         if (updateBtn != null)
         {
-            updateBtn.Disabled = !isInstalled || isInstalling;
+            updateBtn.Disabled = !isInstalled || isBusy;
             updateBtn.Text = isInstalling ? "Installing Emulator..." : "Update Emulator";
         }
 
         if (uninstallBtn != null)
         {
-            uninstallBtn.Disabled = !isInstalled || isInstalling;
+            uninstallBtn.Disabled = !isInstalled || isBusy;
         }
     }
 

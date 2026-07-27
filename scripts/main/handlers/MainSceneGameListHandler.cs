@@ -1154,6 +1154,60 @@ public partial class MainSceneGameListHandler
         }
     }
 
+    public GameActionState ResolveGameAction(Game game)
+    {
+        if (game == null)
+        {
+            return new GameActionState { Kind = GameActionKind.Unavailable, Label = "Play", Disabled = true };
+        }
+
+        string mappedEmulator = appInstance.emulatorManager.GetMappedEmulator(game.PlatformSlug);
+
+        if (string.IsNullOrEmpty(mappedEmulator))
+        {
+            return new GameActionState { Kind = GameActionKind.Unavailable, Label = "No Emulator For This System", Disabled = true };
+        }
+
+        string emulatorDisplayName = appInstance.emulatorManager.GetEmulatorDisplayName(mappedEmulator);
+
+        if (appInstance.emulatorManager.IsEmulatorInstalling(mappedEmulator))
+        {
+            return new GameActionState { Kind = GameActionKind.Unavailable, Label = $"Installing {emulatorDisplayName}...", Disabled = true };
+        }
+
+        if (appInstance.emulatorManager.IsEmulatorLaunching)
+        {
+            return new GameActionState { Kind = GameActionKind.Unavailable, Label = "Starting...", Disabled = true };
+        }
+
+        if (appInstance.emulatorManager.IsEmulatorRunning)
+        {
+            return new GameActionState { Kind = GameActionKind.Unavailable, Label = "Running", Disabled = true };
+        }
+
+        if (appInstance.downloadManager.IsDownloadingGame(game.Id.ToString()))
+        {
+            return new GameActionState { Kind = GameActionKind.Unavailable, Label = "Downloading...", Disabled = true };
+        }
+
+        if (!appInstance.emulatorManager.IsEmulatorInstalled(mappedEmulator))
+        {
+            return new GameActionState { Kind = GameActionKind.InstallEmulator, Label = $"Install {emulatorDisplayName}", Disabled = false, EmulatorName = mappedEmulator };
+        }
+
+        if (!CheckIfGameIsDownloaded(game))
+        {
+            return new GameActionState { Kind = GameActionKind.DownloadGame, Label = "Download", Disabled = false, EmulatorName = mappedEmulator };
+        }
+
+        if (!appInstance.emulatorManager.IsSelectedCoreInstalled(mappedEmulator, game.PlatformSlug))
+        {
+            return new GameActionState { Kind = GameActionKind.LaunchGame, Label = "Install Core", Disabled = false, EmulatorName = mappedEmulator };
+        }
+
+        return new GameActionState { Kind = GameActionKind.LaunchGame, Label = "Play", Disabled = false, EmulatorName = mappedEmulator };
+    }
+
     public void UpdateDetailsPanelButtons(Game game)
     {
         bool isGameDownloadedLocally = CheckIfGameIsDownloaded(game);
@@ -1163,55 +1217,18 @@ public partial class MainSceneGameListHandler
             mainScene.installedIcon.Visible = isGameDownloadedLocally;
         }
 
-        if (mainScene.actionBtn == null)
+        if (mainScene.actionBtn != null)
         {
-            return;
-        }
-
-        bool isDownloading = appInstance.downloadManager.IsDownloadingGame(game.Id.ToString());
-
-        if (isGameDownloadedLocally)
-        {
-            string mappedEmulator = appInstance.emulatorManager.GetMappedEmulator(game.PlatformSlug);
-
-            if (appInstance.emulatorManager.IsEmulatorInstalling(mappedEmulator))
-            {
-                mainScene.actionBtn.Text = $"Installing {appInstance.emulatorManager.GetEmulatorDisplayName(mappedEmulator)}...";
-                mainScene.actionBtn.Disabled = true;
-            }
-            else if (!appInstance.emulatorManager.IsEmulatorInstalled(mappedEmulator))
-            {
-                mainScene.actionBtn.Text = $"Install {appInstance.emulatorManager.GetEmulatorDisplayName(mappedEmulator)}";
-                mainScene.actionBtn.Disabled = false;
-            }
-            else if (!appInstance.emulatorManager.IsSelectedCoreInstalled(mappedEmulator, game.PlatformSlug))
-            {
-                mainScene.actionBtn.Text = "Install Core";
-                mainScene.actionBtn.Disabled = false;
-            }
-            else
-            {
-                mainScene.actionBtn.Text = "Play";
-                mainScene.actionBtn.Disabled = false;
-            }
-        }
-        else
-        {
-            if (isDownloading)
-            {
-                mainScene.actionBtn.Text = "Downloading...";
-                mainScene.actionBtn.Disabled = true;
-            }
-            else
-            {
-                mainScene.actionBtn.Text = "Download";
-                mainScene.actionBtn.Disabled = false;
-            }
+            var gameAction = ResolveGameAction(game);
+            mainScene.actionBtn.Text = gameAction.Label;
+            mainScene.actionBtn.Disabled = gameAction.Disabled;
         }
 
         if (mainScene.deleteBtn != null)
         {
-            mainScene.deleteBtn.Disabled = !isGameDownloadedLocally;
+            mainScene.deleteBtn.Disabled = !isGameDownloadedLocally
+                || appInstance.emulatorManager.IsEmulatorLaunching
+                || appInstance.emulatorManager.IsEmulatorRunning;
         }
     }
 
@@ -1363,4 +1380,23 @@ public partial class MainSceneGameListHandler
         Image img = SafeLoadImage(path);
         return img != null ? ImageTexture.CreateFromImage(img) : null;
     }
+}
+
+public enum GameActionKind
+{
+    Unavailable,
+    InstallEmulator,
+    DownloadGame,
+    LaunchGame
+}
+
+public class GameActionState
+{
+    public GameActionKind Kind { get; set; }
+
+    public string Label { get; set; }
+
+    public bool Disabled { get; set; }
+
+    public string EmulatorName { get; set; }
 }

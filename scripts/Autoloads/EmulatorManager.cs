@@ -878,6 +878,9 @@ public partial class EmulatorManager : Node
     [Signal]
     public delegate void EmulatorInstallationCompletedEventHandler(string emulatorName, bool wasSuccessful);
 
+    [Signal]
+    public delegate void EmulatorLaunchStateChangedEventHandler();
+
     private string emulatorMapFilePath;
     private string executableMapFilePath;
 
@@ -936,7 +939,16 @@ public partial class EmulatorManager : Node
 
             activeEmulatorProcess = null;
             activeGame = null;
+            EmitSignal(SignalName.EmulatorLaunchStateChanged);
         }
+    }
+
+    public bool IsEmulatorLaunching { get; private set; }
+
+    private void SetEmulatorLaunching(bool isLaunching)
+    {
+        IsEmulatorLaunching = isLaunching;
+        EmitSignal(SignalName.EmulatorLaunchStateChanged);
     }
 
     private void InitializeFilePaths()
@@ -1759,6 +1771,28 @@ public partial class EmulatorManager : Node
             return;
         }
 
+        if (IsEmulatorLaunching || IsEmulatorRunning)
+        {
+            GD.Print("An emulator is already starting or running; ignoring the launch request.");
+            return;
+        }
+
+        SetEmulatorLaunching(true);
+
+        try
+        {
+            await LaunchEmulatorWithGameInternal(game);
+        }
+
+        finally
+        {
+            SetEmulatorLaunching(false);
+        }
+    }
+
+    private async Task LaunchEmulatorWithGameInternal(Game game)
+    {
+
         string mappedEmulatorName = GetMappedEmulator(game.System.Slug);
 
         if (string.IsNullOrEmpty(mappedEmulatorName))
@@ -1938,6 +1972,12 @@ public partial class EmulatorManager : Node
         if (string.IsNullOrEmpty(emulatorName))
         {
             GD.PrintErr("No emulator name provided.");
+            return;
+        }
+
+        if (IsEmulatorLaunching || IsEmulatorRunning)
+        {
+            GD.Print("An emulator is already starting or running; ignoring the launch request.");
             return;
         }
 

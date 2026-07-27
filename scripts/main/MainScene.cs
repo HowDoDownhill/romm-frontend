@@ -153,6 +153,7 @@ public partial class MainScene : Control
 
         appInstance.downloadManager.DownloadCompleted += DownloadHandler.OnDownloadCompleted;
         appInstance.emulatorManager.EmulatorInstallationCompleted += OnEmulatorInstallationCompleted;
+        appInstance.emulatorManager.EmulatorLaunchStateChanged += OnEmulatorLaunchStateChanged;
 
         if (startMenuPanel != null)
         {
@@ -437,27 +438,35 @@ public partial class MainScene : Control
     {
         if (GameListHandler.currentlySelectedGame == null) return;
 
-        if (actionBtn != null && actionBtn.Disabled) return;
+        var gameAction = GameListHandler.ResolveGameAction(GameListHandler.currentlySelectedGame);
 
-        string emulatorName = appInstance.emulatorManager.GetMappedEmulator(GameListHandler.currentlySelectedGame.PlatformSlug);
+        if (gameAction.Disabled) return;
 
-        if (!appInstance.emulatorManager.IsEmulatorInstalled(emulatorName))
+        switch (gameAction.Kind)
         {
-            actionBtn.Disabled = true;
-            OpenReleasePicker(emulatorName);
-            return;
+            case GameActionKind.InstallEmulator:
+                actionBtn.Disabled = true;
+                OpenReleasePicker(gameAction.EmulatorName);
+                return;
+
+            case GameActionKind.DownloadGame:
+                DownloadHandler.DownloadGame(GameListHandler.currentlySelectedGame);
+                return;
+
+            case GameActionKind.LaunchGame:
+                appInstance.emulatorManager.LaunchEmulatorWithGame(GameListHandler.currentlySelectedGame);
+                return;
+        }
+    }
+
+    private void OnEmulatorLaunchStateChanged()
+    {
+        if (GameListHandler.currentlySelectedGame != null)
+        {
+            GameListHandler.UpdateDetailsPanelButtons(GameListHandler.currentlySelectedGame);
         }
 
-        bool isGameDownloadedLocally = GameListHandler.CheckIfGameIsDownloaded(GameListHandler.currentlySelectedGame);
-
-        if (isGameDownloadedLocally)
-        {
-            appInstance.emulatorManager.LaunchEmulatorWithGame(GameListHandler.currentlySelectedGame);
-        }
-        else
-        {
-            DownloadHandler.DownloadGame(GameListHandler.currentlySelectedGame);
-        }
+        PopupHandler.RefreshEmulatorMenuOptions();
     }
 
     private void OnDeleteButtonPressed()
