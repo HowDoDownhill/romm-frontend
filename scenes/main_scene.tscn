@@ -248,19 +248,6 @@ theme_override_fonts/font = ExtResource("11_lobbybold")
 theme_override_font_sizes/font_size = 24
 text = "Ready"
 
-[node name="MarginContainer2" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel" unique_id=1354160283]
-layout_mode = 2
-theme_override_constants/margin_left = 5
-theme_override_constants/margin_top = 5
-theme_override_constants/margin_right = 5
-theme_override_constants/margin_bottom = 5
-
-[node name="LobbyLeaveButton" type="Button" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel/MarginContainer2" unique_id=2097618163]
-layout_mode = 2
-theme_override_fonts/font = ExtResource("11_lobbybold")
-theme_override_font_sizes/font_size = 24
-text = "Leave Lobby"
-
 [node name="MarginContainer6" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel" unique_id=726151181]
 layout_mode = 2
 theme_override_constants/margin_left = 5
@@ -273,6 +260,19 @@ layout_mode = 2
 theme_override_fonts/font = ExtResource("11_lobbybold")
 theme_override_font_sizes/font_size = 24
 text = "Copy Code"
+
+[node name="MarginContainer2" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel" unique_id=1354160283]
+layout_mode = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="LobbyLeaveButton" type="Button" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel/MarginContainer2" unique_id=2097618163]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("11_lobbybold")
+theme_override_font_sizes/font_size = 24
+text = "Leave Lobby"
 
 [node name="DetailsPanel" type="VBoxContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel" unique_id=280236495]
 layout_mode = 1

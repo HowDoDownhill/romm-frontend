@@ -47,11 +47,6 @@ public class MainSceneNetplayHandler
             mainScene.lobbyCopyCodeButton.Pressed += CopyJoinCodeToClipboard;
         }
 
-        if (mainScene.lobbySelectGameButton != null)
-        {
-            mainScene.lobbySelectGameButton.Pressed += BeginBrowsingForLobbyGame;
-        }
-
         if (appInstance.downloadManager != null)
         {
             appInstance.downloadManager.DownloadCompleted += OnAnyDownloadCompleted;
@@ -746,13 +741,6 @@ public class MainSceneNetplayHandler
         {
             mainScene.lobbyCopyCodeButton.Visible = !string.IsNullOrEmpty(activeJoinCode);
             mainScene.lobbyCopyCodeButton.Text = "Copy Code";
-        }
-
-        if (mainScene.lobbySelectGameButton != null)
-        {
-            mainScene.lobbySelectGameButton.Visible = lobby.IsHosting;
-            mainScene.lobbySelectGameButton.Disabled = IsBrowsingForLobbyGame;
-            mainScene.lobbySelectGameButton.Text = string.IsNullOrEmpty(lobby.SelectedGameName) ? "Select Game" : "Change Game";
         }
 
         if (mainScene.lobbyStatusLabel != null)

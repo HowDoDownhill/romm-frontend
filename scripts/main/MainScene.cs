@@ -23,7 +23,6 @@ public partial class MainScene : Control
     [Export] public Button lobbyActionButton;
     [Export] public Button lobbyLeaveButton;
     [Export] public Button lobbyCopyCodeButton;
-    [Export] public Button lobbySelectGameButton;
     [Export] public TextureRect gameCover;
     [Export] public TextureRect gameMarquee;
     [Export] public Label gameTitle;

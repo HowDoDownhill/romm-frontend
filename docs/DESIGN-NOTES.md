@@ -628,12 +628,23 @@ cycle over a filtered list rather than a geometric neighbour search, which means
 skipped instead of becoming a dead end.
 
 The cycle order is read from the panel's own child order, not from a list in code. It was a hardcoded
-array first, and it silently disagreed with the scene: the panel lays the buttons out as
+array first, and it silently disagreed with the scene: the panel laid the buttons out as
 Action → Leave → Copy Code while the array said Action → Copy Code → Leave, so pressing down from the
 action button jumped to the bottom entry and then back up to the middle one. It reads as the d-pad
 running backwards. Walking `lobbyPanel` for `Button` descendants in tree order cannot drift from the
 layout, and it picks up buttons nested inside their `MarginContainer` wrappers without needing to know
 they are there.
+
+The consequence is that `LobbyPanel` is a `VBoxContainer`, so the order of the `MarginContainer` blocks
+in `main_scene.tscn` is the only thing that sets *both* the visual order and the d-pad order — there is
+no second place to keep them in sync, and no code change can reorder them. They now read
+Action → Copy Code → Leave so that leaving the lobby is last rather than sitting between the two
+buttons you actually use.
+
+`lobbySelectGameButton` used to be a fourth entry here. It had a C# `[Export]` but no node and no
+binding in the scene, so it was permanently null: invisible to this walk and its `Pressed` handler never
+connected. Browsing for a game is reached from Back and from the internal call sites instead, so the
+export was removed rather than given a node.
 
 ### RetroArch must not do its own NAT traversal, because the frontend already did it
 `NetplayPortMapper` maps the netplay port over UPnP before launching, and RetroArch then asks the

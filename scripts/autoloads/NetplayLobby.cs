@@ -270,8 +270,6 @@ public partial class NetplayLobby : Node
         var statuses = orderedMembers.Select(member => member.Status ?? "").ToArray();
         var emulatorVersions = orderedMembers.Select(member => member.EmulatorVersion ?? "").ToArray();
 
-        GD.Print($"[Lobby] host broadcasting roster of {peerIds.Length}: {string.Join(", ", usernames)}");
-
         Rpc(MethodName.ReceiveMemberRoster, peerIds, usernames, rommHosts, hasGameFlags, readyFlags, statuses, emulatorVersions);
         EmitSignal(SignalName.MembersChanged);
     }
@@ -326,8 +324,6 @@ public partial class NetplayLobby : Node
     [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = false, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
     private void ReceiveMemberRoster(int[] peerIds, string[] usernames, string[] rommHosts, int[] hasGameFlags, int[] readyFlags, string[] statuses, string[] emulatorVersions)
     {
-        GD.Print($"[Lobby] client received roster of {peerIds.Length}: {string.Join(", ", usernames)}");
-
         membersByPeerId.Clear();
 
         for (int memberIndex = 0; memberIndex < peerIds.Length; memberIndex++)

@@ -1037,7 +1037,6 @@ public partial class EmulatorManager : Node
     {
         secondsSinceEmulatorLaunch = 0.0;
         secondsSinceEmulatorLivenessCheck = 0.0;
-        hasLoggedEmulatorWatch = false;
     }
 
     private bool HasActiveEmulatorExited(double delta)
@@ -1070,12 +1069,6 @@ public partial class EmulatorManager : Node
 
         bool isRunning = IsEmulatorExecutableRunning(activeEmulatorProcess);
 
-        if (!hasLoggedEmulatorWatch)
-        {
-            hasLoggedEmulatorWatch = true;
-            GD.Print($"[Emulator] watching for \"{ResolveLinuxProcessName(activeEmulatorProcess.StartInfo?.FileName ?? "")}\" from {activeEmulatorProcess.StartInfo?.FileName}; running={isRunning}");
-        }
-
         if (!isRunning)
         {
             GD.Print("[Emulator] the emulator process is gone; ending the session.");
@@ -1084,7 +1077,6 @@ public partial class EmulatorManager : Node
         return !isRunning;
     }
 
-    private bool hasLoggedEmulatorWatch;
 
     private static bool IsEmulatorExecutableRunning(Process emulatorProcess)
     {
