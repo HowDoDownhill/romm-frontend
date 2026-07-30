@@ -9,6 +9,9 @@ public partial class CacheManager : Node
 {
     private string systemsCacheFilePath;
     private string gamesCacheFilePath;
+    private string romHashCacheFilePath;
+
+    private Dictionary<string, RomHashEntry> romHashesByPath;
 
     private AppInstance appInstance;
 
@@ -26,13 +29,76 @@ public partial class CacheManager : Node
         {
             systemsCacheFilePath = ProjectSettings.GlobalizePath("res://systems.cache");
             gamesCacheFilePath = ProjectSettings.GlobalizePath("res://games.cache");
+            romHashCacheFilePath = ProjectSettings.GlobalizePath("res://romhashes.cache");
         }
 
         else
         {
             systemsCacheFilePath = OS.GetExecutablePath().GetBaseDir() + "/systems.cache";
             gamesCacheFilePath = OS.GetExecutablePath().GetBaseDir() + "/games.cache";
+            romHashCacheFilePath = OS.GetExecutablePath().GetBaseDir() + "/romhashes.cache";
         }
+    }
+
+    public string GetStoredRomHash(string romFilePath)
+    {
+        var currentStamp = ResolveRomFileStamp(romFilePath);
+
+        if (currentStamp == null)
+        {
+            return null;
+        }
+
+        EnsureRomHashesLoaded();
+
+        if (!romHashesByPath.TryGetValue(romFilePath, out RomHashEntry storedEntry))
+        {
+            return null;
+        }
+
+        bool stampMatches = storedEntry.SizeBytes == currentStamp.SizeBytes
+            && storedEntry.ModifiedUnix == currentStamp.ModifiedUnix;
+
+        return stampMatches ? storedEntry.Md5 : null;
+    }
+
+    public void StoreRomHash(string romFilePath, string romHash)
+    {
+        var currentStamp = ResolveRomFileStamp(romFilePath);
+
+        if (currentStamp == null || string.IsNullOrEmpty(romHash))
+        {
+            return;
+        }
+
+        EnsureRomHashesLoaded();
+
+        currentStamp.Md5 = romHash;
+        romHashesByPath[romFilePath] = currentStamp;
+
+        WriteJsonToFile(romHashCacheFilePath, romHashesByPath, RommJsonContext.Default.DictionaryStringRomHashEntry);
+    }
+
+    private static RomHashEntry ResolveRomFileStamp(string romFilePath)
+    {
+        if (string.IsNullOrEmpty(romFilePath) || !File.Exists(romFilePath))
+        {
+            return null;
+        }
+
+        var romFileInfo = new FileInfo(romFilePath);
+
+        return new RomHashEntry
+        {
+            SizeBytes = romFileInfo.Length,
+            ModifiedUnix = new System.DateTimeOffset(romFileInfo.LastWriteTimeUtc).ToUnixTimeSeconds()
+        };
+    }
+
+    private void EnsureRomHashesLoaded()
+    {
+        romHashesByPath ??= ReadJsonFromFile(romHashCacheFilePath, RommJsonContext.Default.DictionaryStringRomHashEntry)
+            ?? new Dictionary<string, RomHashEntry>();
     }
 
     public void SaveCache(List<GameSystem> gameSystems, Dictionary<int, List<Game>> gameCacheBySystemId)

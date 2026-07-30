@@ -30,6 +30,7 @@ public class MainSceneNetplayHandler
             appInstance.netplayLobby.HostBrowsingGameChanged += OnHostBrowsingGameChanged;
             appInstance.netplayLobby.StartRequested += OnStartRequested;
             appInstance.netplayLobby.LobbyClosed += OnLobbyClosed;
+            appInstance.netplayLobby.RequiredRomHashChanged += OnRequiredRomHashChanged;
         }
 
         if (mainScene.lobbyActionButton != null)
@@ -225,6 +226,8 @@ public class MainSceneNetplayHandler
 
         appInstance.netplayLobby.SelectGame(selectedGame.Id, selectedGame.Name, hostEmulatorName, hostEmulatorVersion, ResolvePublishedRomHash(selectedGame));
         appInstance.netplayDiscovery?.UpdateAdvertisement(selectedGame.Id, selectedGame.Name, appInstance.netplayLobby.Members.Count);
+
+        PublishHostRomHashWhenComputed(selectedGame);
 
         RefreshLobbyPanel();
     }
@@ -437,9 +440,43 @@ public class MainSceneNetplayHandler
             && !isVerifyingLocalRom;
     }
 
-    private static string ResolvePublishedRomHash(Game game)
+    private string ResolvePublishedRomHash(Game game)
     {
+        string storedHash = appInstance.cacheManager?.GetStoredRomHash(ResolveLocalRomPath(game));
+
+        if (!string.IsNullOrEmpty(storedHash))
+        {
+            return storedHash;
+        }
+
         return game?.Files == null || game.Files.Count == 0 ? null : game.Files[0].Md5Hash;
+    }
+
+    private async void PublishHostRomHashWhenComputed(Game game)
+    {
+        string localRomPath = ResolveLocalRomPath(game);
+
+        if (localRomPath == null || !System.IO.File.Exists(localRomPath))
+        {
+            return;
+        }
+
+        if (!string.IsNullOrEmpty(appInstance.cacheManager?.GetStoredRomHash(localRomPath)))
+        {
+            return;
+        }
+
+        isVerifyingLocalRom = true;
+        ReportPreparednessIfInLobby();
+
+        string computedRomHash = await ResolveRomHashAsync(localRomPath);
+
+        isVerifyingLocalRom = false;
+
+        GD.Print($"[Netplay] Hashed {System.IO.Path.GetFileName(localRomPath)} as {computedRomHash} for the lobby.");
+        appInstance.netplayLobby?.PublishRomHash(game.Id, computedRomHash);
+
+        ReportPreparednessIfInLobby();
     }
 
     private string ResolveLocalRomPath(Game game)
@@ -483,7 +520,7 @@ public class MainSceneNetplayHandler
         isVerifyingLocalRom = true;
         RefreshLobbyPanel();
 
-        string computedRomHash = await System.Threading.Tasks.Task.Run(() => ComputeFileMd5(localRomPath));
+        string computedRomHash = await ResolveRomHashAsync(localRomPath);
 
         isVerifyingLocalRom = false;
         verifiedRomFilePath = localRomPath;
@@ -495,6 +532,38 @@ public class MainSceneNetplayHandler
         }
 
         ReportPreparednessIfInLobby();
+    }
+
+    private readonly System.Collections.Generic.Dictionary<string, System.Threading.Tasks.Task<string>> romHashComputationsByPath = new();
+
+    private System.Threading.Tasks.Task<string> ResolveRomHashAsync(string romFilePath)
+    {
+        string storedHash = appInstance.cacheManager?.GetStoredRomHash(romFilePath);
+
+        if (!string.IsNullOrEmpty(storedHash))
+        {
+            return System.Threading.Tasks.Task.FromResult(storedHash);
+        }
+
+        if (romHashComputationsByPath.TryGetValue(romFilePath, out var runningComputation))
+        {
+            return runningComputation;
+        }
+
+        var startedComputation = ComputeAndStoreRomHashAsync(romFilePath);
+        romHashComputationsByPath[romFilePath] = startedComputation;
+
+        return startedComputation;
+    }
+
+    private async System.Threading.Tasks.Task<string> ComputeAndStoreRomHashAsync(string romFilePath)
+    {
+        string computedRomHash = await System.Threading.Tasks.Task.Run(() => ComputeFileMd5(romFilePath));
+
+        appInstance.cacheManager?.StoreRomHash(romFilePath, computedRomHash);
+        romHashComputationsByPath.Remove(romFilePath);
+
+        return computedRomHash;
     }
 
     private static string ComputeFileMd5(string filePath)
@@ -625,7 +694,42 @@ public class MainSceneNetplayHandler
     {
         ResetLocalRomVerification();
         VerifyLocalRomAgainstHost();
+        PublishHostRomHashIfHosting();
         ReportPreparednessIfInLobby();
+    }
+
+    public async void WarmRomHashForNetplay(Game downloadedGame)
+    {
+        if (appInstance.netplayManager == null || !appInstance.netplayManager.SupportsNetplayForGame(downloadedGame))
+        {
+            return;
+        }
+
+        string localRomPath = ResolveLocalRomPath(downloadedGame);
+
+        if (localRomPath == null || !System.IO.File.Exists(localRomPath))
+        {
+            return;
+        }
+
+        string computedRomHash = await ResolveRomHashAsync(localRomPath);
+
+        GD.Print($"[Netplay] Cached hash {computedRomHash} for {System.IO.Path.GetFileName(localRomPath)}.");
+    }
+
+    private void OnRequiredRomHashChanged()
+    {
+        ResetLocalRomVerification();
+        VerifyLocalRomAgainstHost();
+        ReportPreparednessIfInLobby();
+    }
+
+    private void PublishHostRomHashIfHosting()
+    {
+        if (IsLobbyVisible && appInstance.netplayLobby.IsHosting)
+        {
+            PublishHostRomHashWhenComputed(ResolveSelectedLobbyGame());
+        }
     }
 
     private void OnEmulatorInstallationCompleted(string emulatorName, bool wasSuccessful)

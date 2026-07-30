@@ -29,6 +29,8 @@ using System.Text.Json.Serialization;
 [JsonSerializable(typeof(SyncNegotiatePayload))]
 [JsonSerializable(typeof(SyncCompletePayload))]
 [JsonSerializable(typeof(GithubReleaseInfo))]
+[JsonSerializable(typeof(RomHashEntry))]
+[JsonSerializable(typeof(Dictionary<string, RomHashEntry>))]
 public partial class RommJsonContext : JsonSerializerContext
 {
 }

@@ -2,6 +2,18 @@ using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
+public class RomHashEntry
+{
+    [JsonPropertyName("size_bytes")]
+    public long SizeBytes { get; set; }
+
+    [JsonPropertyName("modified_unix")]
+    public long ModifiedUnix { get; set; }
+
+    [JsonPropertyName("md5")]
+    public string Md5 { get; set; }
+}
+
 public class ClientSaveState
 {
     [JsonPropertyName("rom_id")]

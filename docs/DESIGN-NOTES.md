@@ -352,6 +352,33 @@ on a stale cache the whole ROM-matching feature is inert and every client silent
 It fails open rather than blocking play, which is why it is easy to miss. A cache rebuild is what turns
 it back on; there is no error to notice in the meantime.
 
+### The host publishes a hash it computed, not one the server reported
+Depending on the server's `md5_hash` made the check hostage to cache freshness, and it was the wrong
+question anyway. Netplay needs both sides running *identical bytes*; "matches the host" is the real
+requirement and "matches the server's canonical dump" only approximates it. The host therefore hashes
+its own file and publishes that.
+
+Hashing is too slow to do inline — `CommitHostGameSelection` would block on a multi-GB image — so the
+selection goes out immediately and the hash follows on `ReceiveRomHash`. Clients treat an empty
+`RequiredRomHash` as *not yet verified*: `OnRequiredRomHashChanged` resets verification and re-runs it,
+which drops a client back out of Ready until it has actually compared. That closes the window where
+everyone looks ready before anyone has checked.
+
+While the host hashes it sets `isVerifyingLocalRom`, so it reports `Checking game file` through the
+existing `LobbyMember.Status` and `LocalPlayerHasGame` returns false — a hashing host cannot press
+Start. No new status field was needed; the host simply never used to participate in the one that
+already existed.
+
+`romhashes.cache` sits beside `games.cache` and is keyed by path with a size and mtime stamp. The stamp
+is what makes a re-download or a swapped dump invalidate cleanly rather than trusting a stale entry.
+All three callers — the download-time warm, the host publish and the client verify — funnel through
+`ResolveRomHashAsync`, which collapses concurrent requests for the same path so a file is never hashed
+twice at once.
+
+Verified on the two machines: identical ROMs produce `Checking game file` then `Ready`, and a client
+whose ROM has four bytes appended reports the real computed hash against the host's and settles on
+`Game file does not match`, refusing to ready up.
+
 ### A client must not have its game list filtered out from under the host's choice
 `showOnlyInstalledGames` hides anything not downloaded, which is right when browsing your own library
 and wrong in a lobby: the host picks from *their* library, and the whole point of a client's lobby is

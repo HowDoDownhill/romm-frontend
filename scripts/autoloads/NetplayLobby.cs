@@ -50,6 +50,9 @@ public partial class NetplayLobby : Node
     [Signal]
     public delegate void LobbyClosedEventHandler(string reason);
 
+    [Signal]
+    public delegate void RequiredRomHashChangedEventHandler();
+
     public override void _Ready()
     {
         appInstance = GetNode<AppInstance>("/root/AppInstance");
@@ -392,6 +395,29 @@ public partial class NetplayLobby : Node
         RequiredEmulatorVersion = emulatorVersion;
         RequiredRomHash = romHash;
         EmitSignal(SignalName.GameSelectionChanged, romId);
+    }
+
+    public void PublishRomHash(int romId, string romHash)
+    {
+        if (!IsHosting || romId != SelectedRomId || string.IsNullOrEmpty(romHash))
+        {
+            return;
+        }
+
+        RequiredRomHash = romHash;
+        Rpc(MethodName.ReceiveRomHash, romId, romHash);
+    }
+
+    [Rpc(MultiplayerApi.RpcMode.Authority, CallLocal = false, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void ReceiveRomHash(int romId, string romHash)
+    {
+        if (romId != SelectedRomId)
+        {
+            return;
+        }
+
+        RequiredRomHash = romHash;
+        EmitSignal(SignalName.RequiredRomHashChanged);
     }
 
     public void ReportLocalReadiness(bool hasGame, bool isReady, string status, string emulatorVersion)
