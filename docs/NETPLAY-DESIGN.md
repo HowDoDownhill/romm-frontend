@@ -480,6 +480,28 @@ not offer. Adequate for friends on a home server; not a security boundary.
 Phase 1 is only useful on a LAN. That is intentional — it proves the launch path before any
 network service exists.
 
+## Flycast status
+
+Driven entirely by `-config network:*`, keys read out of the binary rather than guessed — see
+`DESIGN-NOTES.md` for the key list and the Lua-binding lookalikes that are not config keys.
+
+Verified on the two-machine rig:
+
+- `dc` is offered for netplay and the lobby accepts a Dreamcast game
+- both sides render the intended arguments — `network:GGPO=yes` plus `ActAsServer` on the host and
+  `network:server=<host>:19713` on the client
+- GGPO activates on both (each opens UDP 19713, and Flycast takes its netplay `.state.net` path)
+- the 210 MB ROM hashes once and is served from `romhashes.cache` on every later run
+
+**Not yet verified: that a session actually synchronises.** Both peers sat at ~0.5% CPU with no
+`Connected to peer`, because the Windows host has two *enabled inbound Block* firewall rules for
+`flycast.exe` (TCP and UDP, Private+Public). That is a machine setting, not a code path — the
+frontend cannot and should not rewrite it. Re-run the LAN test once those rules are removed or
+changed to Allow, and confirm `Connected to peer` and a CPU load consistent with emulation.
+
+Internet play additionally needs the port-mapping change described in `DESIGN-NOTES.md`: the
+frontend forwards the lobby-time session port, so Flycast's 19713 is never opened.
+
 ## Open questions
 
 - Does gopher64 accept a server address from the command line, or only via its UI and LAN

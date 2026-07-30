@@ -696,6 +696,39 @@ binding in the scene, so it was permanently null: invisible to this walk and its
 connected. Browsing for a game is reached from Back and from the internal call sites instead, so the
 export was removed rather than given a node.
 
+### Flycast's GGPO port is fixed at 19713; `network:LocalPort` does not move it
+`network:LocalPort` looks like the GGPO port and is not — it belongs to the Naomi/BBA networking
+path. Launching the host with `-config network:LocalPort=55435` produced a Flycast bound to UDP
+**19713** regardless, which is GGPO's own default and the only port it listens on. There is no
+`GGPOPort` key anywhere in the binary; the client side is configurable only in that
+`network:server` accepts `address:port` ("Your peer IP address and optional port").
+
+`host_args` therefore sets no port at all and `default_port` is 19713, which is the real number
+rather than a wish. The client is pointed at `{peer_address}:{peer_port}`, and both resolve to
+19713 through the emulator's declared port.
+
+This is why `BuildLaunchFragment` now prefers the emulator's declared `default_port` over the
+session port. The session port is chosen when the *lobby* opens, before anyone has picked a game,
+so it cannot know which emulator will run — it was always the generic 55435 fallback. RetroArch
+declares 55435 too, so nothing changes for it, but the field is no longer decorative.
+
+**The frontend still forwards the session port, not the emulator's.** `TryMapPortsAsync(hostPort,
+lobbyPort)` runs at lobby-open with the same pre-emulator information, so a Flycast session over
+the internet would have 55435 forwarded and 19713 closed. LAN is unaffected. Fixing this means
+mapping the port once the host commits a game, which is the same UPnP-lifetime area that already
+caused the second-launch bugs, so it is deliberately left for its own change.
+
+### Flycast's config keys were read out of the binary, not guessed
+`flycast -help` documents only `-config section:key=value`, so the key names had to come from
+somewhere. They are laid out as string literals in the executable: the `network` section is
+followed by `Enable`, `ActAsServer`, `DNS`, `server`, `LocalPort`, `EmulateBBA`, `EnableUPnP`,
+`GGPO`, `GGPODelay`, `Stats`, `GGPOAnalogAxes`, `GGPOChat`.
+
+A second cluster containing `NetworkEnable`, `NetworkServer` and `GGPOEnable` is a **Lua API**
+binding list — it sits next to `maple`, `memory` and `input` — and those names are not config
+keys. Using `network:GGPOEnable` would silently do nothing, because `-config` accepts any
+section:key pair and simply stores unknown ones.
+
 ### RetroArch must not do its own NAT traversal, because the frontend already did it
 `NetplayPortMapper` maps the netplay port over UPnP before launching, and RetroArch then asks the
 router to map **the same port again**. The second request is refused — routers do not hand the same

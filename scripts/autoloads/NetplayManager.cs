@@ -43,6 +43,18 @@ public partial class NetplayManager : Node
         return declaredPort > 0 ? declaredPort : FallbackPort;
     }
 
+    public int ResolveEmulatorNetplayPort(EmulatorMeta emulatorMetadata)
+    {
+        int declaredPort = emulatorMetadata?.Netplay?.DefaultPort ?? 0;
+
+        if (declaredPort > 0)
+        {
+            return declaredPort;
+        }
+
+        return Port > 0 ? Port : FallbackPort;
+    }
+
     public bool SupportsNetplay(string emulatorName, string systemSlug)
     {
         var emulatorMetadata = appInstance?.emulatorManager?.LoadEmulatorMetadataFromDisk(emulatorName);
@@ -178,7 +190,7 @@ public partial class NetplayManager : Node
             return "";
         }
 
-        int resolvedPort = Port > 0 ? Port : ResolveDefaultPort(emulatorMetadata);
+        int resolvedPort = ResolveEmulatorNetplayPort(emulatorMetadata);
 
         return argumentTemplate
             .Replace("{local_port}", resolvedPort.ToString())
