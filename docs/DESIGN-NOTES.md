@@ -329,6 +329,29 @@ reaches extraction and still has to repaint.
 Emulator installs do not have this problem: `InstallEmulator` awaits the installer to completion before
 emitting, so that signal already fires when the state it describes is true.
 
+Confirmed on the two-machine rig. A client joining with `--netplay-auto-download` logs the whole ladder,
+and the middle line is the bug itself:
+
+```
+[Netplay] preparedness now "Downloading..."
+Download complete. Starting extraction for: ...
+[Netplay] preparedness now "Needs game"
+Successfully extracted ... to roms/nes
+[Netplay] preparedness now "Ready"
+```
+
+`Needs game` after `Download complete` is the recompute reading a file that is not there yet. Before the
+fix that was the terminal state.
+
+### The published ROM hash is absent from any cache written before the hashing work
+`RequiredRomHash` comes only from `game.Files[0].Md5Hash`, which is populated from the API's `md5_hash`.
+That field was added to `RomFile` alongside netplay, so a `games.cache` written before then contains no
+hash at all — not even a null. `VerifyLocalRomAgainstHost` returns early on an empty expected hash, so
+on a stale cache the whole ROM-matching feature is inert and every client silently passes.
+
+It fails open rather than blocking play, which is why it is easy to miss. A cache rebuild is what turns
+it back on; there is no error to notice in the meantime.
+
 ### A client must not have its game list filtered out from under the host's choice
 `showOnlyInstalledGames` hides anything not downloaded, which is right when browsing your own library
 and wrong in a lobby: the host picks from *their* library, and the whole point of a client's lobby is

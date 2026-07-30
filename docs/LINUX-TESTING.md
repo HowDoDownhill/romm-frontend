@@ -195,6 +195,28 @@ The scripted flags for an unattended run are `--netplay-host --netplay-game=<rom
 --netplay-auto-start` on the host and `--netplay-join=<address> --netplay-auto-ready` on the client.
 Auto-ready alone never starts anything; only `--netplay-auto-start` presses Start.
 
+`--netplay-auto-download` presses the lobby's Download for you, once per selection. Without it the
+download path cannot be reached unattended — acquiring a ROM needs a button press and the Arch box
+takes no remote input. Point the host at a rom the client does **not** have to exercise it:
+
+```
+host:   --netplay-host --netplay-game=<romId> --netplay-auto-ready
+client: --netplay-join=192.168.1.13 --netplay-auto-ready --netplay-auto-download
+```
+
+The pass condition is the client's preparedness reaching `Ready`. Watch for the transition through
+`Needs game` *after* `Download complete` — that is the download signal arriving before extraction, and
+the recovery to `Ready` only happens because `HandleExtractionFinished` reports again.
+
+## Where the remote log actually is
+
+`-Action logs` reads `.test-state/run.log`, which is the app's stdout. Godot *also* keeps its own
+`~/.local/share/godot/app_userdata/romm-frontend/logs/godot.log`, and on startup it renames the previous
+session's file to `godot<timestamp>.log` using the **new** session's timestamp. A rotated file therefore
+carries a name that looks like the run you just started while holding the run before it, which reads as
+a launch that produced impossible output. Prefer `run.log`; if you open the userdata logs, `godot.log`
+is the live one.
+
 ## Troubleshooting
 
 | Symptom | Cause |

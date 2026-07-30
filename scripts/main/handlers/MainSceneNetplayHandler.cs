@@ -67,16 +67,19 @@ public class MainSceneNetplayHandler
     private const string JoinSessionArgumentPrefix = "--netplay-join=";
     private const string AutoReadyArgument = "--netplay-auto-ready";
     private const string AutoStartArgument = "--netplay-auto-start";
+    private const string AutoDownloadArgument = "--netplay-auto-download";
     private const string StartupGameArgumentPrefix = "--netplay-game=";
 
     private bool readiesAutomatically;
     private bool startsAutomatically;
+    private bool downloadsAutomatically;
     private int startupRomId;
 
     public void ApplyStartupSessionArguments()
     {
         readiesAutomatically = OS.GetCmdlineUserArgs().Contains(AutoReadyArgument);
         startsAutomatically = OS.GetCmdlineUserArgs().Contains(AutoStartArgument);
+        downloadsAutomatically = OS.GetCmdlineUserArgs().Contains(AutoDownloadArgument);
         startupRomId = ResolveStartupRomId();
 
         foreach (string startupArgument in OS.GetCmdlineUserArgs())
@@ -658,6 +661,7 @@ public class MainSceneNetplayHandler
         }
 
         RefreshLobbyPanel();
+        AutoDownloadSelectedGameIfRequested();
         AutoStartHostedGameIfRequested();
     }
 
@@ -668,6 +672,7 @@ public class MainSceneNetplayHandler
         isLocallyReady = false;
         lastReportedReadinessSignature = null;
         hasAutoStartedCurrentSelection = false;
+        hasAutoDownloadedCurrentSelection = false;
         ResetLocalRomVerification();
         VerifyLocalRomAgainstHost();
 
@@ -791,6 +796,32 @@ public class MainSceneNetplayHandler
         GD.Print("[Netplay] Starting the game because of --netplay-auto-start.");
         hasAutoStartedCurrentSelection = true;
         StartHostedGame(selectedGame);
+    }
+
+    private bool hasAutoDownloadedCurrentSelection;
+
+    private void AutoDownloadSelectedGameIfRequested()
+    {
+        if (!downloadsAutomatically || hasAutoDownloadedCurrentSelection || !IsLobbyVisible)
+        {
+            return;
+        }
+
+        var selectedGame = ResolveSelectedLobbyGame();
+
+        if (selectedGame == null || appInstance.downloadManager.IsDownloadingGame(selectedGame.Id.ToString()))
+        {
+            return;
+        }
+
+        if (ResolveLobbyGameAction()?.Kind != GameActionKind.DownloadGame)
+        {
+            return;
+        }
+
+        GD.Print($"[Netplay] Downloading {selectedGame.Name} because of --netplay-auto-download.");
+        hasAutoDownloadedCurrentSelection = true;
+        mainScene.DownloadHandler.DownloadGame(selectedGame);
     }
 
     private bool IsLobbyButtonUsable(Button lobbyButton)
