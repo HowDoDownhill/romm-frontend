@@ -67,6 +67,8 @@ public partial class LoadingScreen : Control
 
             await PopulateAvailableFirmwareAsync();
 
+            await LoadCollectionsAsync();
+
 
             await Task.Delay(200);
             GetTree().ChangeSceneToFile("res://scenes/main_scene.tscn");
@@ -154,8 +156,10 @@ public partial class LoadingScreen : Control
         await SyncFirmwareAsync();
 
         await PopulateAvailableFirmwareAsync();
-        
-        
+
+        await LoadCollectionsAsync();
+
+
         if (statusLabel != null)
         {
             statusLabel.Text = "Finished!";
@@ -163,6 +167,31 @@ public partial class LoadingScreen : Control
         
         await Task.Delay(200);
         GetTree().ChangeSceneToFile("res://scenes/main_scene.tscn");
+    }
+
+    private async Task LoadCollectionsAsync()
+    {
+        if (statusLabel != null)
+        {
+            statusLabel.Text = "Loading collections...";
+        }
+
+        var collections = await appInstance.rommApi.GetCollectionsAsync();
+        appInstance.dataBus.collectionSystems = CollectionProjection.Project(collections, appInstance.dataBus.gameCache);
+
+        var favoriteCollection = collections?.FirstOrDefault(collection => collection.IsFavorite);
+        appInstance.dataBus.favoriteCollectionId = favoriteCollection?.Id ?? 0;
+        appInstance.dataBus.favoriteRomIds = favoriteCollection?.RomIds == null
+            ? new System.Collections.Generic.HashSet<int>()
+            : new System.Collections.Generic.HashSet<int>(favoriteCollection.RomIds);
+
+        GD.Print($"Loaded {appInstance.dataBus.collectionSystems.Count} collections, {appInstance.dataBus.favoriteRomIds.Count} favorites.");
+
+        foreach (var collectionSystem in appInstance.dataBus.collectionSystems)
+        {
+            int cachedGameCount = appInstance.dataBus.gameCache.TryGetValue(collectionSystem.Id, out var cachedCollectionGames) ? cachedCollectionGames.Count : -1;
+            GD.Print($"  collection id={collectionSystem.Id} slug={collectionSystem.Slug} games={cachedGameCount} favorite={collectionSystem.IsFavoriteCollection} name=\"{collectionSystem.Name}\"");
+        }
     }
 
     private async Task SyncFirmwareAsync()

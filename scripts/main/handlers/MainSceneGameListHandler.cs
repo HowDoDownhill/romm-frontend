@@ -68,6 +68,70 @@ public partial class MainSceneGameListHandler
         }
     }
 
+    private int pendingRomIdToSelect;
+
+    public void SelectGameById(int romId)
+    {
+        if (currentlyShownGames == null)
+        {
+            return;
+        }
+
+        int gameIndex = currentlyShownGames.FindIndex(game => game.Id == romId);
+
+        if (gameIndex < 0)
+        {
+            return;
+        }
+
+        pendingRomIdToSelect = 0;
+        ScrollGameListTo(gameIndex);
+        OnGameSelected(gameIndex);
+    }
+
+    private void ScrollGameListTo(int gameIndex)
+    {
+        if (mainScene.gameList == null)
+        {
+            return;
+        }
+
+        mainScene.gameList.Set("SelectedIndex", gameIndex);
+        mainScene.gameList.Call("UpdateLayout", true);
+    }
+
+    public void SelectGameOnceSystemSettles(int romId)
+    {
+        pendingRomIdToSelect = romId;
+        SelectGameById(romId);
+    }
+
+    private long ResolveInitialGameIndex()
+    {
+        if (pendingRomIdToSelect <= 0)
+        {
+            return 0L;
+        }
+
+        int requestedIndex = currentlyShownGames.FindIndex(game => game.Id == pendingRomIdToSelect);
+        pendingRomIdToSelect = 0;
+
+        return requestedIndex < 0 ? 0L : requestedIndex;
+    }
+
+    public bool CurrentSystemIsCollection
+    {
+        get
+        {
+            if (gameSystems == null || currentGameSystemIndex < 0 || currentGameSystemIndex >= gameSystems.Count)
+            {
+                return false;
+            }
+
+            return gameSystems[currentGameSystemIndex].IsCollection;
+        }
+    }
+
     public void ProcessPendingDetailsRefresh()
     {
         if (!marqueeRefreshPending && !coverRefreshPending && !screenshotsRefreshPending)
@@ -195,10 +259,36 @@ public partial class MainSceneGameListHandler
         isTransitioningSystem = false;
     }
 
+    public void CancelQuickSwitchFade()
+    {
+        if (!preFadedForQuickSwitch)
+        {
+            return;
+        }
+
+        preFadedForQuickSwitch = false;
+
+        if (mainScene.gameList != null)
+        {
+            Color restoredListColor = mainScene.gameList.Modulate;
+            restoredListColor.A = 1.0f;
+            mainScene.gameList.Modulate = restoredListColor;
+        }
+
+        if (mainScene.detailsPanel != null)
+        {
+            Color restoredPanelColor = mainScene.detailsPanel.Modulate;
+            restoredPanelColor.A = 1.0f;
+            mainScene.detailsPanel.Modulate = restoredPanelColor;
+            mainScene.detailsPanel.Scale = Vector2.One;
+        }
+    }
+
     public void SelectSystemByIndex(int index)
     {
         if (index < 0 || index >= gameSystems.Count)
         {
+            CancelQuickSwitchFade();
             return;
         }
 
@@ -208,6 +298,8 @@ public partial class MainSceneGameListHandler
             {
                 DoSelectSystemByIndex(index);
             }
+
+            CancelQuickSwitchFade();
             return;
         }
 
@@ -262,7 +354,9 @@ public partial class MainSceneGameListHandler
 
         if (currentlyShownGames.Any())
         {
-            OnGameSelected(0L);
+            long initialGameIndex = ResolveInitialGameIndex();
+            ScrollGameListTo((int)initialGameIndex);
+            OnGameSelected(initialGameIndex);
 
             if (mainScene.downloadsListContainer != null && !mainScene.downloadsListContainer.IsOpen &&
                 (mainScene.settingsMenuContainer == null || !mainScene.settingsMenuContainer.IsOpen))
@@ -303,10 +397,13 @@ public partial class MainSceneGameListHandler
                 currentlyShownGames = currentlyShownGames.Where(g => CheckIfGameIsDownloaded(g)).ToList();
             }
 
+            GD.Print($"[Filter] index={currentGameSystemIndex} id={system.Id} name=\"{system.Name}\" cached={cachedGames.Count} shown={currentlyShownGames.Count} hideNoArt={appInstance.configManager.HideGamesWithoutBoxArt} installedOnly={showOnlyInstalledGames}");
+
             RefreshGameList();
         }
         else
         {
+            GD.Print($"[Filter] index={currentGameSystemIndex} id={system.Id} name=\"{system.Name}\" NO CACHE ENTRY");
             currentlyShownGames = new List<Game>();
             RefreshGameList();
         }
@@ -456,7 +553,8 @@ public partial class MainSceneGameListHandler
 
         if (mainScene.detailsPanelContainer != null)
         {
-            mainScene.detailsPanelContainer.Visible = currentlyShownGames.Count > 0;
+            bool lobbyOwnsPanel = mainScene.NetplayHandler != null && mainScene.NetplayHandler.IsLobbyVisible;
+            mainScene.detailsPanelContainer.Visible = currentlyShownGames.Count > 0 && !lobbyOwnsPanel;
         }
     }
 
@@ -643,6 +741,7 @@ public partial class MainSceneGameListHandler
 
         currentlySelectedGame = currentlyShownGames[(int)index];
         ShowGameDetails(currentlySelectedGame);
+        mainScene.NetplayHandler?.PushHostBrowsingGame(currentlySelectedGame);
 
         await mainScene.ToSignal(mainScene.GetTree(), "process_frame");
 
@@ -1202,7 +1301,7 @@ public partial class MainSceneGameListHandler
 
         if (!appInstance.emulatorManager.IsSelectedCoreInstalled(mappedEmulator, game.PlatformSlug))
         {
-            return new GameActionState { Kind = GameActionKind.LaunchGame, Label = "Install Core", Disabled = false, EmulatorName = mappedEmulator };
+            return new GameActionState { Kind = GameActionKind.InstallEmulator, Label = $"Repair {emulatorDisplayName}", Disabled = false, EmulatorName = mappedEmulator };
         }
 
         return new GameActionState { Kind = GameActionKind.LaunchGame, Label = "Play", Disabled = false, EmulatorName = mappedEmulator };
@@ -1217,16 +1316,40 @@ public partial class MainSceneGameListHandler
             mainScene.installedIcon.Visible = isGameDownloadedLocally;
         }
 
+        bool isInLobby = mainScene.NetplayHandler != null && mainScene.NetplayHandler.IsLobbyVisible;
+        bool isChoosingLobbyGame = isInLobby && mainScene.NetplayHandler.IsBrowsingForLobbyGame;
+
         if (mainScene.actionBtn != null)
         {
-            var gameAction = ResolveGameAction(game);
-            mainScene.actionBtn.Text = gameAction.Label;
-            mainScene.actionBtn.Disabled = gameAction.Disabled;
+            if (isInLobby)
+            {
+                mainScene.actionBtn.Text = isChoosingLobbyGame ? "Set Game" : "Select";
+                mainScene.actionBtn.Disabled = false;
+            }
+
+            else
+            {
+                var gameAction = ResolveGameAction(game);
+                mainScene.actionBtn.Text = gameAction.Label;
+                mainScene.actionBtn.Disabled = gameAction.Disabled;
+            }
+        }
+
+        if (mainScene.filterInstalledGamesBtn != null)
+        {
+            bool showsLobbyReturn = isInLobby && !isChoosingLobbyGame;
+
+            mainScene.filterInstalledGamesBtn.Text = showsLobbyReturn
+                ? "Change Game"
+                : (showOnlyInstalledGames ? "Installed" : "All Games");
+
+            mainScene.filterInstalledGamesBtn.Disabled = false;
         }
 
         if (mainScene.deleteBtn != null)
         {
-            mainScene.deleteBtn.Disabled = !isGameDownloadedLocally
+            mainScene.deleteBtn.Disabled = isInLobby
+                || !isGameDownloadedLocally
                 || appInstance.emulatorManager.IsEmulatorLaunching
                 || appInstance.emulatorManager.IsEmulatorRunning;
         }

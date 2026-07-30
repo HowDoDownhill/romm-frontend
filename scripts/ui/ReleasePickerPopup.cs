@@ -79,12 +79,14 @@ public partial class ReleasePickerPopup : UiPanel
         UpdateScrollHeight(0);
     }
 
-    public void Populate(string emulatorDisplayName, List<ReleaseOption> releases)
+    public void Populate(string emulatorDisplayName, List<ReleaseOption> releases, string installedVersion = null)
     {
         EmulatorName = emulatorDisplayName;
         Releases = releases;
         titleLabel.Text = $"Install {emulatorDisplayName}";
-        statusLabel.Text = "Select a version";
+        statusLabel.Text = string.IsNullOrEmpty(installedVersion)
+            ? "Select a version"
+            : $"Select a version — {installedVersion} is installed";
         ClearReleaseList();
 
         for (int i = 0; i < releases.Count; i++)
@@ -97,10 +99,15 @@ public partial class ReleasePickerPopup : UiPanel
                 Alignment = HorizontalAlignment.Left,
                 CustomMinimumSize = new Vector2(400, 44)
             };
-            entryBtn.Text = string.IsNullOrEmpty(release.PublishedDate)
-                ? release.VersionLabel
-                : $"{release.VersionLabel}    ({release.PublishedDate})";
+            entryBtn.Text = BuildEntryText(release, installedVersion);
             StyleEntryButton(entryBtn);
+
+            if (EmulatorVersions.IsDowngrade(release.VersionLabel, installedVersion))
+            {
+                entryBtn.AddThemeColorOverride("font_color", DowngradeColor);
+                entryBtn.AddThemeColorOverride("font_hover_color", DowngradeColor);
+                entryBtn.AddThemeColorOverride("font_focus_color", DowngradeColor);
+            }
 
             entryBtn.Pressed += () =>
             {
@@ -116,6 +123,27 @@ public partial class ReleasePickerPopup : UiPanel
         {
             releaseListContainer.GetChild<Button>(0).GrabFocus();
         }
+    }
+
+    private static readonly Color DowngradeColor = new Color(1.0f, 0.72f, 0.42f);
+
+    private static string BuildEntryText(ReleaseOption release, string installedVersion)
+    {
+        string entryText = string.IsNullOrEmpty(release.PublishedDate)
+            ? release.VersionLabel
+            : $"{release.VersionLabel}    ({release.PublishedDate})";
+
+        if (EmulatorVersions.AreSame(release.VersionLabel, installedVersion))
+        {
+            return $"{entryText}    — installed";
+        }
+
+        if (EmulatorVersions.IsDowngrade(release.VersionLabel, installedVersion))
+        {
+            return $"{entryText}    — downgrade";
+        }
+
+        return entryText;
     }
 
     private void ClearReleaseList()

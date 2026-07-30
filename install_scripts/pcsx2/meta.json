@@ -42,7 +42,11 @@
       "label": "Internal Resolution",
       "type": "dropdown",
       "default_value_string": "1",
-      "config_file_relative_path": "inis/PCSX2.ini",
+      "config_file_relative_path": {
+        "windows": "inis/PCSX2.ini",
+        "linux": "PCSX2/inis/PCSX2.ini",
+        "macos": "inis/PCSX2.ini"
+      },
       "config_section": "EmuCore/GS",
       "config_key": "upscale_multiplier",
       "options": {
@@ -59,7 +63,11 @@
       "label": "Aspect Ratio",
       "type": "dropdown",
       "default_value_string": "Auto 4:3/3:2",
-      "config_file_relative_path": "inis/PCSX2.ini",
+      "config_file_relative_path": {
+        "windows": "inis/PCSX2.ini",
+        "linux": "PCSX2/inis/PCSX2.ini",
+        "macos": "inis/PCSX2.ini"
+      },
       "config_section": "EmuCore/GS",
       "config_key": "AspectRatio",
       "options": {
@@ -74,7 +82,11 @@
       "label": "Per-Game Memory Card",
       "type": "hidden",
       "default_value_string": "RomM_{game_id}.ps2",
-      "config_file_relative_path": "inis/PCSX2.ini",
+      "config_file_relative_path": {
+        "windows": "inis/PCSX2.ini",
+        "linux": "PCSX2/inis/PCSX2.ini",
+        "macos": "inis/PCSX2.ini"
+      },
       "config_section": "MemoryCards",
       "config_key": "Slot1_Filename"
     },
@@ -83,7 +95,11 @@
       "label": "VSync",
       "type": "dropdown",
       "default_value_string": "0",
-      "config_file_relative_path": "inis/PCSX2.ini",
+      "config_file_relative_path": {
+        "windows": "inis/PCSX2.ini",
+        "linux": "PCSX2/inis/PCSX2.ini",
+        "macos": "inis/PCSX2.ini"
+      },
       "config_section": "EmuCore/GS",
       "config_key": "VsyncEnable",
       "options": {
@@ -94,7 +110,11 @@
   ],
   "controller_config": {
     "max_controllers": 2,
-    "config_file_relative_path": "inis/PCSX2.ini",
+    "config_file_relative_path": {
+      "windows": "inis/PCSX2.ini",
+      "linux": "PCSX2/inis/PCSX2.ini",
+      "macos": "inis/PCSX2.ini"
+    },
     "format": "ini",
     "controller_sections": [
       {

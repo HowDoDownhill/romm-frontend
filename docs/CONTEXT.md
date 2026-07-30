@@ -27,3 +27,4 @@ The application ships with default mappings for 19 platforms:
 ## Workflow Rules for AI Agents
 - **Review Architecture**: Always review `docs/ARCHITECTURE.md` to understand the Singleton pattern and script structure before proposing architectural changes.
 - **Maintain Context**: If a feature changes the core behavior, data models, or external dependencies of the project, this `CONTEXT.md` and `ARCHITECTURE.md` file MUST be updated.
+- **Testing on Linux**: Do not reason about Linux behavior from the Windows build. `docs/LINUX-TESTING.md` describes a push-to-real-hardware harness (`tools/linux-test/`) that exports on Windows, deploys over SSH to an Arch machine, launches on its desktop session and screenshots back. Use it for anything platform-specific or GPU-dependent.

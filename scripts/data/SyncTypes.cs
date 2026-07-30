@@ -40,6 +40,9 @@ public class DevicePayload
     [JsonPropertyName("sync_mode")]
     public string SyncMode { get; set; }
 
+    [JsonPropertyName("hostname")]
+    public string Hostname { get; set; }
+
     [JsonPropertyName("allow_existing")]
     public bool AllowExisting { get; set; }
 }

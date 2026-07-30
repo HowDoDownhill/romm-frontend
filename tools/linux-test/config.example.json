@@ -1,0 +1,7 @@
+{
+  "host": "arch-box.local",
+  "user": "your-linux-username",
+  "port": 22,
+  "remoteDir": "romm-frontend-test",
+  "wslDistro": "archlinux"
+}

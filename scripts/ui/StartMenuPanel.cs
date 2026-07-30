@@ -13,6 +13,12 @@ public partial class StartMenuPanel : UiPanel
     [Export] public Button updateEmulatorButton;
     [Export] public Button uninstallEmulatorButton;
     [Export] public Button selectBiosButton;
+    [Export] public Button favoriteGameButton;
+    [Export] public Button hostNetplayButton;
+    [Export] public Button joinNetplayButton;
+    [Export] public Control netplayView;
+    [Export] public Label netplayCodeLabel;
+    [Export] public Label netplayInfoLabel;
     [Export] public Button settingsButton;
     [Export] public Button randomGameButton;
     [Export] public Button refreshAllGamesButton;
@@ -24,12 +30,16 @@ public partial class StartMenuPanel : UiPanel
     [Signal]
     public delegate void BiosViewRequestedEventHandler();
 
+    [Signal]
+    public delegate void NetplayCancelRequestedEventHandler();
+
     public bool IsBiosViewOpen => biosView != null && biosView.Visible;
 
     public void ShowMenuView()
     {
         if (menuView != null) menuView.Visible = true;
         if (biosView != null) biosView.Visible = false;
+        if (netplayView != null) netplayView.Visible = false;
 
         if (GodotObject.IsInstanceValid(focusBeforeBiosView))
         {
@@ -49,9 +59,24 @@ public partial class StartMenuPanel : UiPanel
 
         if (menuView != null) menuView.Visible = false;
         if (biosView != null) biosView.Visible = true;
+        if (netplayView != null) netplayView.Visible = false;
 
         EmitSignal(SignalName.BiosViewRequested);
     }
+
+    public void ShowNetplayView(string joinCode, string joinInformation)
+    {
+        focusBeforeBiosView = GetViewport().GuiGetFocusOwner();
+
+        if (menuView != null) menuView.Visible = false;
+        if (biosView != null) biosView.Visible = false;
+        if (netplayView != null) netplayView.Visible = true;
+
+        if (netplayCodeLabel != null) netplayCodeLabel.Text = joinCode;
+        if (netplayInfoLabel != null) netplayInfoLabel.Text = joinInformation;
+    }
+
+    public bool IsNetplayViewOpen => netplayView != null && netplayView.Visible;
 
     protected override void OnOpened()
     {
@@ -62,11 +87,15 @@ public partial class StartMenuPanel : UiPanel
     {
         if (State == PanelState.Closing) return true;
 
-        Control activeList = IsBiosViewOpen ? biosView : optionsList;
+        Control activeList = optionsList;
+
+        if (IsBiosViewOpen) activeList = biosView;
+        else if (IsNetplayViewOpen) activeList = netplayView;
 
         if (inputEvent.IsActionPressed("ui_cancel") || inputEvent.IsActionPressed("Back"))
         {
             if (IsBiosViewOpen) ShowMenuView();
+            else if (IsNetplayViewOpen) EmitSignal(SignalName.NetplayCancelRequested);
             else Close();
             return true;
         }

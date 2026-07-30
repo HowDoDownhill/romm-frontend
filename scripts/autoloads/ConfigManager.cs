@@ -18,9 +18,18 @@ public partial class ConfigManager : Node
     public string RomMUsername { get; private set; }
     public string RomMPassword { get; private set; }
     public string RomMApiKey { get; private set; }
+
+    public string RomMDeviceId { get; private set; }
+
+    public void SaveDeviceId(string deviceId)
+    {
+        RomMDeviceId = deviceId;
+        SaveConfig();
+    }
     public bool RomMValidLoginLastUsed { get; private set; }
     public bool HideGamesWithoutBoxArt { get; private set; }
     public bool ShowAllSystems { get; private set; }
+    public bool PreferDiscreteGpu { get; private set; }
     public string AppTheme { get; private set; }
     public string AppBackground { get; private set; }
 
@@ -318,6 +327,8 @@ public partial class ConfigManager : Node
         RomMPassword = (string)configurationFile.GetValue("RomM", "Password", "");
         RomMApiKey = (string)configurationFile.GetValue("RomM", "ApiKey", "");
         RomMValidLoginLastUsed = (bool)configurationFile.GetValue("RomM", "ValidLoginLastUsed", "");
+        RomMDeviceId = (string)configurationFile.GetValue("RomM", "DeviceId", "");
+        PreferDiscreteGpu = (bool)configurationFile.GetValue("Graphics", "PreferDiscreteGpu", true);
         HideGamesWithoutBoxArt = (bool)configurationFile.GetValue("UI", "HideGamesWithoutBoxArt", false);
         ShowAllSystems = (bool)configurationFile.GetValue("UI", "ShowAllSystems", false);
         AppTheme = (string)configurationFile.GetValue("UI", "AppTheme", "Default");
@@ -408,6 +419,8 @@ public partial class ConfigManager : Node
         configurationFile.SetValue("RomM", "Password", RomMPassword);
         configurationFile.SetValue("RomM", "ApiKey", RomMApiKey);
         configurationFile.SetValue("RomM", "ValidLoginLastUsed", RomMValidLoginLastUsed);
+        configurationFile.SetValue("RomM", "DeviceId", RomMDeviceId ?? "");
+        configurationFile.SetValue("Graphics", "PreferDiscreteGpu", PreferDiscreteGpu);
         configurationFile.SetValue("UI", "HideGamesWithoutBoxArt", HideGamesWithoutBoxArt);
         configurationFile.SetValue("UI", "ShowAllSystems", ShowAllSystems);
         configurationFile.SetValue("UI", "AppTheme", AppTheme);
@@ -477,6 +490,12 @@ public partial class ConfigManager : Node
     {
         HideGamesWithoutBoxArt = shouldHideGamesWithoutBoxArt;
         ShowAllSystems = showAllSystems;
+        SaveConfig();
+    }
+
+    public void SavePreferDiscreteGpu(bool shouldPreferDiscreteGpu)
+    {
+        PreferDiscreteGpu = shouldPreferDiscreteGpu;
         SaveConfig();
     }
 

@@ -63,6 +63,8 @@ games.cache
 systems.cache
 assets/screenshots/
 
+tools/linux-test/config.json
+
 .claude/
 
 # AI Agent and Context Files

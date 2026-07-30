@@ -525,7 +525,7 @@ public class EmulatorMeta
     public string CoreLaunchArg { get; set; }
 
     [JsonPropertyName("core_directory")]
-    public string CoreDirectory { get; set; }
+    public JsonElement CoreDirectory { get; set; }
 
     [JsonPropertyName("core_file_name")]
     public JsonElement CoreFileName { get; set; }
@@ -582,8 +582,9 @@ public class EmulatorMeta
         }
 
         string coreFileName = coreFileNameTemplate.Replace("{core}", coreName);
+        string coreDirectory = EmulatorSettingField.ResolveOsScopedValue(CoreDirectory, operatingSystem);
 
-        return string.IsNullOrEmpty(CoreDirectory) ? coreFileName : CoreDirectory + "/" + coreFileName;
+        return string.IsNullOrEmpty(coreDirectory) ? coreFileName : coreDirectory + "/" + coreFileName;
     }
 
     public string ResolveCoreDownloadUrl(string coreName, string operatingSystem)
@@ -616,6 +617,14 @@ public class EmulatorMeta
     [JsonPropertyName("controller_config")]
     public ControllerConfig ControllerConfig { get; set; }
 
+    [JsonPropertyName("netplay")]
+    public NetplayConfig Netplay { get; set; }
+
+    public bool SupportsNetplayForSystem(string systemSlug)
+    {
+        return Netplay != null && Netplay.SupportsSystem(systemSlug);
+    }
+
     public List<string> GetSaveRelativePaths()
     {
         var savePaths = new List<string>();
@@ -647,8 +656,18 @@ public class EmulatorMeta
         return savePaths;
     }
 
+    public static bool IsEmulatorInternalSaveItem(string saveItemName)
+    {
+        return !string.IsNullOrEmpty(saveItemName) && saveItemName.StartsWith(".");
+    }
+
     public bool ShouldSyncSaveItem(string saveItemName)
     {
+        if (IsEmulatorInternalSaveItem(saveItemName))
+        {
+            return false;
+        }
+
         if (SyncInclude == null)
         {
             return true;
@@ -787,6 +806,45 @@ public class InstallRecipe
     public List<ExtraDownload> ExtraDownloads { get; set; }
 }
 
+public class NetplayConfig
+{
+    [JsonPropertyName("transport")]
+    public string Transport { get; set; } = "launch_args";
+
+    [JsonPropertyName("host_args")]
+    public string HostArgs { get; set; }
+
+    [JsonPropertyName("join_args")]
+    public string JoinArgs { get; set; }
+
+    [JsonPropertyName("max_players")]
+    public int MaxPlayers { get; set; } = 2;
+
+    [JsonPropertyName("default_port")]
+    public int DefaultPort { get; set; }
+
+    [JsonPropertyName("requires_identical_rom")]
+    public bool RequiresIdenticalRom { get; set; } = true;
+
+    [JsonPropertyName("unsupported_systems")]
+    public List<string> UnsupportedSystems { get; set; }
+
+    public bool SupportsSystem(string systemSlug)
+    {
+        if (string.IsNullOrEmpty(HostArgs) || string.IsNullOrEmpty(JoinArgs))
+        {
+            return false;
+        }
+
+        if (UnsupportedSystems == null || string.IsNullOrEmpty(systemSlug))
+        {
+            return true;
+        }
+
+        return !UnsupportedSystems.Any(unsupportedSlug => string.Equals(unsupportedSlug, systemSlug, StringComparison.OrdinalIgnoreCase));
+    }
+}
+
 public class ExtraDownload
 {
     [JsonPropertyName("url")]
@@ -797,6 +855,9 @@ public class ExtraDownload
 
     [JsonPropertyName("extract")]
     public bool Extract { get; set; } = true;
+
+    [JsonPropertyName("extract_folder_regex")]
+    public string ExtractFolderRegex { get; set; }
 }
 
 public class ReleaseOption
@@ -816,7 +877,9 @@ public class ControllerConfig
     public int MaxControllers { get; set; }
 
     [JsonPropertyName("config_file_relative_path")]
-    public string ConfigFileRelativePath { get; set; }
+    public JsonElement ConfigFileRelativePath { get; set; }
+
+    public string ResolveConfigFileRelativePath(string operatingSystem) => EmulatorSettingField.ResolveOsScopedValue(ConfigFileRelativePath, operatingSystem);
 
     [JsonPropertyName("format")]
     public string Format { get; set; }
@@ -926,21 +989,179 @@ public partial class EmulatorManager : Node
         }
     }
 
+    private const double EmulatorLivenessCheckSeconds = 1.0;
+    private const double EmulatorLivenessGraceSeconds = 15.0;
+    private const int LinuxProcessNameLength = 15;
+
+    private double secondsSinceEmulatorLaunch;
+    private double secondsSinceEmulatorLivenessCheck;
+
     public override void _Process(double delta)
     {
-        if (activeEmulatorProcess != null && activeEmulatorProcess.HasExited)
+        if (activeEmulatorProcess == null || !HasActiveEmulatorExited(delta))
         {
-            DateTime sessionEnd = DateTime.UtcNow;
+            return;
+        }
 
-            if (appInstance.saveSyncManager != null && activeGame != null)
+        DateTime sessionEnd = DateTime.UtcNow;
+
+        bool joinedSomeoneElsesSession = appInstance.netplayManager?.Role == NetplayRole.Join;
+
+        if (joinedSomeoneElsesSession)
+        {
+            GD.Print($"[Netplay] not uploading a save for {activeGame?.Name}: this machine joined another player's session, so the progress is the host's.");
+        }
+
+        else if (appInstance.saveSyncManager != null && activeGame != null)
+        {
+            _ = appInstance.saveSyncManager.SyncAfterExit(activeGame, activeSessionStart, sessionEnd);
+        }
+
+        CloseLingeringLauncherProcess(activeEmulatorProcess);
+
+        activeEmulatorProcess = null;
+        activeGame = null;
+        appInstance.netplayManager?.EndSession();
+
+        bool lobbyStillOpen = appInstance.netplayLobby != null && appInstance.netplayLobby.IsInLobby;
+
+        if (!lobbyStillOpen)
+        {
+            appInstance.netplayPortMapper?.ReleasePorts();
+        }
+
+        EmitSignal(SignalName.EmulatorLaunchStateChanged);
+    }
+
+    private void BeginEmulatorLivenessGrace()
+    {
+        secondsSinceEmulatorLaunch = 0.0;
+        secondsSinceEmulatorLivenessCheck = 0.0;
+        hasLoggedEmulatorWatch = false;
+    }
+
+    private bool HasActiveEmulatorExited(double delta)
+    {
+        if (activeEmulatorProcess.HasExited)
+        {
+            return true;
+        }
+
+        if (OperatingSystem.IsWindows())
+        {
+            return false;
+        }
+
+        secondsSinceEmulatorLaunch += delta;
+
+        if (secondsSinceEmulatorLaunch < EmulatorLivenessGraceSeconds)
+        {
+            return false;
+        }
+
+        secondsSinceEmulatorLivenessCheck += delta;
+
+        if (secondsSinceEmulatorLivenessCheck < EmulatorLivenessCheckSeconds)
+        {
+            return false;
+        }
+
+        secondsSinceEmulatorLivenessCheck = 0.0;
+
+        bool isRunning = IsEmulatorExecutableRunning(activeEmulatorProcess);
+
+        if (!hasLoggedEmulatorWatch)
+        {
+            hasLoggedEmulatorWatch = true;
+            GD.Print($"[Emulator] watching for \"{ResolveLinuxProcessName(activeEmulatorProcess.StartInfo?.FileName ?? "")}\" from {activeEmulatorProcess.StartInfo?.FileName}; running={isRunning}");
+        }
+
+        if (!isRunning)
+        {
+            GD.Print("[Emulator] the emulator process is gone; ending the session.");
+        }
+
+        return !isRunning;
+    }
+
+    private bool hasLoggedEmulatorWatch;
+
+    private static bool IsEmulatorExecutableRunning(Process emulatorProcess)
+    {
+        string executablePath = emulatorProcess.StartInfo?.FileName;
+
+        if (string.IsNullOrEmpty(executablePath))
+        {
+            return true;
+        }
+
+        string expectedProcessName = ResolveLinuxProcessName(executablePath);
+
+        foreach (string processDirectory in Directory.EnumerateDirectories("/proc"))
+        {
+            if (!int.TryParse(Path.GetFileName(processDirectory), out _))
             {
-                _ = appInstance.saveSyncManager.SyncAfterExit(activeGame, activeSessionStart, sessionEnd);
+                continue;
             }
 
-            activeEmulatorProcess = null;
-            activeGame = null;
-            EmitSignal(SignalName.EmulatorLaunchStateChanged);
+            if (!ReadProcessEntry(processDirectory, "cmdline").Replace('\0', ' ').Contains(executablePath))
+            {
+                continue;
+            }
+
+            string processName = ReadProcessEntry(processDirectory, "comm").Trim();
+
+            if (processName == expectedProcessName || !LauncherProcessNames.Contains(processName))
+            {
+                return true;
+            }
         }
+
+        return false;
+    }
+
+    private static readonly HashSet<string> LauncherProcessNames = new HashSet<string>
+    {
+        "AppRun",
+        "AppRun.wrapped",
+        "dwarfs",
+        "memfd:dwarfs",
+        "squashfuse",
+        "squashfuse_ll",
+        "fusermount",
+        "fusermount3"
+    };
+
+    private static string ResolveLinuxProcessName(string executablePath)
+    {
+        string executableName = Path.GetFileName(executablePath);
+
+        return executableName.Length > LinuxProcessNameLength
+            ? executableName[..LinuxProcessNameLength]
+            : executableName;
+    }
+
+    private static string ReadProcessEntry(string processDirectory, string entryName)
+    {
+        try
+        {
+            return File.ReadAllText(Path.Combine(processDirectory, entryName));
+        }
+
+        catch (Exception)
+        {
+            return "";
+        }
+    }
+
+    private static void CloseLingeringLauncherProcess(Process emulatorProcess)
+    {
+        if (OperatingSystem.IsWindows() || emulatorProcess.HasExited)
+        {
+            return;
+        }
+
+        SignalEmulatorExecutable(emulatorProcess, "-KILL");
     }
 
     public bool IsEmulatorLaunching { get; private set; }
@@ -1295,6 +1516,37 @@ public partial class EmulatorManager : Node
         return string.IsNullOrEmpty(literalExecutableName) ? null : Path.GetFullPath(Path.Combine(emulatorInstallDirectory, literalExecutableName));
     }
 
+    public string GetInstalledVersion(string emulatorName)
+    {
+        var emulatorMetadata = LoadEmulatorMetadataFromDisk(emulatorName);
+        string currentOperatingSystem = OS.GetName().ToLower();
+
+        if (emulatorMetadata?.EmulatorDirName == null || !emulatorMetadata.EmulatorDirName.ContainsKey(currentOperatingSystem))
+        {
+            return null;
+        }
+
+        string versionFilePath = Path.Combine(
+            appInstance.configManager.EmulatorsPath,
+            emulatorMetadata.EmulatorDirName[currentOperatingSystem],
+            UniversalInstaller.InstalledVersionFileName);
+
+        if (!System.IO.File.Exists(versionFilePath))
+        {
+            return null;
+        }
+
+        try
+        {
+            return System.IO.File.ReadAllText(versionFilePath).Trim();
+        }
+
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
     public bool IsEmulatorInstalled(string emulatorName)
     {
         if (string.IsNullOrEmpty(emulatorName))
@@ -1569,6 +1821,30 @@ public partial class EmulatorManager : Node
         return launchArguments;
     }
 
+    private string ApplyNetplayArguments(string launchArguments, EmulatorMeta emulatorMetadata, string systemSlug)
+    {
+        string netplayArguments = appInstance.netplayManager == null
+            ? ""
+            : appInstance.netplayManager.BuildLaunchFragment(emulatorMetadata, systemSlug);
+
+        if (launchArguments != null && launchArguments.Contains("{netplay}"))
+        {
+            if (string.IsNullOrEmpty(netplayArguments))
+            {
+                return launchArguments.Replace("{netplay} ", "").Replace(" {netplay}", "").Replace("{netplay}", "");
+            }
+
+            return launchArguments.Replace("{netplay}", netplayArguments);
+        }
+
+        if (string.IsNullOrEmpty(netplayArguments))
+        {
+            return launchArguments;
+        }
+
+        return launchArguments + " " + netplayArguments;
+    }
+
     private string AppendDynamicSettingsToArguments(string launchArguments, string emulatorName, EmulatorMeta emulatorMetadata)
     {
         string settingsArguments = BuildDynamicSettingsArguments(emulatorName, emulatorMetadata);
@@ -1731,6 +2007,10 @@ public partial class EmulatorManager : Node
             UseShellExecute = false
         };
 
+        bool preferDiscreteGpu = appInstance?.configManager?.PreferDiscreteGpu ?? true;
+
+        DiscreteGpuPreference.ApplyToProcess(processStartInfo, preferDiscreteGpu);
+        DiscreteGpuPreference.RegisterWindowsGpuPreference(executablePath, preferDiscreteGpu);
         ApplyLaunchEnvironment(processStartInfo, emulatorMetadata, workingDirectory);
 
         return Process.Start(processStartInfo);
@@ -1861,6 +2141,7 @@ public partial class EmulatorManager : Node
             string firmwarePath = ResolveFirmwarePath(game.System);
             launchArguments = ApplyBiosArgumentsAndCopyFiles(launchArguments, firmwarePath, emulatorInstallDirectory, emulatorMetadata, currentOperatingSystem);
             launchArguments = AppendDynamicSettingsToArguments(launchArguments, mappedEmulatorName, emulatorMetadata);
+            launchArguments = ApplyNetplayArguments(launchArguments, emulatorMetadata, game.System.Slug);
 
             if (emulatorMetadata.SettingsFields != null)
             {
@@ -1913,6 +2194,7 @@ public partial class EmulatorManager : Node
                 activeEmulatorProcess = emulatorProcess;
                 activeGame = game;
                 activeSessionStart = sessionStart;
+                BeginEmulatorLivenessGrace();
             }
 
             else
@@ -1953,17 +2235,91 @@ public partial class EmulatorManager : Node
         }
     }
 
+    private const int EmulatorShutdownGraceMilliseconds = 5000;
+
     public void CloseEmulator()
     {
-        if (activeEmulatorProcess != null && !activeEmulatorProcess.HasExited)
-        {
-            activeEmulatorProcess.CloseMainWindow();
+        Process closingProcess = activeEmulatorProcess;
 
-            if (!activeEmulatorProcess.WaitForExit(5000))
+        if (closingProcess == null || closingProcess.HasExited)
+        {
+            return;
+        }
+
+        RequestEmulatorShutdown(closingProcess);
+        ForceCloseEmulatorAfterGrace(closingProcess);
+    }
+
+    private static void RequestEmulatorShutdown(Process emulatorProcess)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            emulatorProcess.CloseMainWindow();
+            return;
+        }
+
+        SignalProcessTermination("kill", "-TERM", emulatorProcess.Id.ToString());
+        SignalEmulatorExecutable(emulatorProcess, "-TERM");
+    }
+
+    private static void SignalEmulatorExecutable(Process emulatorProcess, string signalOption)
+    {
+        string executablePath = emulatorProcess.StartInfo?.FileName;
+
+        if (string.IsNullOrEmpty(executablePath))
+        {
+            return;
+        }
+
+        SignalProcessTermination("pkill", signalOption, "-f", executablePath);
+    }
+
+    private static void SignalProcessTermination(string signalCommand, params string[] arguments)
+    {
+        try
+        {
+            var signalStartInfo = new ProcessStartInfo(signalCommand)
             {
-                activeEmulatorProcess.Kill();
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            foreach (string argument in arguments)
+            {
+                signalStartInfo.ArgumentList.Add(argument);
             }
 
+            Process.Start(signalStartInfo)?.WaitForExit(1000);
+        }
+
+        catch (Exception signalFailure)
+        {
+            GD.PrintErr($"Could not signal the emulator with {signalCommand}: {signalFailure.Message}");
+        }
+    }
+
+    private static async void ForceCloseEmulatorAfterGrace(Process emulatorProcess)
+    {
+        bool closedOnRequest = await Task.Run(() => emulatorProcess.WaitForExit(EmulatorShutdownGraceMilliseconds));
+
+        if (closedOnRequest)
+        {
+            return;
+        }
+
+        if (!OperatingSystem.IsWindows())
+        {
+            SignalEmulatorExecutable(emulatorProcess, "-KILL");
+        }
+
+        try
+        {
+            emulatorProcess.Kill(true);
+        }
+
+        catch (Exception killFailure)
+        {
+            GD.PrintErr($"Could not force the emulator to close: {killFailure.Message}");
         }
     }
 
@@ -2026,6 +2382,7 @@ public partial class EmulatorManager : Node
             if (emulatorProcess != null)
             {
                 activeEmulatorProcess = emulatorProcess;
+                BeginEmulatorLivenessGrace();
 
                 emulatorProcess.EnableRaisingEvents = true;
                 emulatorProcess.Exited += (sender, exitEventArgs) =>
@@ -2048,7 +2405,7 @@ public partial class EmulatorManager : Node
             {"ngc", new List<string>{"dolphin"}},
             {"wii", new List<string>{"dolphin"}},
             {"snes", new List<string>{"retroarch", "snes9x"}},
-            {"n64", new List<string>{"retroarch", "gopher64"}},
+            {"n64", new List<string>{"gopher64", "retroarch"}},
             {"nes", new List<string>{"retroarch", "ares"}},
             {"gb", new List<string>{"retroarch", "mGBA"}},
             {"gbc", new List<string>{"retroarch", "mGBA"}},
@@ -2142,7 +2499,15 @@ public partial class EmulatorManager : Node
         var controllerConfig = emulatorMetadata.ControllerConfig;
         var connectedControllers = controllerManager.GetConnectedControllers();
         int availableControllerCount = Math.Min(connectedControllers.Count, controllerConfig.MaxControllers);
-        string configFilePath = Path.Combine(emulatorInstallDirectory, controllerConfig.ConfigFileRelativePath);
+        string configFileRelativePath = controllerConfig.ResolveConfigFileRelativePath(OS.GetName().ToLower());
+
+        if (string.IsNullOrEmpty(configFileRelativePath))
+        {
+            GD.PrintErr("Controller config has no config_file_relative_path for this platform.");
+            return;
+        }
+
+        string configFilePath = Path.Combine(emulatorInstallDirectory, configFileRelativePath);
 
         GD.Print($"Applying controller mappings: {availableControllerCount} of {controllerConfig.MaxControllers} max controllers");
 

@@ -5,16 +5,17 @@
 [ext_resource type="Material" uid="uid://dhmv62s1oow6i" path="res://assets/materials/moving_background.tres" id="2_movbg"]
 [ext_resource type="PackedScene" uid="uid://cew2a8jxcgu6t" path="res://scenes/games_list/game_list_entry.tscn" id="2_rt2n2"]
 [ext_resource type="Script" uid="uid://cwtykxfgbvhv6" path="res://scripts/ui/VerticalCarousel.cs" id="3_gubc5"]
-[ext_resource type="Script" uid="uid://dvfmg1ugxmmur" path="res://scripts/ui/UiPanel.cs" id="3_uipanel"]
-[ext_resource type="PackedScene" path="res://scenes/ui/panels/changelog_panel.tscn" id="8_chglogscene"]
-[ext_resource type="PackedScene" path="res://scenes/ui/panels/progress_panel.tscn" id="9_progressscene"]
-[ext_resource type="PackedScene" path="res://scenes/ui/panels/start_menu_panel.tscn" id="10_stmenuscene"]
-[ext_resource type="Script" path="res://scripts/ui/SettingsPanel.cs" id="3_setpanel"]
 [ext_resource type="Material" uid="uid://b822n10q6f56b" path="res://assets/materials/mica_panel.tres" id="3_mica"]
+[ext_resource type="Script" uid="uid://cm85euea7rnm8" path="res://scripts/ui/SettingsPanel.cs" id="3_setpanel"]
+[ext_resource type="Script" uid="uid://dvfmg1ugxmmur" path="res://scripts/ui/UiPanel.cs" id="3_uipanel"]
 [ext_resource type="PackedScene" uid="uid://cffanb3xjob1c" path="res://scenes/downloads_list/download_entry.tscn" id="4_pu3yx"]
 [ext_resource type="PackedScene" path="res://scenes/ui/system_carousel.tscn" id="5_6wevv"]
 [ext_resource type="Script" uid="uid://bgqglerkcylxx" path="res://addons/SmoothScroll/smooth_scroll_container.gd" id="6_c16ls"]
 [ext_resource type="Script" uid="uid://b7h0k2h2qwlqv" path="res://addons/SmoothScroll/scroll_damper/expo_scroll_damper.gd" id="7_18nlu"]
+[ext_resource type="PackedScene" path="res://scenes/ui/panels/changelog_panel.tscn" id="8_chglogscene"]
+[ext_resource type="PackedScene" path="res://scenes/ui/panels/progress_panel.tscn" id="9_progressscene"]
+[ext_resource type="PackedScene" path="res://scenes/ui/panels/start_menu_panel.tscn" id="10_stmenuscene"]
+[ext_resource type="FontFile" uid="uid://dyue2hm1equjr" path="res://assets/fonts/Inter-Bold.woff2" id="11_lobbybold"]
 
 [sub_resource type="Resource" id="Resource_e1cbu"]
 script = ExtResource("7_18nlu")
@@ -44,7 +45,7 @@ script = ExtResource("7_18nlu")
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_r6p65"]
 
-[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "systemCarousel", "gameList", "detailsPanel", "detailsPanelContainer", "gameMarquee", "gameDescription", "gameScreenshotsScroll", "gameScreenshotsFlow", "gameDownloadProgressBar", "gameListSection", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "progressPanel", "changelogPanel", "backgroundRect", "mainVBoxContainer", "startMenuPanel", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
+[node name="MainScene" type="Control" unique_id=1581770269 node_paths=PackedStringArray("headerContainer", "systemCarousel", "gameList", "detailsPanel", "detailsPanelContainer", "lobbyPanel", "lobbyCodeLabel", "lobbyStatusLabel", "lobbyPlayerList", "lobbyActionButton", "lobbyLeaveButton", "lobbyCopyCodeButton", "gameMarquee", "gameDescription", "gameScreenshotsScroll", "gameScreenshotsFlow", "gameDownloadProgressBar", "gameListSection", "downloadsListContainer", "downloadProgressUI", "gameListFooter", "downloadsFooter", "settingsFooter", "actionBtn", "deleteBtn", "optionsBtn", "filterInstalledGamesBtn", "toggleDownloadsBtn", "downloadsToggleDownloadsBtn", "navHintBtn", "cancelDownloadBtn", "settingsSelectBtn", "settingsBackBtn", "progressPanel", "changelogPanel", "backgroundRect", "mainVBoxContainer", "startMenuPanel", "settingsMenuContainer", "settingsSectionsTree", "sectionOptionsContainer")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -60,6 +61,13 @@ gameList = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/G
 gameListEntryScene = ExtResource("2_rt2n2")
 detailsPanel = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel")
 detailsPanelContainer = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel")
+lobbyPanel = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel")
+lobbyCodeLabel = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel/MarginContainer3/LobbyCodeLabel")
+lobbyStatusLabel = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel/MarginContainer4/LobbyStatusLabel")
+lobbyPlayerList = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel/MarginContainer5/LobbyPlayerList")
+lobbyActionButton = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel/MarginContainer/LobbyActionButton")
+lobbyLeaveButton = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel/MarginContainer2/LobbyLeaveButton")
+lobbyCopyCodeButton = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel/MarginContainer6/LobbyCopyCodeButton")
 gameMarquee = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/NameMargin/GameMarquee")
 gameDescription = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ScreenShotsContainer/HBoxContainer/RichTextLabel")
 gameScreenshotsScroll = NodePath("Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/ScreenShotsContainer/HBoxContainer/SmoothScrollContainer")
@@ -141,7 +149,6 @@ layout_mode = 2
 layout_mode = 2
 size_flags_vertical = 3
 script = ExtResource("3_uipanel")
-Transition = 2
 RestingScale = 0.98
 UseMica = false
 ShadowSize = 0
@@ -177,6 +184,95 @@ preloadItemsHalfCount = 3
 material = ExtResource("3_mica")
 layout_mode = 2
 size_flags_horizontal = 3
+
+[node name="LobbyPanel" type="VBoxContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel" unique_id=586167073]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 10
+
+[node name="MarginContainer3" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel" unique_id=1407031092]
+layout_mode = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="LobbyCodeLabel" type="Label" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel/MarginContainer3" unique_id=2059191304]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("11_lobbybold")
+theme_override_font_sizes/font_size = 40
+text = "----------"
+horizontal_alignment = 1
+
+[node name="MarginContainer4" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel" unique_id=835888830]
+layout_mode = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="LobbyStatusLabel" type="Label" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel/MarginContainer4" unique_id=1048234722]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("11_lobbybold")
+theme_override_font_sizes/font_size = 24
+horizontal_alignment = 1
+
+[node name="MarginContainer5" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel" unique_id=1960294438]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="LobbyPlayerList" type="VBoxContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel/MarginContainer5" unique_id=1244558558]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+[node name="MarginContainer" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel" unique_id=353288497]
+layout_mode = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="LobbyActionButton" type="Button" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel/MarginContainer" unique_id=212534476]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("11_lobbybold")
+theme_override_font_sizes/font_size = 24
+text = "Ready"
+
+[node name="MarginContainer2" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel" unique_id=1354160283]
+layout_mode = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="LobbyLeaveButton" type="Button" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel/MarginContainer2" unique_id=2097618163]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("11_lobbybold")
+theme_override_font_sizes/font_size = 24
+text = "Leave Lobby"
+
+[node name="MarginContainer6" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel" unique_id=726151181]
+layout_mode = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="LobbyCopyCodeButton" type="Button" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel/MarginContainer6" unique_id=1548354050]
+layout_mode = 2
+theme_override_fonts/font = ExtResource("11_lobbybold")
+theme_override_font_sizes/font_size = 24
+text = "Copy Code"
 
 [node name="DetailsPanel" type="VBoxContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel" unique_id=280236495]
 layout_mode = 1
@@ -247,7 +343,6 @@ visible = false
 layout_mode = 2
 size_flags_vertical = 3
 script = ExtResource("3_uipanel")
-Transition = 2
 RestingScale = 0.98
 UseMica = false
 ShadowSize = 0
@@ -255,15 +350,10 @@ ContentRoot = NodePath("DownloadsPage")
 
 [node name="DownloadsPage" parent="Background/VBoxContainer/DownloadsPageContainer" unique_id=141579046 node_paths=PackedStringArray("downloadsVBox") instance=ExtResource("2_6l7je")]
 layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
 offset_left = 10.0
 offset_top = 10.0
 offset_right = -10.0
 offset_bottom = -10.0
-grow_horizontal = 2
-grow_vertical = 2
 downloadsVBox = NodePath("VBoxContainer2")
 downloadEntryScene = ExtResource("4_pu3yx")
 
@@ -281,7 +371,6 @@ visible = false
 layout_mode = 2
 size_flags_vertical = 3
 script = ExtResource("3_setpanel")
-Transition = 2
 RestingScale = 0.98
 UseMica = false
 ShadowSize = 0
@@ -637,7 +726,10 @@ alignment = 0
 expand_icon = true
 
 [node name="StartMenuPanel" parent="Background" unique_id=1160206546 instance=ExtResource("10_stmenuscene")]
+layout_mode = 1
 
 [node name="ProgressPanel" parent="Background" unique_id=695295220 instance=ExtResource("9_progressscene")]
+layout_mode = 1
 
 [node name="ChangelogPanel" parent="Background" unique_id=664785356 instance=ExtResource("8_chglogscene")]
+layout_mode = 1

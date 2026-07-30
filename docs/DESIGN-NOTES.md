@@ -72,16 +72,39 @@ One emulator can serve several platforms from a single meta (ares). Auto-detecti
 is ambiguous for shared formats like `.bin`/`.cue` (Genesis vs. disc systems), so `system_flags` maps
 a system slug to the launch fragment substituted for `{system}` — e.g. `--system "Mega Drive"`.
 
-### Cores install on demand, not at emulator install time
-RetroArch declares 19 cores across 14 systems; downloading all of them to play one game wastes about
-30 MB. `EnsureCoreInstalled` runs at launch, after the save link and sync, and fetches only the core
-the selected system actually needs. Switching core in settings therefore needs no reinstall — the new
-one is fetched the next time that system launches.
+### Cores ship with the install, because only the bundle is versioned
+Cores are installed with RetroArch as one `RetroArch_cores.7z` from the same `{version}` the install
+recipe resolved, not fetched per core at launch. This replaces an earlier on-demand scheme that pulled
+each core individually from `buildbot.libretro.com/nightly/.../latest/`.
+
+The reason is netplay parity. RetroArch refuses a netplay connection unless both peers run the same
+RetroArch version *and* the same core version, and `latest/` is unpinnable — two users installing days
+apart get different core builds with no way to ask for a specific one. Probed on the buildbot: there is
+no per-core stable download and no dated per-core archive. `stable/<version>/<os>/x86_64/cores/`,
+`.../latest/` and a bare `.../<core>_libretro.dll.zip` all 404. The only versioned artifact is the
+whole-bundle `RetroArch_cores.7z`.
+
+Extracting one core from the remote archive is not an option either: the bundle reports `Solid = +`
+with `Blocks = 1`, so a single file cannot be decompressed without the entire archive. The cost is
+therefore fixed at one 227 MB download per RetroArch install, against roughly 30 MB before, and
+on-demand buys nothing once it has been paid. All 44 declared cores across 41 systems were verified
+present in the stable bundle, so no system needs a fallback core.
+
+`{version}` is substituted into `extra_downloads` URLs from the resolved `ReleaseOption.VersionLabel`,
+which is the bare version for `web_scrape` recipes, so cores can never drift from the RetroArch build
+they shipped with. `extract_folder_regex` on an extra download lifts the contents of the archive's
+wrapper directory into the destination — the bundle nests everything under `RetroArch-Win64/cores/`,
+so without it the cores land one level too deep.
 
 `core_directory` plus a per-OS `core_file_name` are the single source of truth for a core's on-disk
 path; `core_launch_arg` is a plain string using `{core_path}`, so the `.dll`/`.so` split lives in one
 field rather than being duplicated into every system's launch fragment. `cores` is in
-`preserve_on_reinstall` so an upgrade does not discard cores it would only re-download.
+`preserve_on_reinstall` so an upgrade does not discard them.
+
+`core_download_url` and the per-core path in `EnsureCoreInstalled` are deliberately left in place for
+any future emulator that has a versioned per-core source. RetroArch no longer declares the field, so a
+core missing from a RetroArch install is reported as needing a reinstall rather than silently pulling
+an unpinned nightly.
 
 ### Installing while the emulator runs corrupts the install
 `UninstallEmulator` refused to run while an emulator was open but `InstallEmulator` did not, so
@@ -91,11 +114,21 @@ directory and a working executable. `InstallEmulator` now carries the same `IsEm
 
 ### Default emulator per system favours RetroArch for pre-gen-6 and cartridge systems
 `GetMappedEmulator` returns index `[0]`, so ordering in `BuildDefaultEmulatorMap` is the default.
-RetroArch is first for generations 1-5 and for all cartridge systems (`nes`, `snes`, `n64`, `genesis`,
+RetroArch is first for generations 1-5 and for most cartridge systems (`nes`, `snes`, `genesis`,
 `sms`, `sega32`, `segacd`, `psx`, `gb`, `gbc`, `gba`, `nds`) because those are the systems RomM's
 EmulatorJS browser player supports, so a save written by RetroArch is also playable in the web UI.
 Gen-6-and-later disc systems keep their native emulator; 3DS is a cartridge system but has no usable
 libretro core, so azahar stays.
+
+`n64` is the exception to the cartridge rule and defaults to gopher64. Neither `mupen64plus_next`
+nor `parallel_n64` supports RetroArch netplay (measured — see `docs/NETPLAY-DESIGN.md`), while
+gopher64 has P2P netplay with TURN fallback built in. Browser-player save compatibility is not worth
+giving up multiplayer on the console whose library is most worth playing together.
+
+For the same reason `psx` keeps RetroArch but its default core is `mednafen_psx_hw`, not
+`swanstation`: swanstation cannot netplay at all, and beetle is the only PS1 path that can. psx is
+the one system where the netplay-capable choice and the browser-save-compatible choice coincide, so
+it stays on RetroArch rather than moving to DuckStation, which has no netplay whatsoever.
 
 `MergeMissingDefaultMappings` appends and never reorders, so this changes fresh installs only. That is
 deliberate: reordering an existing user's map would switch their emulator, and since saves are not
@@ -124,6 +157,454 @@ argument (Azahar): those put `{settings}` before `{rom_path}` so appended settin
 ROM out of final position. When removing the placeholder, drop exactly one adjacent space — never
 collapse other whitespace, since a ROM path may contain consecutive spaces.
 
+### The device id must be persisted, or every sync registers a new device
+`GetOrCreateDeviceAsync` is called by `SaveSyncManager` twice per game session — once before launch
+and once after exit — and it unconditionally `POST`ed `/api/devices`, discarding the returned id.
+Nothing was ever reused, so each sync created a row. Measured against a live server: **403 devices,
+all named `romm-frontend`**, with `last_seen` spread across weeks.
+
+`allow_existing` did not save it, most likely because the payload carried nothing RomM could match an
+existing row on — no `hostname`, no `mac_address`. The id is now stored in `config.cfg` under
+`[RomM] DeviceId` and revalidated with `GET /api/devices/{id}` before reuse, so a server-side
+deletion re-registers rather than failing forever. `hostname` is also sent now, giving RomM a chance
+to dedupe on its own.
+
+This matters beyond tidiness: `device_id` is what save sync attributes uploads to, so hundreds of
+one-shot devices make the server's own sync history meaningless, and any future presence built on the
+device registry would be unusable.
+
+### A netplay session must not outlive the emulator
+`NetplayManager` holds the session as autoload state, and `{netplay}` resolves from it on every
+launch. If a session were left active after the emulator closed, the *next* ordinary launch would
+silently carry `--host` or `--connect` and sit waiting for a peer that never arrives — a failure with
+no visible cause.
+
+`EndSession` is therefore called from the same `EmulatorManager._Process` branch that already detects
+process exit and triggers save sync, not from the UI. Cancelling from the menu also ends it, but the
+process-exit path is the one that must never be missed, because it covers the emulator being closed
+by the hotkey, by its own quit, or by crashing.
+
+### Hosting is gated on the game being launchable, not just supported
+The host button asks `ResolveGameAction(game).Kind == LaunchGame` rather than testing the emulator
+and download state itself. That reuses the single state machine the play button already derives from,
+so the menu can never offer to host a game that the play button would refuse to start — and a game
+that still needs downloading says so instead of failing at launch.
+
+### The netplay view is a third start-menu view, and Back cancels rather than closes
+`ShowNetplayView` follows `ShowBiosView`: the menu list hides and a sibling container shows. Two
+things had to change beyond adding nodes. `HandleInput` picked its focus-cycling list with a boolean
+`IsBiosViewOpen ? biosView : optionsList`, which would have cycled the hidden menu while the netplay
+view was up; and Back closed the whole panel, which would have left a session armed with no visible
+way to cancel it. Back now emits `NetplayCancelRequested`, which ends the session and returns to the
+menu.
+
+### `{netplay}` is a denylist, unlike `sync_include`
+`netplay.unsupported_systems` names the systems that *cannot* netplay, so an unlisted system is
+allowed to try. That is the opposite of `sync_include`, which is an allowlist, and the difference is
+deliberate.
+
+The failure modes are not symmetric. A save-sync allowlist that misses an extension silently stops a
+real save from being uploaded, and nobody notices until the save is needed. A netplay denylist that
+misses a bad core costs nothing: RetroArch refuses the connection outright with
+`Core does not support netplay`, which is loud, immediate and harmless. Guessing wrong is safe in one
+direction and destructive in the other, so the schemas point opposite ways on purpose.
+
+Only 13 of RetroArch's 41 systems were measured. The unmeasured ones are allowed to attempt netplay
+because the worst case is a clear refusal.
+
+`{netplay}` sits before `{rom_path}` in the launch template for the same reason `{settings}` does —
+some emulators require the ROM path last — and is removed with the same single-adjacent-space rule
+when no session is active.
+
+### Join codes encode an address, not a session
+A join code is the host's IPv4 address and port packed into 6 bytes and rendered as 10 characters of
+Crockford base32. The alphabet omits `I`, `L`, `O` and `U`, and parsing folds `I`/`L` to `1` and `O`
+to `0`, because these are typed on a gamepad's on-screen keyboard where those glyphs are easy to
+confuse. Hyphens and whitespace are ignored so a code can be written in groups.
+
+The code carries no session identity, so it cannot survive the host changing address. That is
+acceptable while codes are LAN-scoped; a relay-backed session id (RetroArch's `--mitm-session`) is
+the eventual replacement and is deliberately a different field rather than an overload of this one.
+`BuildJoinCode` returns null for anything that is not IPv4, rather than inventing an encoding that
+would then need supporting.
+
+### The host has no Ready button, so its readiness is its preparedness
+`AllMembersReady` asks every member — including the host — for `IsReady`, but the host's action
+button is Start, not Ready, so nothing ever set the host's `isLocallyReady`. The host therefore
+reported itself unready forever, `AllMembersReady` could never be true, and Start stayed disabled
+reading `Waiting For Players` no matter how many clients readied up.
+
+Readiness is now reported as `isPrepared && (isLocallyReady || IsHosting)`. Pressing Start *is* the
+host's readiness declaration, so deriving it from preparedness rather than adding a Ready toggle
+keeps one button on the host and avoids a state where the host is ready but has not started.
+
+### A rom cannot be selected until the system transition has finished
+`TransitionToSystem` is `async void`: it awaits a 0.2 s fade-out *before* calling
+`DoSelectSystemByIndex`, which is what actually rebuilds `currentlyShownGames`. Switching system and
+then immediately calling `SelectGameById` therefore searched the **previous** system's list and
+silently found nothing, while the carousel header — updated synchronously by
+`SetSelectionSilently` — had already moved. A client following the host's pick showed the new
+system's name above the old system's games.
+
+`SelectGameOnceSystemSettles` records the wanted rom id instead, and `OnSystemSelected` consumes it
+through `ResolveInitialGameIndex` in place of its usual `OnGameSelected(0)`. The selection happens
+once, on the list that actually contains the game, rather than being retried against a list that is
+not there yet.
+
+### The host's browsing is broadcast separately from its pick, and is debounced
+Clients mirror the host's carousel so everyone is looking at the same game before it is committed.
+That is a different message from `ReceiveGameSelection`: browsing moves the client's carousel and
+nothing else, while a committed selection also resets readiness, publishes the host's emulator and
+version, and drives the download prompt.
+
+Broadcasting on every highlight was rejected once already because it puts a network message behind
+every frame of scrolling. `PushHostBrowsingGame` therefore coalesces: it records the newest rom id
+and schedules one broadcast `BrowsingBroadcastSettleSeconds` later, so a scroll through fifty games
+sends one packet rather than fifty. `BroadcastBrowsingGame` also returns early when the host is
+alone in the lobby.
+
+The client's handler ignores the message when it is itself hosting, which is what stops
+`OnGameSelected` → broadcast → `OnGameSelected` from looping back.
+
+### The port mapping belongs to the lobby, not to the emulator session
+`EmulatorManager`'s exit branch released the UPnP mappings along with ending the netplay session. That
+is right when the lobby is closing too, and wrong while the lobby is still open: the *second* game in a
+lobby then had no port forwarding at all, so an internet peer could reach the lobby but not the
+emulator. Measured over a phone tether — the second session connected to the right address and simply
+was not forwarded, which presents as "netplay launched but the players are not connected".
+
+`ReleasePorts` on emulator exit is now conditional on the lobby being gone. The lobby's own paths —
+leaving, cancelling, tree exit — still release, which is where that responsibility belonged.
+
+### The advertised host address must come from the routing table, not the first private address
+`ResolveLocalHostAddress` walked `IP.GetLocalAddresses()` and returned the first RFC1918 address it
+found. On a machine with WSL or Hyper-V installed that is a **virtual adapter**: it advertised
+`172.31.16.1`, an address no peer can reach. It also poisons the LAN join code, which encodes the same
+value.
+
+It now asks the OS which local address would be used to reach the internet, by connecting a UDP socket
+to a public address and reading the local endpoint back. UDP connect sends no packets — it only
+resolves the route — so this costs nothing and cannot fail on a firewall. The old scan remains as a
+fallback for a machine with no route out.
+
+Clients were insulated from this by the earlier "connect to the address you reached the lobby on" rule,
+which is the second time that rule has covered for a bad advertised address.
+
+### Readiness is cleared when a session ends
+Nothing reset the ready flags when an emulator exited, so a lobby returning from a game showed everyone
+still Ready. The host could then start the next game before anyone had confirmed they wanted it or
+finished downloading it. Ending a session now clears readiness on the host and locally on each client.
+
+### Readiness never starts a session; only the host pressing Start does
+Readiness says "I am able to play this", not "go". The host decides when a session begins, and nothing
+else may decide for it — otherwise a player finishing a download is enough to drag everyone into a
+game.
+
+That was never true of the product, but it *was* true of the test flags: `--netplay-auto-ready`
+originally readied clients **and** started the game on the host, so selecting a game appeared to launch
+it instantly. The two behaviours are now separate arguments — `--netplay-auto-ready` readies up and
+stops there, `--netplay-auto-start` is the host-only flag that presses Start. Only the second one can
+begin a session, and neither exists unless explicitly passed.
+
+Auto-start is also one-shot per selection, reset when the selection changes. Without that, clearing
+readiness at the end of a session immediately re-readies everyone and relaunches the same game forever.
+
+### `lobbyCopyCodeButton` was never bound, so the button did nothing at all
+The node existed in `main_scene.tscn` and the `[Export]` existed in `MainScene`, but the field was
+absent from `node_paths` and had no assignment line — exactly the failure mode this document and
+`CLAUDE.md` warn about. The field was null, so the button was invisible to focus navigation *and* its
+`Pressed` signal was never connected: it had never copied anything.
+
+Verifying by eye is what let it through. The check that catches it is mechanical — parse the scene for
+declared `node_paths`, assignment lines and real node paths, parse the C# for `[Export]` fields, and
+diff all four sets. Doing that surfaced a second one immediately: `lobbySelectGameButton` has a C#
+export and **no node in the scene at all**, so the Select/Change Game button has never existed and
+browsing is reachable only via Back.
+
+### A netplay client must not upload its save, because the progress is the host's
+Lockstep netplay has exactly one game state and it is the host's file — RetroArch syncs it to each
+client on connect. So whatever a client's emulator writes when it exits is the *host's* progress
+sitting in the client's save directory under the client's name.
+
+`SyncAfterExit` ran on every emulator exit with no netplay distinction, which meant joining a session
+overwrote the joiner's own cloud save for that game with the host's progress. Silently, and for a game
+they may have had their own long-running save of. The upload is now skipped when
+`NetplayManager.Role` is `Join`. The role is still set at that point — `EndSession` is called further
+down the same branch — which is the only reason this can be decided there at all.
+
+Only the upload is suppressed. `SyncBeforeLaunch` still runs for a client, because it costs nothing
+and keeps the pre-session state coherent.
+
+The client's *local* file turns out to be safe without any help from us. Measured with both machines
+holding the same Emerald save and the host saving in-game mid-session: the host's `.srm` changed and
+uploaded, while the client's was **not written at all** — same hash, same mtime as before the session
+— even though lockstep means the client's in-memory SRAM was identical to the host's at the moment of
+saving. RetroArch does not persist SRAM while it is a netplay client. The `.netplay` directory it
+creates under the save directory stayed empty too.
+
+So no backup-and-restore is needed, and the upload gate is defence in depth rather than the only thing
+standing between a joined session and someone's overwritten save. That distinction matters for phase
+4: this is a RetroArch behaviour, not a guarantee, and Flycast, PPSSPP and gopher64 have not been
+measured. The gate protects the cloud save whatever they do locally.
+
+### Readiness depends on who else is in the lobby, so it has to be recomputed when they change
+Once the version target became "the newest anyone has" rather than the host's, readiness stopped
+being a purely local property: a peer joining with a newer build can invalidate everyone else's. The
+first cut recomputed only on download, install and game-selection events, so a host that readied
+while alone stayed ready when a newer client arrived, and started the game it was no longer eligible
+for.
+
+Recomputing on `MembersChanged` fixes that but closes a loop — reporting readiness broadcasts the
+roster, which raises `MembersChanged`, which reports readiness. Reporting is therefore idempotent: the
+computed values are hashed into a signature and an unchanged signature sends nothing. The loop
+terminates on the first repeat.
+
+Handler order on that signal matters too, and it is subtle. `AutoStartHostedGameIfRequested` was
+subscribed before `ReportPreparednessIfInLobby`, so it saw the *stale* roster — the host still marked
+ready from before the client joined — and started the game before the recompute could clear the flag.
+Preparedness is now reported first. Auto-start also asks `LocalPlayerHasGame` directly rather than
+trusting the roster, because a host should never start a session it is not itself eligible for,
+whatever order the signals arrive in.
+
+A peer's own installed version has to seed the target as well, not just the versions in the roster.
+A client learns its own version through the roster only *after* it reports, so a client on the newest
+build would compare itself against the host's older one, decide it needed to change, and never report
+at all — a deadlock where nobody is ready because nobody has spoken.
+
+### The host waits until the emulator is actually listening, rather than guessing
+Clients used to sleep `HostStartupGraceSeconds` — five seconds — after the start message and then
+connect blind. `--connect` against a host that is not yet listening fails outright with no retry, so
+a core that took longer than the guess lost the session, and every session paid the five seconds
+whether it needed them or not.
+
+The host now polls `GetActiveTcpListeners` for its netplay port and only sends `ReleaseMembersToStart`
+once something is listening; clients connect immediately on receipt. RetroArch binds that port when
+netplay initialises, which is after the core and content have loaded — exactly the delay the guess
+was covering.
+
+Reading the OS listener table is deliberate over connecting to the port to test it. A probe
+connection would arrive at RetroArch as a peer that immediately disappears, which is at best noise in
+the very handshake this is trying to protect. Binding the port to see if it is taken is not reliable
+either: address-reuse semantics differ across platforms, so a successful bind does not prove nobody
+is listening. The listener table is passive and means exactly what it says.
+
+There is still a timeout, and it releases the other players anyway when it expires — a session that
+might work beats one that certainly will not.
+
+#### The session port must be re-resolved per launch, not read from the previous session
+`EndSession` sets `Port` to zero when an emulator exits, and `BeginHosting` is what applies the
+fallback. `StartHostedGame` read `Port` *before* calling `BeginHosting`, so the first game in a lobby
+worked — the lobby's own `BeginHosting` had already set it — and **every game after it launched with
+port 0**.
+
+The damage was almost invisible, which is why it survived: the client's `BeginJoining` applies the
+same fallback independently, so it still connected to the right port. What broke was the host's
+listening check, which waited for something to listen on port 0 and burned the entire 60-second
+timeout before releasing the other players. Measured as `nothing started listening on 0` followed by a
+client that launched a minute-plus late, into a session the host had by then finished with.
+
+The port is now resolved through `ResolveDefaultPort` on every launch, matching how the lobby resolved
+the port it asked UPnP to map, and the listening poll refuses a non-positive port outright rather than
+waiting out the timeout on a value that can never match.
+
+Worth noting how this escaped: every automated test launched exactly **one** game per lobby. The bug
+only exists from the second launch onward, so a scripted run could never see it.
+
+### ROM parity is checked against the file on disk, not against the metadata
+Comparing the host's ROM metadata with the client's would prove nothing: both resolve the same
+`rom_id` against the same RomM server, so the hashes are equal by construction. The failure this
+guards against is a **local file** that does not match what RomM says it should be — a partial
+download, a hand-replaced file, a different regional dump — which RetroArch reports as a cryptic
+connection failure.
+
+The host publishes RomM's `md5_hash` with the game selection, and each peer hashes its own file and
+compares. MD5 rather than the CRC32 RetroArch itself logs, because .NET has MD5 built in and CRC32
+would need a package for no benefit — the check is "is this the file RomM describes", and any hash
+answers that.
+
+Hashing runs off the main thread and is cached per file path, so it happens once per selection rather
+than once per panel refresh. A mismatch blocks readiness and turns the action button into
+`Redownload <game>`, so the fix is one press. A hash that cannot be computed counts as a match: the
+frontend's own failure to read a file must not be what stops a session starting.
+
+### A client connects to the address it reached the lobby on, not the one the host advertises
+`StartHostedGame` publishes the host's UPnP external address when there is one, which is right for a
+peer coming in over the internet and wrong for everyone else. Measured on two machines on one LAN:
+the host launched `--host --port 55435` while the client launched `--connect 50.34.50.204` — its own
+router's public address. That only works if the router supports NAT hairpinning, and consumer
+routers commonly do not, so a purely local session would fail with a connect error that names a
+public address and gives no hint that the LAN address was available.
+
+The host cannot tell which of its addresses a given peer can reach, but the peer already knows: it
+is talking to the lobby right now, over an address that demonstrably arrives. `MainSceneNetplayHandler`
+remembers that address from `JoinLobby` and prefers it, falling back to the advertised one only if
+it has none. This needs no subnet comparison and stays correct for internet peers, whose lobby
+address *is* the external one.
+
+### Internet play needs the lobby port forwarded too, not just the netplay port
+Hosting mapped `hostPort` — the emulator's netplay port — and nothing else, so the log read
+`Mapped ports 55435 via UPnP` and the join code advertised the public address as reachable. But a
+joiner connects the **lobby** first, and `NetplayLobby` listens on its own ENet port (55440), which
+was never forwarded. Over the internet the client's connection was dropped at the host's NAT, so the
+lobby opened with an empty roster and sat there until ENet gave up — the failure looked like an
+empty lobby rather than a blocked port. On a LAN nothing forwards anything, which is why this only
+appeared once a code was used across the internet.
+
+Both ports are mapped now, and *both* must succeed before the code advertises the public address:
+`MapPorts` returns true if **any** port mapped, so checking its return value alone would still call
+a host reachable when only the emulator's port got through. `IsPortMapped` is asked about each one.
+When either fails the code carries the LAN address and the note names both ports to forward by hand.
+
+A client cannot tell "connected, nobody here yet" from "never connected" either, since both are an
+empty roster, so a non-hosting lobby with no members reports `Connecting to the host...` rather than
+the waiting-for-a-game text.
+
+### Closing the emulator is three different things on Linux
+`CloseEmulator` was written for Windows and silently did nothing on Linux. Measured: the host quit,
+the client logged that it had been told to close, and RetroArch stayed on screen.
+
+Three separate faults:
+
+- `Process.CloseMainWindow` only works on Windows. On Unix .NET has no window handle to send to, so
+  it returns false and nothing happens.
+- `Process.Kill()` without `entireProcessTree` kills only the tracked process. RetroArch on Linux is
+  an AppImage, so the tracked pid is the AppImage runtime and the emulator is its child — killing the
+  parent leaves the emulator running.
+- `WaitForExit(5000)` ran on the main thread, so the whole frontend froze for five seconds while
+  waiting for a process that was never asked to exit.
+
+The request is now per-platform — `CloseMainWindow` on Windows, `SIGTERM` elsewhere — and the wait
+happens off the main thread. `SIGTERM` rather than `Kill` first matters: `Process.Kill` sends
+`SIGKILL` on Unix, which would stop RetroArch before it flushes SRAM, and save sync reads those files
+off disk once the process exits.
+
+#### An AppImage's launcher outlives the emulator, so exit is detected by scanning `/proc`
+The same double-fork breaks *detecting* the exit, not just causing it, and that is the more damaging
+half. Measured: the emulator was quit, and one minute later
+
+```
+27935      1  romm-frontend.x
+28366  27935  AppRun            <- still alive, emulator long gone
+```
+
+`activeEmulatorProcess` is the launcher, so `HasExited` stayed false indefinitely. Everything hanging
+off that check silently never ran: **save sync never fired on exit**, `EndSession` never cleared the
+netplay role — so the next ordinary launch would have carried `--host` or `--connect` — the port
+mapping was never released, and `IsEmulatorRunning` stayed true, which refuses every later launch
+with "an emulator is already starting or running". None of it produced an error; the frontend simply
+believed a game was still running forever.
+
+On Windows `HasExited` is the whole answer and is still used unchanged. On Linux the emulator is
+identified by scanning `/proc` for a process whose `comm` is the executable's file name — truncated
+to the 15 characters the kernel keeps — *and* whose `cmdline` contains the executable path.
+
+A process counts as the emulator when its `cmdline` contains the executable path **and** either its
+`comm` is that expected name, or its `comm` is not a known launcher. Both tests are kept because
+their failure modes are wildly asymmetric, and only the union is safe in both directions:
+
+- **Name match alone** breaks badly when an AppImage's `AppRun` execs a binary under a different
+  name — plausible for PCSX2 or Dolphin, whose real process may not be named after the AppImage. No
+  process would match, the session would be declared over about fifteen seconds in, and save sync
+  would fire *while the game was still being played*.
+- **Excluding launchers alone** breaks gently: an unrecognised launcher keeps the frontend thinking a
+  game is running until that launcher exits. That is the old bug's behaviour, no worse.
+
+So a severe failure now needs both rules to be wrong at once. The launcher list has to include the
+FUSE mount daemons some AppImages leave behind — `dwarfs` processes carrying the AppImage path in
+their own `cmdline`, observed still running ten hours after their emulator closed — or those alone
+would keep the session alive forever.
+
+Verified against RetroArch, whose `comm` is `RetroArch-Linux`, exactly the first 15 characters of
+`RetroArch-Linux-x86_64.AppImage`, with `AppRun` as its launcher. The other AppImage emulators are
+covered by the launcher-exclusion half and are untested.
+
+The scan is throttled to `EmulatorLivenessCheckSeconds` rather than run every frame, and suppressed
+for `EmulatorLivenessGraceSeconds` after launch: an AppImage has to mount itself before the emulator
+exists, and a check that ran in that window would see no match and declare the session over
+immediately. Detecting the exit a second late costs nothing.
+
+The lingering launcher is killed once the exit is detected, or it accumulates one orphan per game.
+
+#### Signalling the process tree does not reach an AppImage's emulator
+Killing by process handle cannot work for these emulators, and measuring the tree shows why:
+
+```
+14145  ppid=13842  AppRun                    <- what the frontend tracks
+14149  ppid=1      RetroArch-Linux-x86_64    <- re-parented to init
+```
+
+`AppRun` double-forks the real emulator, so it is orphaned to init and is **not a descendant** of
+anything the frontend holds. `pkill -P`, `Kill(entireProcessTree: true)` and every other tree walk
+find no children to signal. Worse, `AppRun` ignores `SIGTERM` outright — sending it one changes
+nothing — while the same signal to the real process shuts it down cleanly.
+
+Shutdown is therefore addressed by **executable path** (`pkill -f` on `StartInfo.FileName`), which
+matches the orphan as well as the wrapper, with the tracked pid signalled too so non-AppImage
+emulators still take the ordinary path. The force stage repeats it with `-KILL` before falling back
+to `Kill(true)`, because a lingering `AppRun` keeps `IsEmulatorRunning` true and would leave the
+frontend believing a game is still running.
+
+### Selecting a game by id has to scroll the carousel, not just mark the card
+`OnGameSelected` sets `currentlySelectedGame`, fills the details panel and flips each card's
+`Selected` flag — but the carousel's own position lives in `VerticalCarousel.SelectedIndex`, and
+nothing in that path touches it. Calling `SelectGameById` therefore lit the right card up while the
+list stayed exactly where it was, so a client following the host's pick highlighted a game that was
+somewhere off screen.
+
+Every other caller that moves the selection programmatically already sets `SelectedIndex` and calls
+`UpdateLayout` alongside `OnGameSelected`; `SelectGameById` was the one that did not.
+`ScrollGameListTo` is that pair, and `OnSystemSelected` uses it too so the first card of a new
+system is actually scrolled to rather than assumed to be in view.
+
+### The lobby panel needs explicit d-pad navigation, and must not steal focus on refresh
+Two separate faults made the lobby unnavigable on a controller.
+
+Godot drops focus from a control the moment it is disabled, and `RefreshLobbyPanel` reassigns
+`Disabled` on the action and select-game buttons every time it runs. It runs on every roster
+broadcast, which arrives repeatedly, so the focused button was routinely disabled out from under the
+user and the panel then re-focused its *first* enabled button. Focus snapped back to the top faster
+than it could be moved. The refresh now remembers what was focused and restores it when it is still
+usable, falling back to the first button only when it is not.
+
+Focus navigation between the buttons could not be left to Godot either. `MainScene` sits in front of
+the GUI for directional input, so `HandleLobbyNavigation` cycles the enabled, visible lobby buttons
+directly, in the same place `Select` and `Back` are already routed for the lobby. It is a wrap-around
+cycle over a filtered list rather than a geometric neighbour search, which means a disabled button is
+skipped instead of becoming a dead end.
+
+The cycle order is read from the panel's own child order, not from a list in code. It was a hardcoded
+array first, and it silently disagreed with the scene: the panel lays the buttons out as
+Action → Leave → Copy Code while the array said Action → Copy Code → Leave, so pressing down from the
+action button jumped to the bottom entry and then back up to the middle one. It reads as the d-pad
+running backwards. Walking `lobbyPanel` for `Button` descendants in tree order cannot drift from the
+layout, and it picks up buttons nested inside their `MarginContainer` wrappers without needing to know
+they are there.
+
+### RetroArch must not do its own NAT traversal, because the frontend already did it
+`NetplayPortMapper` maps the netplay port over UPnP before launching, and RetroArch then asks the
+router to map **the same port again**. The second request is refused — routers do not hand the same
+external port to two mappings — and RetroArch reports `Netplay UPnP Port Mapping Failed` followed by
+`Your room is not connectable from the internet`, which reads as a router problem when it is really
+the frontend and the emulator competing for one mapping.
+
+`netplay_nat_traversal = "false"` in the shipped `retroarch.cfg` stops the duplicate attempt. The
+mapping still exists; the frontend owns it and releases it on cancel, on emulator exit and on tree
+exit, which RetroArch cannot do for a mapping it did not make. `netplay_public_announce` is off for
+a separate reason: sessions here are formed in the lobby, and there is no reason to list a private
+game on RetroArch's public server.
+
+This supersedes the earlier reading of that measurement as a plain router refusal.
+
+### Netplay can be driven from the command line, because a lobby needs two machines
+`--netplay-host` and `--netplay-join=<address>` are read by `ApplyStartupSessionArguments` at the end
+of `MainScene._Ready` and call the same handlers the start-menu buttons do. They exist because a
+lobby cannot be tested from one keyboard: verifying host and client behaviour means driving two
+machines at once, and the Arch test box (see `LINUX-TESTING.md`) has no way to take input remotely.
+
+They take the host address directly rather than a join code, so a test does not depend on the
+clipboard. Both are read from `OS.GetCmdlineUserArgs`, which means they must follow a bare `--` on
+the command line.
+
 ### Save data lives inside the install directory
 Every emulator keeps its saves inside its own install directory (memory cards, save folders), so
 uninstall and reinstall must know which sub-paths to leave alone. Two separate lists exist and the
@@ -139,6 +620,58 @@ as a game save.
 ### Prerelease filtering
 GitHub release recipes prefer stable releases, but some repos (PCSX2) flag every rolling release as
 a prerelease. When prereleases are all that exist, they are used.
+
+### RetroArch on Linux is an AppImage that rewrites its own HOME
+The Linux `RetroArch.7z` from the libretro buildbot contains no `retroarch` binary. It ships
+`RetroArch-Linux-x86_64.AppImage` alongside a `RetroArch-Linux-x86_64.AppImage.home` directory, and
+the AppImage sets `$HOME` to that directory on launch. Every RetroArch-owned path — `cores`,
+`system`, `assets`, `info`, `database` — therefore lives under
+`RetroArch-Linux-x86_64.AppImage.home/.config/retroarch/`, not flat in the install directory the way
+the Windows build lays them out.
+
+`executable_name.linux` and `core_directory.linux` in `install_scripts/retroarch/meta.json` are
+written against that layout. Declaring `executable_name.linux` as `retroarch` (the obvious guess)
+makes `IsEmulatorInstalled` resolve a path that never exists, so a fully successful download and
+extraction still reports as "not installed".
+
+The Linux `default_config` deliberately does **not** override `system_directory`,
+`libretro_directory`, `assets_directory` and friends. Because the AppImage already points `$HOME` at
+its bundled tree, RetroArch's own defaults are already correct; overriding them just hardcodes the
+versioned folder name in a second place. Only `savefile_directory` and `savestate_directory` are
+redirected, so saves land in the central save store like every other emulator.
+
+### PCSX2's Linux AppImage keeps its config in a nested `PCSX2/` directory
+`-portable` on Windows makes PCSX2 read `inis/PCSX2.ini` next to the executable. The Linux AppImage
+cannot do that — its "app directory" is a read-only mount — so it creates a `PCSX2/` data directory
+*next to the AppImage* and uses `PCSX2/inis/PCSX2.ini` instead. Anything written to `inis/` on Linux
+is inert: PCSX2 generates its own config about half a second after install and never reads ours.
+
+This is why `install_scripts/pcsx2/default_config/linux/PCSX2/inis/PCSX2.ini` exists, and why every
+`config_file_relative_path` in the PCSX2 metadata — the four `settings_fields` and
+`controller_config` — is OS-scoped. Without that, the in-app graphics settings and controller
+mappings silently write to a file PCSX2 ignores.
+
+The symptom is the first-run setup wizard appearing forever: `SetupWizardIncomplete = false` is
+being written to the wrong file. PCSX2 is the only emulator that does this. Dolphin (`User/`),
+Azahar (`user/`), PPSSPP (`memstick/`) and Flycast (`data/`) all keep their data where the shipped
+`default_config` already puts it.
+
+`[Folders]` in the Linux config points `Bios` and `MemoryCards` at `../bios` and `../memcards` so
+they resolve back out to the emulator install directory. That keeps `emulator_bios_path` and
+`relative_save_path` identical across platforms — PCSX2 accepts the parent-relative paths and does
+not rewrite them.
+
+### Default configs can be scoped per OS
+`install_scripts/<emulator>/default_config/` is copied wholesale on install, but a `windows/`,
+`linux/` or `macos/` subdirectory inside it is treated as an overlay rather than as content: the
+base directory is copied with those names excluded, then the one matching the running OS is copied
+over the top. This exists because emulators that ship a different directory layout per platform
+(RetroArch) need different path settings in the same config file name.
+
+### `core_directory` is OS-scoped
+`core_directory` accepts either a plain string or an object keyed by OS name, resolved through
+`ResolveOsScopedValue` like `core_file_name` beside it. Existing metadata using a plain string keeps
+working unchanged.
 
 ### Platform mapping merges on upgrade
 The on-disk `EmulatorMap.json` is written once at first run. Platforms added to the defaults in a
@@ -193,6 +726,38 @@ a valid key for that emulator.
 the UI keeps reacting to the controller behind the emulator, which makes configuring an emulator's
 own controller bindings nearly impossible. `activeGame` stays null so the process cleanup runs
 without triggering a save sync.
+
+---
+
+## Discrete GPU preference
+
+On hybrid laptops the compositor (Linux) or the driver (Windows) hands out the integrated GPU by
+default, which is wrong for both the frontend's background shader work and for every emulator.
+`ConfigManager.PreferDiscreteGpu` (`[Graphics] PreferDiscreteGpu`, default true) drives
+`DiscreteGpuPreference`.
+
+The two platforms need completely different mechanisms:
+
+- **Linux** sets PRIME offload environment variables on the child `ProcessStartInfo`. They are
+  applied before `ApplyLaunchEnvironment`, so an emulator's own `launch_env` in `meta.json` can
+  still override them.
+- **Windows** writes `HKCU\Software\Microsoft\DirectX\UserGpuPreferences`, keyed by full executable
+  path with the value `GpuPreference=2;`. This is the same key the Windows Graphics Settings UI
+  writes. It is registered for each emulator as it launches, and for our own executable at startup.
+
+### The registry call is isolated in its own method on purpose
+`Microsoft.Win32.Registry` is Windows-only. A platform check *inside* a method does not stop the JIT
+from having to resolve the type when that method is compiled, so the registry work lives in
+`WriteWindowsGpuPreference`, marked `[SupportedOSPlatform("windows")]` and `NoInlining`, behind an
+`OperatingSystem.IsWindows()` guard in the caller. Inlining it back would risk a type-load failure on
+Linux, where the method is still reached (and returns early) on every emulator launch.
+
+### The setting cannot move the frontend itself on Linux
+PRIME offload variables must exist in the environment *before* the process starts, so the app cannot
+apply them to itself once running. On Linux the setting therefore affects launched emulators only;
+moving the frontend requires the variables in whatever launches it (`.desktop` entry, wrapper
+script, or `tools/linux-test/deploy.ps1 -Gpu discrete` when testing). On Windows the registry key
+covers the frontend too, but only from the next launch onward.
 
 ---
 
@@ -420,6 +985,31 @@ Emitting `Pressed` manually, and controller "Select" routing directly, both bypa
 disabled-button gate. The disabled state has to be re-checked by hand at those call sites, e.g. while
 an emulator install or download is running.
 
+### A quick-switch fade with nothing to fade back in leaves the list invisible
+`BeginQuickSwitchFade` drops `gameList` and `detailsPanel` to alpha 0 and relies on the
+`TransitionToSystem` that follows to bring them back. Nothing did when the carousel could not
+actually move: `Next`/`Previous` wrapped a single-entry list back to the same index,
+`SelectSystemByIndex` hit its `index == currentGameSystemIndex` early return, and the fade was never
+reversed. The page looked empty because it was invisible, and re-entering the mode fixed it only
+because that path runs a full transition.
+
+Latent for any one-entry list, and collections made it routine — most users have exactly one
+Favorites collection.
+
+Fixed at both ends. `Next`/`Previous` return false when there is nothing to move to, so the caller
+never starts the fade; and every early return in `SelectSystemByIndex` calls
+`CancelQuickSwitchFade`, so a fade can never outlive the transition that was supposed to end it.
+
+### Closing a panel has to hand focus back
+`gameList` keeps its own focus for controller navigation, and nothing restored it when the start menu
+closed — focus stayed on a button that was no longer visible, so the list ignored input until a click
+gave it back. `UpdateMouseFocus` did not rescue it either, since that only runs on mouse motion.
+
+`MainScene` now subscribes to the panel's `Closed` signal rather than restoring focus inside
+`ToggleStartMenu`, so it holds however the panel was dismissed — toggle, Back, or a menu action. It
+is guarded by `IsAnyMenuOpen` so a panel closing beneath another one does not steal focus from
+whatever is still open.
+
 ### Focus-follows-mouse
 For keyboard/mouse users, whichever focusable widget the cursor moves over takes focus; the nearest
 focusable *ancestor* is used, so hovering a settings entry's inner widget still focuses the entry.
@@ -564,6 +1154,25 @@ start syncing.
 
 Omitting `sync_include` means "sync everything" and is the default; an empty list means sync nothing.
 
+### Dot-prefixed save items are the emulator's, never a game's
+A netplay client in RetroArch does not write to the normal save path. It redirects SRAM into
+`<savefile_directory>/.netplay/`, so the joining player's own save is not overwritten by the host's
+state. Measured by joining a local session: the host wrote
+`saves/Pokemon - Emerald Version (USA, Europe).srm`, the client wrote
+`saves/.netplay/Pokemon - Emerald Version (USA, Europe).srm`.
+
+RetroArch declares no `sync_include`, which means "sync everything", so `SyncAfterExit` would have
+treated `.netplay` as one game's save unit and uploaded it to RomM as `.netplay.folder.zip` under
+whatever game was being played — once per session, for every joining player.
+
+`ShouldSyncSaveItem` now rejects any item whose name starts with `.` before the allowlist is
+consulted. This is deliberately a rule in code rather than a `sync_include` entry per recipe.
+`sync_include` is an allowlist, so covering RetroArch that way means enumerating every save extension
+across 41 systems and 44 cores; a single omission silently stops a real save from syncing, which is a
+worse failure than the one being fixed. The saves directory of this install already holds both `.srm`
+and `.sav` for the same game, which is how little the extension set can be trusted. A per-recipe
+allowlist for RetroArch should be built empirically, one system at a time, as each is verified.
+
 ### `sync_save_path` narrows the sync scope without narrowing the link scope
 `relative_save_path` answers two questions at once: what gets linked into the store and preserved
 across reinstall, and what save-sync walks. Those are not always the same directory. azahar is the
@@ -622,6 +1231,68 @@ logged, and the emulator launches with saves in the old location.
 
 ---
 
+## Collections
+
+### Collections are projected into `GameSystem` with negative ids
+A RomM collection becomes a `GameSystem` carrying `IsCollection = true` and a synthetic **negative**
+`Id`, with its games registered in `gameCache` under that id. Real platform ids from RomM are always
+positive, so the two can never collide and `systemId < 0` is a reliable test for "this is a
+projection, not a platform".
+
+Doing it this way means `SystemCarousel.Populate`, the game grid, the card pool and the art pipeline
+all work on collections unchanged — the carousel takes a `List<GameSystem>` and does not care where
+the entries came from.
+
+`Project` clears existing negative-id entries before rebuilding, so it is idempotent and self-heals
+if a stale projection ever reached `games.cache`.
+
+### A collection is a view, never a re-homing
+Games in a collection are the **same `Game` objects** already in `gameCache`, so each one keeps the
+`System` it was given at cache build. `LaunchEmulatorWithGame` reads `game.System.Slug`, not the
+carousel selection, so a game launched from a collection still resolves its real platform's emulator.
+
+This is load-bearing and easy to break. `OnRefreshCurrentSystemGamesPressed` assigns
+`game.System = currentSystem` to every game it fetches; running it while a collection is selected
+would re-home the whole collection onto a synthetic system with no emulator and break launching for
+those games everywhere, not just on that page. It now returns early on a collection, as does
+`OnSelectBiosMenuPressed` — BIOS and preferred-emulator are per-platform concepts with no meaning
+here.
+
+### The start menu's emulator actions follow the game, not the carousel
+`GetCurrentPlatformSystem` resolves the selected game's own `System` first and only falls back to the
+carousel entry. Every emulator action in the start menu — launch, install, update, uninstall — goes
+through it, so the buttons name the emulator that would actually run the highlighted game.
+
+It used to read the carousel system's slug directly. That was already slightly wrong (the menu
+described the system rather than the selection) and became outright broken with collections: a
+collection's slug maps to no emulator, so `GetMappedEmulator` returned empty and every emulator
+button went permanently dead on a collection page.
+
+The fallback returns null rather than the carousel entry when that entry is a collection, so a
+collection with no selected game disables the actions instead of resolving to nonsense.
+`OnLaunchEmulatorPressed` needs the `GameSystem` itself, not just the emulator name, which is why the
+helper returns the system and `GetCurrentEmulator` is layered on top rather than the other way round.
+
+### Collections bypass the emulator filter, and are not cached
+`GetCache` filters out systems with no mapped-and-installed emulator unless `ShowAllSystems` is set.
+A collection has no emulator by definition, so the collections branch returns before that filter
+rather than being exempted inside it.
+
+They are also fetched fresh on every load rather than written to `systems.cache`. Smart collections
+are evaluated server-side from `filter_criteria` and change without the client doing anything, so a
+cached copy would go stale invisibly. The cost is one extra request per launch.
+
+Virtual collections need their own type. `VirtualCollectionSchema.id` is a **string** where the other
+two are integers, so deserialising them into `Collection` would fail on the id alone. `Project` takes
+both lists and normalises them into one internal shape whose `SourceId` is a string, which is safe
+because the synthetic system id is assigned by the projection and never derived from the source id —
+the source id only reaches the slug.
+
+Ordering is favourites, then real collections, then virtual ones grouped by `type`. Virtual
+collections sort last deliberately: they are auto-generated per genre, franchise and publisher, so
+there can be a great many of them and they would otherwise bury the collections a user actually
+curated.
+
 ## Image loading
 
 Images are loaded by sniffing magic bytes (PNG/JPEG/WebP) rather than trusting the file extension, so
@@ -664,6 +1335,60 @@ The transfer runs on a task thread and publishes progress with `Interlocked.Exch
 reads it back with `Interlocked.Read` and is the only place that emits `DownloadProgressUpdated` or
 touches a node. Godot signals and UI must be driven from the main thread, so completion is a
 `Volatile.Write` flag that `_Process` notices, never a callback invoked from the worker.
+
+### A signal per chunk is what made the updater slow, not the network
+`AppUpdater` read the release zip in 8 KB chunks and fired
+`CallDeferred(EmitSignal, UpdateDownloadProgress, …)` on **every one of them**. For the 87 MB v1.0.14
+release that is 11,097 marshalled main-thread calls, each one re-rendering a progress bar and
+re-setting a label, queued onto the same thread that is trying to draw at 60 fps.
+
+The network was never the constraint: the same asset pulls in **1.0 s at 89 MB/s** measured with
+curl on this machine. The download was starved by its own progress reporting.
+
+The fix is the pattern the note above already describes — the worker publishes bytes with
+`Interlocked.Exchange`, `_Process` emits at most once per frame, and the buffer matches
+`DownloadManager` at 1 MB. That turns ~11,000 emissions into at most one per frame, and 11,097 reads
+into 87. `_Process` also skips emitting when the value has not changed, so an idle updater costs
+nothing.
+
+### Installer downloads reach the downloads page as external transfers
+`UniversalInstaller` does its own HTTP (see above) and so never appeared on the downloads page —
+emulator installs emitted only `EmulatorInstallationCompleted`, with no progress at all. That was
+tolerable when an install was a single archive; it stopped being tolerable when RetroArch grew a
+227 MB cores bundle on top of its own download.
+
+`DownloadManager.BeginExternalTransfer` / `ReportExternalTransferProgress` / `CompleteExternalTransfer`
+let a transfer the manager does not own publish through the *existing* `DownloadProgressUpdated` and
+`DownloadCompleted` signals, so `DownloadProgressUI` needed no changes. They are held in a
+`ConcurrentDictionary` rather than the plain `List` used for game downloads, because the installer
+resumes on a task thread after its awaits and would otherwise mutate that list while `_Process`
+iterates it. Reads still happen only in `_Process`, so the threading rule above is unchanged.
+
+A missing `Content-Length` reports a total of 0, which `DownloadProgressDisplay.ApplyTo` already turns
+into an indeterminate bar, so no extra guard is needed at the call site.
+
+Every transfer the user starts or waits on now reports: ROMs and firmware through `DownloadManager`
+directly, the emulator archive and cores bundle through `UniversalInstaller`, save sync through
+`RomMAPI`, and the app update through `AppUpdater`.
+
+### Box art is the one download deliberately kept off the page
+`RomMAPI.DownloadAssetAsync` serves both save sync and `AssetManager`'s cover art, and reports
+progress **only when given a `displayName`**. Save sync passes one; `AssetManager` does not, so art
+stays silent.
+
+That asymmetry is the point. The asset queue runs two workers continuously while the user browses and
+fetches a cover for nearly every game they scroll past — hundreds of small files, each finishing in
+well under a second. Listing them would flood the downloads page with entries appearing and vanishing
+faster than they can be read, and bury the ROM or emulator install the page exists to show. Opting in
+by name means a new caller is silent until someone decides it is worth showing, rather than the
+reverse.
+
+### `HttpClient` needs an infinite timeout for large transfers
+`HttpClient.Timeout` covers the whole operation, body included, even with
+`HttpCompletionOption.ResponseHeadersRead`. The default 100 s therefore aborts any download slower
+than roughly 2.3 MB/s once it passes ~227 MB — which the RetroArch cores bundle does exactly.
+`DownloadManager` already set `Timeout.InfiniteTimeSpan`; `UniversalInstaller` and `AppUpdater` did
+not, and now do. Cancellation is the `CancellationTokenSource`'s job, not the timeout's.
 
 ### Extraction runs off the main thread
 

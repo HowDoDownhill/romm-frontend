@@ -298,6 +298,26 @@ public class MainSceneSettingsHandler
         var backgroundEntry = settingsListEntryScene.Instantiate<SettingsListEntry>();
         backgroundEntry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(backgroundFieldBox);
         vbox.AddChild(backgroundEntry);
+
+        HBoxContainer discreteGpuFieldBox = new HBoxContainer();
+        Label discreteGpuLabel = new Label();
+        discreteGpuLabel.Text = "Prefer discrete GPU";
+        discreteGpuLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        discreteGpuFieldBox.AddChild(discreteGpuLabel);
+
+        CheckButton discreteGpuCheckbox = new CheckButton();
+        discreteGpuCheckbox.ButtonPressed = appInstance.configManager.PreferDiscreteGpu;
+
+        discreteGpuCheckbox.Toggled += (bool toggledOn) =>
+        {
+            appInstance.configManager.SavePreferDiscreteGpu(toggledOn);
+            DiscreteGpuPreference.RegisterWindowsGpuPreference(OS.GetExecutablePath(), toggledOn);
+        };
+
+        discreteGpuFieldBox.AddChild(discreteGpuCheckbox);
+        var discreteGpuEntry = settingsListEntryScene.Instantiate<SettingsListEntry>();
+        discreteGpuEntry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(discreteGpuFieldBox);
+        vbox.AddChild(discreteGpuEntry);
     }
 
     private void GenerateGameListSettingsForm()

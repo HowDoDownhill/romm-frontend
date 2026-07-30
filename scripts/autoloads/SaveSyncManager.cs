@@ -94,7 +94,7 @@ public partial class SaveSyncManager : Node
                         string downloadUrl = appInstance.rommApi.GetSaveDownloadUrl(serverSaveId, fileName);
                         
                         string tempDownloadPath = Path.Combine(savesDirs[0], "temp_" + fileName);
-                        await appInstance.rommApi.DownloadAssetAsync(downloadUrl, tempDownloadPath);
+                        await appInstance.rommApi.DownloadAssetAsync(downloadUrl, tempDownloadPath, $"Save: {fileName}");
 
                         foreach (var savesDir in savesDirs)
                         {
@@ -170,7 +170,7 @@ public partial class SaveSyncManager : Node
                     if (op.FileName.EndsWith(".folder.zip"))
                     {
                         GD.Print($"Downloading zipped folder save for {game.Name}: {op.FileName}");
-                        await appInstance.rommApi.DownloadAssetAsync(downloadUrl, tempDownloadPath);
+                        await appInstance.rommApi.DownloadAssetAsync(downloadUrl, tempDownloadPath, $"Save: {op.FileName}");
                         
                         string folderName = op.FileName.Substring(0, op.FileName.Length - ".folder.zip".Length);
 
@@ -186,7 +186,7 @@ public partial class SaveSyncManager : Node
                     else
                     {
                         GD.Print($"Downloading save for {game.Name}: {op.FileName}");
-                        await appInstance.rommApi.DownloadAssetAsync(downloadUrl, tempDownloadPath);
+                        await appInstance.rommApi.DownloadAssetAsync(downloadUrl, tempDownloadPath, $"Save: {op.FileName}");
 
                         foreach (var savesDir in savesDirs)
                         {

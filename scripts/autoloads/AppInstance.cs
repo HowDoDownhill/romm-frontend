@@ -12,6 +12,10 @@ public partial class AppInstance : Node
     public AssetManager assetManager;
     public SaveSyncManager saveSyncManager;
     public ControllerManager controllerManager;
+    public NetplayManager netplayManager;
+    public NetplayLobby netplayLobby;
+    public NetplayDiscovery netplayDiscovery;
+    public NetplayPortMapper netplayPortMapper;
     
     public override void _Ready()
     {
@@ -27,5 +31,17 @@ public partial class AppInstance : Node
         }
         dataBus = GetNode<DataBus>("/root/DataBus");
         controllerManager = GetNode<ControllerManager>("/root/ControllerManager");
+        Callable.From(ApplyDiscreteGpuPreference).CallDeferred();
+    }
+
+    private void ApplyDiscreteGpuPreference()
+    {
+        DiscreteGpuPreference.RegisterWindowsGpuPreference(OS.GetExecutablePath(), configManager.PreferDiscreteGpu);
+
+        if (DiscreteGpuPreference.ShouldRelaunchOnDiscreteGpu(configManager.PreferDiscreteGpu)
+            && DiscreteGpuPreference.RelaunchOnDiscreteGpu())
+        {
+            GetTree().Quit();
+        }
     }
 }

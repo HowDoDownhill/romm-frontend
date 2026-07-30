@@ -1,6 +1,9 @@
 # Netplay Design
 
-Status: **proposal** — not yet implemented.
+Status: **implemented for RetroArch.** Phases 0 through 1c are done and were verified across two
+machines — a Windows host and the Arch test box — covering lobby, roster, game selection, readiness,
+launch, and the host's quit closing everyone's emulator. Phases 2 through 4 are open; see
+[Phasing](#phasing).
 
 ## Goal
 
@@ -39,6 +42,53 @@ Two consequences:
    library, which is where lockstep netplay actually feels good. See
    [Emulator selection](#emulator-selection).
 2. **Dolphin is blocked upstream.** Do not build UI automation to work around it. Track the PR.
+
+## Verified RetroArch matrix
+
+Measured, not assumed. Two local RetroArch instances per system, `--host` and
+`--connect=127.0.0.1`, default core from `system_cores`, saves redirected away from the store.
+A pass means the client logged `You have joined as player 2` and both sides logged the same
+content CRC32. RetroArch 1.21.0 stable cores, July 2026.
+
+| System | Core | Netplay | Ping |
+|---|---|---|---|
+| gb | gambatte | yes | 19 ms |
+| gba | mgba | yes | 5 ms |
+| genesis | genesis_plus_gx | yes | 19 ms |
+| nds | melonds | yes | 7 ms |
+| nes | mesen | yes | 19 ms |
+| sega32 | picodrive | yes | 19 ms |
+| segacd | genesis_plus_gx | yes | 6 ms |
+| sms | genesis_plus_gx | yes | 7 ms |
+| snes | snes9x | yes | 18 ms |
+| psx | **mednafen_psx_hw** | yes | 8 ms |
+| psx | swanstation | **no** | — |
+| n64 | mupen64plus_next | **no** | — |
+| n64 | parallel_n64 | **no** | — |
+| dc | flycast | **no** | — |
+| psp | ppsspp | **no** | — |
+
+`Core does not support netplay` is RetroArch refusing a core that lacks the deterministic
+serialisation netplay needs. It is a property of the core, not of the content, and no setting
+works around it.
+
+### Consequences
+
+**Ten systems work today**, which is the entire 2D-era library where lockstep netplay feels
+good. That is enough to build the plumbing against.
+
+**psx needs its default core changed** from `swanstation` to `mednafen_psx_hw` if it stays on
+RetroArch. The current default cannot netplay at all. This is the only case where the declared
+fallback rescued a system, which is why the whole list was walked rather than just the defaults.
+
+**n64, dc and psp have no libretro path** and move to their standalone emulators. That is not a
+loss: gopher64 has P2P netplay with TURN fallback, Flycast has GGPO rollback, and PPSSPP has
+ad-hoc. All three are better served standalone, so the netplay-capable emulator for those
+systems is the standalone one and phase 4 covers them.
+
+**Sega CD needs its BIOS staged before it will boot**, which the frontend does at launch. The
+first matrix run bypassed the frontend and recorded a false failure until `bios_CD_*.bin` were
+copied into `system/`. Worth remembering when testing a CD-based system outside the app.
 
 ## Emulator selection
 
@@ -180,13 +230,252 @@ launch path.
 
 ## Phasing
 
-1. **Schema and manager.** `netplay` block, `NetplayManager`, `{netplay}` placeholder, join
-   codes, direct LAN connection. Validate against Flycast and RetroArch together, since they
-   have genuinely different transports and will keep the abstraction honest.
-2. **Parity.** Emulator version pinning in `UniversalInstaller`, ROM hash verification,
-   `affects_determinism` on settings fields.
-3. **Relay.** Userspace tunnel for players not on the same LAN.
-4. **Coverage.** gopher64, then PPSSPP via `config_file`. Dolphin when PR #13288 lands.
+0. **Verify per system.** *Done* — see the matrix above. Ten systems confirmed working.
+1. **Schema and manager.** *Done.* `netplay` block, `NetplayManager`, `{netplay}` placeholder and
+   join codes, scoped by `unsupported_systems` (`n64`, `dc`, `psp`).
+1b. **Host UI.** *Done.* A netplay view in the start menu shows the join code and launches on
+   confirm; the button is gated on the game being launchable. Hosting was built first because it
+   needs no text entry — the code is generated and displayed, never typed.
+1c. **Lobby transport.** *Done.* `NetplayLobby` is an ENet host/client carrying identity,
+   roster, game selection, readiness and start/quit as RPCs. Supersedes the join-code entry
+   problem: players pick a session from a list instead of typing a code, so no on-screen keyboard
+   is needed. The host UI's join code remains the direct-connect fallback.
+
+   Verified across two machines: both sides see the full roster, the host's browsing moves every
+   client's carousel, readiness gates the start, and the host quitting closes the clients'
+   emulators. A LAN session was confirmed to actually netplay, not merely to launch.
+
+   Still unverified: save sync after a netplay session, and internet play through a join code —
+   the latter cannot be exercised from inside the host's own network.
+
+## Lobby panel
+
+The lobby replaces the **details panel** rather than opening over it: both are children of the same
+mica `Panel`, and `MainSceneNetplayHandler` toggles `detailsPanelContainer` against `lobbyPanel`. The
+game grid stays live underneath, which is the point — the host browses normally and every selection
+is pushed to the lobby, so the carousel doubles as the host's game picker.
+
+`PushHostGameSelection` is called from `OnGameSelected`, guarded three ways: host only, ignore an
+unchanged rom id, and ignore a game whose system cannot netplay. Without the rom-id guard every
+frame of carousel movement would broadcast.
+
+### The grid refresh owns details-panel visibility, so the lobby has to be checked there
+
+`RefreshGameList` sets `detailsPanelContainer.Visible = currentlyShownGames.Count > 0` on every
+rebuild. Toggling that flag when the lobby opens was not enough — the next grid refresh, which any
+selection or system change triggers, put the details panel straight back over the lobby. The
+visibility expression now also asks whether the lobby owns the panel, so there is a single place
+deciding it rather than two fighting.
+
+### Focus must be taken after the refresh, not before
+
+Godot drops focus from a control the instant it is disabled, so grabbing focus and *then* refreshing
+the panel loses it whenever the refresh disables that control. That is the common case rather than an
+edge case: a host who has just set a game sees `Waiting For Players` disabled until somebody joins, so
+focus vanished immediately and the d-pad did nothing.
+
+`ReturnFocusToLobby` therefore refreshes first and focuses afterwards, and picks the first
+**enabled and visible** lobby button rather than assuming the action button is usable.
+`RefreshLobbyPanel` re-checks afterwards and re-focuses if nothing inside the panel holds focus, so
+any later state change — a player joining, a download finishing — cannot strand the panel with no
+focus either.
+
+### The lobby has two focus modes, and A had to be re-routed for both
+
+A host is either driving the lobby buttons or browsing the grid, never both, so `MainScene` routes
+`Select` and `Back` through `MainSceneNetplayHandler` while a lobby is open.
+
+- **A** confirms the hovered game and returns focus to the lobby; in lobby focus it presses whichever
+  lobby button is focused.
+- **B** swaps modes — from the lobby it reopens browsing, from browsing it returns without changing
+  the pick.
+
+The re-routing was not optional. `MainScene` already intercepts `Select` and calls
+`GetViewport().SetInputAsHandled()`, so once focus moved to a lobby button, **A would have been
+swallowed and Ready/Start/Leave could never have been pressed**. `PressFocusedLobbyButton` checks
+`Disabled` before emitting `Pressed`, because manual emission otherwise bypasses the disabled gate.
+
+Selection is confirmed rather than live: the host used to broadcast on every carousel highlight,
+which put a network message behind every frame of scrolling and left no moment at which focus could
+sensibly change hands.
+
+### The session is opened first, then a game is chosen
+
+Hosting deliberately does **not** depend on the currently selected game. An earlier version required a
+supported, downloaded game before the Host button would enable, which inverted the intended flow —
+open a lobby, wait for players, *then* pick something together — and left the button greyed with no
+explanation once its label was fixed.
+
+Constraint now lives in the game list instead of the button: `FilterSystemsForNetplayHost` narrows
+the carousel to netplay-capable systems for anyone **in a lobby**, host or client, so an
+unplayable choice cannot be made rather than being rejected after the fact. The button is enabled
+whenever no session is active.
+
+The filter is applied in `GetCache` after the existing emulator filter, so it composes with
+`ShowAllSystems` and the collections branch rather than replacing them.
+
+It falls back to the unfiltered list if the filter would empty the carousel, on the same reasoning as
+the existing "no mapped emulators" fallback — an empty carousel is worse than an imperfect one.
+
+Opening and leaving a lobby both call `RefreshBrowseSourceForLobby`, which re-runs `GetCache` and
+reselects from index 0, because the filtered list is a different length and the old index may no
+longer exist.
+
+### Clients need a grace period before connecting
+
+The host's RetroArch takes seconds to boot its core and start listening. `ReleaseMembersToStart` is
+therefore sent *after* the host launches, and clients still wait `HostStartupGraceSeconds` before
+launching their own — `--connect` against a host that is not yet listening simply fails, with no
+retry. Five seconds is a guess that wants replacing with a real "host is listening" signal once
+there is a way to observe it.
+
+### The host is the reference build, and versions are compared against it
+
+RetroArch refuses to connect peers on different builds, so netplay needs every player on the same
+emulator version. The installed version is recorded as `installed_version.txt` in the emulator's own
+directory at the end of a successful install, taken from the `ReleaseOption.VersionLabel` the
+installer already resolved and previously discarded. Keeping it inside the install directory means it
+cannot outlive what it describes.
+
+**The newest version present wins, not the host's.** An earlier design made the host the reference
+build, which is simpler but wrong in one common case: a host on an older build would tell a client on
+a newer one to *downgrade*. Asking somebody to go backwards to join a game is the wrong direction,
+and it silently spreads stale builds through a group.
+
+Every member's installed version now rides along in the roster, and both sides compute the same
+target — the highest version anyone has. Whoever is behind is the one who changes, host included, so
+a host that is behind its clients sees `Update <emulator>` on its own action button and the session
+converges upward.
+
+Ordering comes from `EmulatorVersions.Compare`, which extracts the numbers from a release label and
+compares them component-wise, because tags vary wildly between emulators (`v1.21.0` against
+`2.7.492.r0.g66c0771`). When two labels cannot be ordered — no digits, or otherwise incomparable —
+the comparison returns "equal" and the rule falls back to the old behaviour of matching the host
+exactly, which is still correct, just not clever.
+
+A mismatch blocks readiness, shows `Needs to update <emulator>` in the roster, and offers
+`Update <emulator>` which installs that *specific* release via the `ReleaseOption` overload rather
+than the latest. Installing the latest is what caused the drift in the first place.
+
+Where the target really is older than what is installed — only reachable through the unorderable
+fallback above — both the roster text and the button say **downgrade** rather than update. The
+release picker does the same for any version older than the installed one, marking it `— downgrade`
+and tinting it, with the installed one marked `— installed`, so choosing a version by hand cannot
+quietly move an emulator backwards.
+
+An installed emulator with no recorded version counts as a mismatch, since it predates this tracking
+and cannot be proven to match. A client that cannot find the host's version in the available releases
+logs plainly rather than silently installing something else.
+
+### Readiness reuses `ResolveGameAction` rather than testing the pieces itself
+
+A player is only prepared when the emulator is installed, the core is present *and* the ROM is
+downloaded. `ResolveGameAction` already encodes exactly that ladder for the play button, so the lobby
+asks it for `Kind == LaunchGame` instead of re-deriving the conditions. A second implementation would
+inevitably drift from the first, and it would have missed the core check entirely.
+
+The same call drives the lobby's action button, so it offers `Install <emulator>` or
+`Download <game>` — whichever is actually missing — and only becomes Ready/Start once neither is.
+
+### Readiness has to be recomputed when the prerequisites land
+
+Preparedness is derived, not stored, so nothing would notice a download or an install finishing. The
+handler subscribes to both `DownloadManager.DownloadCompleted` and
+`EmulatorManager.EmulatorInstallationCompleted` and re-reports, otherwise a player who set themselves
+up inside the lobby would sit at "needs setup" until something else forced a refresh.
+
+Re-reporting also clears a stale ready flag: readiness is sent as `isPrepared && isLocallyReady`, so a
+player who readied up and then lost a prerequisite cannot stay marked ready.
+
+## Lobby model
+
+The lobby is **per session, not a global directory**. The host of the game hosts the lobby, so the
+lobby ending when they leave is correct behaviour rather than a failure — there is nothing to migrate
+because the netplay session is over too.
+
+Flow: host opens a lobby → players join → host picks a game → each client downloads it if missing →
+clients report readiness → host launches and releases the others → host quitting closes everyone's
+emulator, which still triggers each player's save sync on process exit.
+
+### Discovery is the unsolved half, and RomM cannot help
+
+RomM has **no presence API**. `/api/play-sessions` is playtime history — `PlaySessionSchema` requires
+`end_time` and `duration_ms`, so sessions are recorded after they finish. Nothing across its 118
+endpoints answers "who is hosting right now", and there is no websocket or event surface.
+
+ENet does not solve this either: a client needs an address before it can connect, so a listen server
+cannot advertise itself.
+
+**`/api/devices` was the promising candidate and it does not work.** The row already exists per
+client, `sync_config` is a free-form object, `ip_address` and `last_seen` are present, and `user_id`
+is server-provided rather than self-reported — it would have been better identity than the lobby
+handshake has. Measured instead: with a second user on the same server launching a game (which
+registers a device through save sync), an **admin** token still saw only its own single row.
+`GET /api/devices` is scoped to the authenticated user. By contrast `/api/users` returns all 11
+accounts to that same token, so RomM exposes cross-user data where it means to; devices are not in
+that category.
+
+The remaining cross-user-writable surfaces are public collections and per-ROM notes. Both would work
+as bulletin boards and both are user-facing content that would look like corruption to anyone
+browsing RomM normally, so neither is used.
+
+Discovery is therefore LAN broadcast now, with a companion service as the internet answer, behind one
+swappable seam.
+
+### LAN discovery advertises over UDP broadcast
+
+`NetplayDiscovery` binds one `PacketPeerUdp` to port 55441 with broadcast enabled, advertises every
+two seconds while hosting, and expires a session that has not been heard from for eight. The sender's
+address comes from `GetPacketIP` rather than the payload, so a host cannot advertise someone else's
+address.
+
+Advertisements carry the RomM host and are dropped when it does not match the local one, which keeps
+the "same server" scoping the lobby also enforces. The host's own packets come back to it, so each
+instance filters on a locally generated `instance_id`.
+
+### UPnP replaces the directory for internet play, when the router allows it
+
+There is no serverless way to *list* internet sessions — something must sit at a known address and
+answer "who is hosting". But there is a serverless way to *join* one: the join code already encodes
+an address and port, so if the host can make itself reachable, no directory is needed. Internet play
+becomes "share a code"; browsing stays a LAN feature.
+
+`NetplayPortMapper` asks the router over UPnP to open the netplay port and reads the public address
+back from `QueryExternalAddress`, which is then what the join code encodes. `Upnp.Discover` blocks
+for seconds, so it runs on a task thread and never touches the scene tree. Mappings are deleted on
+cancel, on emulator exit and on tree exit — an abandoned mapping is a hole left in someone's router.
+
+**Expect this to fail more often than it works.** Measured on the developer's own network, RetroArch's
+identical UPnP request was refused: `Netplay UPnP Port Mapping Failed`, followed by
+`Your room is not connectable from the internet`. Consumer routers increasingly ship with UPnP
+disabled, and carrier-grade NAT defeats it regardless of settings. The failure path therefore names
+the port to forward manually rather than just reporting an error, because a user who can expose RomM
+can forward a port.
+
+**Two instances on one machine cannot both discover.** The socket binds a fixed port and Godot's
+`PacketPeerUdp` exposes no address-reuse option, so the second bind fails and logs why. Testing
+discovery needs two machines; the lobby itself can still be tested on one via direct connect.
+
+### RomM identity is a filter, not proof
+
+Peers exchange their RomM host URL and username, and a peer on a different server is disconnected.
+That scopes a lobby to one RomM instance, which is what makes `rom_id` a shared identifier — the
+reason "host selects game" can travel as a single integer and each client can resolve it against its
+own library.
+
+It is **not authentication**. A peer can claim any username; confirming the name exists via
+`/api/users` does not prove the peer is that user. Real proof would need the client to hand over its
+RomM API token, which is a credential leak and must never be done, or a challenge/response RomM does
+not offer. Adequate for friends on a home server; not a security boundary.
+2. **Parity.** ROM hash verification and `affects_determinism` on settings fields. Emulator
+   version pinning is already solved for RetroArch — cores ship from the same versioned bundle
+   as the executable, so peers on the same release cannot drift.
+3. **Relay.** RetroArch's own `--mitm-session` and `netplay_use_mitm_server` may remove the need
+   to build anything here. Confirmed necessary: the host logged
+   `Your room is not connectable from the internet` after UPnP failed, so direct connection is
+   not a realistic default.
+4. **Standalone coverage.** Flycast GGPO, gopher64, then PPSSPP via `config_file` — the three
+   systems libretro cannot serve. Dolphin when PR #13288 lands.
 
 Phase 1 is only useful on a LAN. That is intentional — it proves the launch path before any
 network service exists.
@@ -194,8 +483,10 @@ network service exists.
 ## Open questions
 
 - Does gopher64 accept a server address from the command line, or only via its UI and LAN
-  discovery? Determines whether it lands in phase 1 or needs a config-file path.
-- RetroArch core installation: bundle cores with the recipe, or use its own core downloader?
-  Affects version pinning, since core version is part of parity.
-- Which RetroArch cores are the netplay-capable defaults per system, and which systems belong
-  in `unsupported_systems`?
+  discovery? Determines whether it lands in phase 4 or needs a config-file path.
+- Is `--mitm-session` enough for internet play, or is a self-hosted relay still wanted for
+  privacy and reliability?
+
+*Resolved:* psx stays on RetroArch with `mednafen_psx_hw` as its default core. n64 moves to
+gopher64; dc and psp already defaulted to Flycast and PPSSPP as gen-6 disc systems, so they
+needed no change.

@@ -5,16 +5,25 @@ using System.IO.Compression;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Linq;
 
 public partial class AppUpdater : Node
 {
-    public const string CurrentVersion = "v1.0.13";
+    public const string CurrentVersion = "v1.0.15";
     private const string RepoOwner = "HowDoDownhill";
     private const string RepoName = "romm-frontend";
+    private const int TransferBufferSizeBytes = 1024 * 1024;
 
-    private readonly System.Net.Http.HttpClient httpClient = new System.Net.Http.HttpClient();
+    private readonly System.Net.Http.HttpClient httpClient = new System.Net.Http.HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+
+    private AppInstance appInstance;
+
+    private long updateBytesDownloaded;
+    private long updateTotalBytes;
+    private bool isDownloadingUpdate;
+    private float lastEmittedDownloadProgress = -1.0f;
 
     [Signal]
     public delegate void UpdateAvailableEventHandler(string version, string releaseNotes);
@@ -29,7 +38,9 @@ public partial class AppUpdater : Node
     {
         httpClient.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("RommFrontendUpdater", "1.0"));
 
-        string downloadsPath = GetNode<AppInstance>("/root/AppInstance").configManager.DownloadsPath;
+        appInstance = GetNode<AppInstance>("/root/AppInstance");
+
+        string downloadsPath = appInstance.configManager.DownloadsPath;
         if (!DirAccess.DirExistsAbsolute(downloadsPath))
         {
             DirAccess.MakeDirRecursiveAbsolute(downloadsPath);
@@ -115,7 +126,7 @@ public partial class AppUpdater : Node
                 return;
             }
 
-            string downloadsPath = GetNode<AppInstance>("/root/AppInstance").configManager.DownloadsPath;
+            string downloadsPath = appInstance.configManager.DownloadsPath;
             string downloadPath = System.IO.Path.Combine(downloadsPath, "update.zip");
             
             using (var downloadResponse = await httpClient.GetAsync(asset.BrowserDownloadUrl, HttpCompletionOption.ResponseHeadersRead))
@@ -123,36 +134,37 @@ public partial class AppUpdater : Node
                 downloadResponse.EnsureSuccessStatusCode();
                 var totalBytes = downloadResponse.Content.Headers.ContentLength;
                 
+                Interlocked.Exchange(ref updateBytesDownloaded, 0);
+                Interlocked.Exchange(ref updateTotalBytes, totalBytes ?? 0);
+                Volatile.Write(ref isDownloadingUpdate, true);
+
+                var downloadManager = appInstance?.downloadManager;
+                var externalTransfer = downloadManager?.BeginExternalTransfer($"Update {remoteVersion}");
+
                 using (var contentStream = await downloadResponse.Content.ReadAsStreamAsync())
-                using (var fileStream = new FileStream(downloadPath, FileMode.Create, System.IO.FileAccess.Write, FileShare.None, 8192, true))
+                using (var fileStream = new FileStream(downloadPath, FileMode.Create, System.IO.FileAccess.Write, FileShare.None, TransferBufferSizeBytes, true))
                 {
                     var totalRead = 0L;
-                    var buffer = new byte[8192];
-                    var isMoreToRead = true;
+                    var buffer = new byte[TransferBufferSizeBytes];
 
-                    do
+                    while (true)
                     {
                         var read = await contentStream.ReadAsync(buffer, 0, buffer.Length);
 
                         if (read == 0)
                         {
-                            isMoreToRead = false;
+                            break;
                         }
 
-                        else
-                        {
-                            await fileStream.WriteAsync(buffer, 0, read);
-                            totalRead += read;
-
-                            if (totalBytes.HasValue)
-                            {
-                                float progress = (float)totalRead / totalBytes.Value;
-                                CallDeferred(MethodName.EmitSignal, SignalName.UpdateDownloadProgress, progress);
-                            }
-                        }
-
-                    } while (isMoreToRead);
+                        await fileStream.WriteAsync(buffer, 0, read);
+                        totalRead += read;
+                        Interlocked.Exchange(ref updateBytesDownloaded, totalRead);
+                        downloadManager?.ReportExternalTransferProgress(externalTransfer, totalRead, totalBytes ?? 0);
+                    }
                 }
+
+                downloadManager?.CompleteExternalTransfer(externalTransfer, true);
+                Volatile.Write(ref isDownloadingUpdate, false);
             }
 
             CallDeferred(MethodName.EmitSignal, SignalName.UpdateDownloadCompleted, true);
@@ -160,14 +172,40 @@ public partial class AppUpdater : Node
 
         catch (Exception ex)
         {
+            Volatile.Write(ref isDownloadingUpdate, false);
             GD.PrintErr($"Exception downloading update: {ex.Message}");
             CallDeferred(MethodName.EmitSignal, SignalName.UpdateDownloadCompleted, false);
         }
     }
 
+    public override void _Process(double delta)
+    {
+        if (!Volatile.Read(ref isDownloadingUpdate))
+        {
+            return;
+        }
+
+        long totalBytes = Interlocked.Read(ref updateTotalBytes);
+
+        if (totalBytes <= 0)
+        {
+            return;
+        }
+
+        float downloadProgress = (float)Interlocked.Read(ref updateBytesDownloaded) / totalBytes;
+
+        if (downloadProgress == lastEmittedDownloadProgress)
+        {
+            return;
+        }
+
+        lastEmittedDownloadProgress = downloadProgress;
+        EmitSignal(SignalName.UpdateDownloadProgress, downloadProgress);
+    }
+
     public void ApplyUpdateAndRestart()
     {
-        string downloadsPath = GetNode<AppInstance>("/root/AppInstance").configManager.DownloadsPath;
+        string downloadsPath = appInstance.configManager.DownloadsPath;
         string downloadPath = System.IO.Path.Combine(downloadsPath, "update.zip");
 
         if (!File.Exists(downloadPath))
@@ -178,7 +216,7 @@ public partial class AppUpdater : Node
 
         string appPath = OS.GetExecutablePath();
         string appDir = System.IO.Path.GetDirectoryName(appPath);
-        string toolsDir = GetNode<AppInstance>("/root/AppInstance").configManager.ToolsPath;
+        string toolsDir = appInstance.configManager.ToolsPath;
         
         if (OS.HasFeature("windows"))
         {

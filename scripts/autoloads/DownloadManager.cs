@@ -45,6 +45,64 @@ public partial class DownloadManager : Node
 
     private List<ActiveDownloadEntry> activeDownloadEntries = new List<ActiveDownloadEntry>();
 
+    public class ExternalTransfer
+    {
+        public string displayName;
+        public long bytesTransferred;
+        public long totalBytes;
+        public bool hasFinished;
+        public bool wasSuccessful;
+    }
+
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<ExternalTransfer, byte> externalTransfers = new System.Collections.Concurrent.ConcurrentDictionary<ExternalTransfer, byte>();
+
+    public ExternalTransfer BeginExternalTransfer(string displayName)
+    {
+        var externalTransfer = new ExternalTransfer { displayName = displayName };
+        externalTransfers.TryAdd(externalTransfer, 0);
+        return externalTransfer;
+    }
+
+    public void ReportExternalTransferProgress(ExternalTransfer externalTransfer, long bytesTransferred, long totalBytes)
+    {
+        if (externalTransfer == null)
+        {
+            return;
+        }
+
+        Interlocked.Exchange(ref externalTransfer.bytesTransferred, bytesTransferred);
+        Interlocked.Exchange(ref externalTransfer.totalBytes, totalBytes);
+    }
+
+    public void CompleteExternalTransfer(ExternalTransfer externalTransfer, bool wasSuccessful)
+    {
+        if (externalTransfer == null)
+        {
+            return;
+        }
+
+        Volatile.Write(ref externalTransfer.wasSuccessful, wasSuccessful);
+        Volatile.Write(ref externalTransfer.hasFinished, true);
+    }
+
+    private void ProcessExternalTransfers()
+    {
+        foreach (var externalTransfer in externalTransfers.Keys)
+        {
+            long bytesTransferred = Interlocked.Read(ref externalTransfer.bytesTransferred);
+            long totalBytes = Interlocked.Read(ref externalTransfer.totalBytes);
+
+            if (Volatile.Read(ref externalTransfer.hasFinished))
+            {
+                externalTransfers.TryRemove(externalTransfer, out _);
+                EmitSignal(SignalName.DownloadCompleted, externalTransfer.displayName, Volatile.Read(ref externalTransfer.wasSuccessful));
+                continue;
+            }
+
+            EmitSignal(SignalName.DownloadProgressUpdated, externalTransfer.displayName, bytesTransferred, totalBytes, "");
+        }
+    }
+
     public void DownloadFile(string downloadUrl, string destinationFilePath, string[] requestHeaders, System.Action<string> onDownloadComplete, string gameId = null, long expectedTotalBytes = 0)
     {
         var downloadEntry = new ActiveDownloadEntry
@@ -192,6 +250,8 @@ public partial class DownloadManager : Node
 
             LogDownloadProgress(downloadEntry, bytesDownloaded, totalBytes, deltaTime);
         }
+
+        ProcessExternalTransfers();
     }
 
     private void LogDownloadProgress(ActiveDownloadEntry downloadEntry, long bytesDownloaded, long totalBytes, double deltaTime)

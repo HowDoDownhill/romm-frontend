@@ -16,6 +16,8 @@ public partial class RomMAPI : Node
     private string authenticationToken;
     private bool isUsingBasicAuthentication = false;
 
+    private const int TransferBufferSizeBytes = 1024 * 1024;
+
     private AppInstance appInstance;
 
     public override void _Ready()
@@ -151,6 +153,72 @@ public partial class RomMAPI : Node
         }
 
         return new List<GameSystem>();
+    }
+
+    public async Task<List<Collection>> GetCollectionsAsync()
+    {
+        var mergedCollections = new List<Collection>();
+
+        foreach (string collectionsEndpoint in new[] { "/api/collections", "/api/collections/smart" })
+        {
+            try
+            {
+                HttpResponseMessage collectionsResponse = await httpClient.GetAsync($"{apiHostUrl}{collectionsEndpoint}");
+
+                if (!collectionsResponse.IsSuccessStatusCode)
+                {
+                    GD.PrintErr($"Failed to fetch {collectionsEndpoint}. Status code: {collectionsResponse.StatusCode}");
+                    continue;
+                }
+
+                string collectionsResponseBody = await collectionsResponse.Content.ReadAsStringAsync();
+                var fetchedCollections = JsonSerializer.Deserialize(collectionsResponseBody, RommJsonContext.Default.ListCollection);
+
+                if (fetchedCollections != null)
+                {
+                    mergedCollections.AddRange(fetchedCollections);
+                }
+            }
+
+            catch (Exception exception)
+            {
+                GD.PrintErr($"GetCollections request to {collectionsEndpoint} failed: {exception.Message}");
+            }
+        }
+
+        return mergedCollections;
+    }
+
+    public async Task<bool> SetRomInCollectionAsync(int collectionId, int romId, bool shouldBeInCollection)
+    {
+        try
+        {
+            var payload = new CollectionRomsPayload { RomIds = new List<int> { romId } };
+            string serialisedPayload = JsonSerializer.Serialize(payload, RommJsonContext.Default.CollectionRomsPayload);
+
+            var httpMethod = shouldBeInCollection ? HttpMethod.Post : HttpMethod.Delete;
+
+            using var requestMessage = new HttpRequestMessage(httpMethod, $"{apiHostUrl}/api/collections/{collectionId}/roms")
+            {
+                Content = new StringContent(serialisedPayload, Encoding.UTF8, "application/json")
+            };
+
+            HttpResponseMessage collectionResponse = await httpClient.SendAsync(requestMessage);
+
+            if (collectionResponse.IsSuccessStatusCode)
+            {
+                return true;
+            }
+
+            GD.PrintErr($"Failed to update collection {collectionId} for rom {romId}. Status code: {collectionResponse.StatusCode}");
+        }
+
+        catch (Exception exception)
+        {
+            GD.PrintErr($"SetRomInCollection request failed: {exception.Message}");
+        }
+
+        return false;
     }
 
     public async Task<GameResponse> GetGamesAsync(GameSystem gameSystem, int pageNumber = 1, int pageSize = 100)
@@ -363,16 +431,40 @@ public partial class RomMAPI : Node
         return $"{apiHostUrl}/api/firmware/{firmware.Id}/content/{urlEncodedFileName}";
     }
 
-    public async Task<bool> DownloadAssetAsync(string assetUrl, string destinationFilePath)
+    public async Task<bool> DownloadAssetAsync(string assetUrl, string destinationFilePath, string displayName = null)
     {
+        var externalTransfer = string.IsNullOrEmpty(displayName) ? null : appInstance?.downloadManager?.BeginExternalTransfer(displayName);
+
         try
         {
             var assetResponse = await httpClient.GetAsync(assetUrl, HttpCompletionOption.ResponseHeadersRead);
 
             if (assetResponse.IsSuccessStatusCode)
             {
-                using var destinationFileStream = new System.IO.FileStream(destinationFilePath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None);
-                await assetResponse.Content.CopyToAsync(destinationFileStream);
+                long totalBytes = assetResponse.Content.Headers.ContentLength ?? 0;
+
+                using (var assetStream = await assetResponse.Content.ReadAsStreamAsync())
+                using (var destinationFileStream = new System.IO.FileStream(destinationFilePath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None, TransferBufferSizeBytes, true))
+                {
+                    var transferBuffer = new byte[TransferBufferSizeBytes];
+                    long bytesTransferred = 0;
+
+                    while (true)
+                    {
+                        int bytesRead = await assetStream.ReadAsync(transferBuffer, 0, transferBuffer.Length);
+
+                        if (bytesRead == 0)
+                        {
+                            break;
+                        }
+
+                        await destinationFileStream.WriteAsync(transferBuffer, 0, bytesRead);
+                        bytesTransferred += bytesRead;
+                        appInstance?.downloadManager?.ReportExternalTransferProgress(externalTransfer, bytesTransferred, totalBytes);
+                    }
+                }
+
+                appInstance?.downloadManager?.CompleteExternalTransfer(externalTransfer, true);
                 return true;
             }
 
@@ -387,6 +479,7 @@ public partial class RomMAPI : Node
             GD.PrintErr($"Failed to download asset {assetUrl}: {exception.Message}");
         }
 
+        appInstance?.downloadManager?.CompleteExternalTransfer(externalTransfer, false);
         return false;
     }
 
@@ -501,8 +594,29 @@ public partial class RomMAPI : Node
         return default;
     }
 
+    private async Task<bool> DeviceStillExistsAsync(string deviceId)
+    {
+        try
+        {
+            HttpResponseMessage deviceResponse = await httpClient.GetAsync($"{apiHostUrl}/api/devices/{deviceId}");
+            return deviceResponse.IsSuccessStatusCode;
+        }
+
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
     public async Task<string> GetOrCreateDeviceAsync()
     {
+        string storedDeviceId = appInstance?.configManager?.RomMDeviceId;
+
+        if (!string.IsNullOrEmpty(storedDeviceId) && await DeviceStillExistsAsync(storedDeviceId))
+        {
+            return storedDeviceId;
+        }
+
         try
         {
             var payload = new DevicePayload
@@ -510,6 +624,7 @@ public partial class RomMAPI : Node
                 Name = "romm-frontend",
                 Client = "romm-frontend",
                 Platform = OS.GetName().ToLower(),
+                Hostname = OS.GetEnvironment("COMPUTERNAME") is string windowsHostname && windowsHostname.Length > 0 ? windowsHostname : OS.GetEnvironment("HOSTNAME"),
                 SyncMode = "api",
                 AllowExisting = true
             };
@@ -524,7 +639,9 @@ public partial class RomMAPI : Node
 
                 if (document.RootElement.TryGetProperty("device_id", out var idElement))
                 {
-                    return idElement.GetString();
+                    string registeredDeviceId = idElement.GetString();
+                    appInstance?.configManager?.SaveDeviceId(registeredDeviceId);
+                    return registeredDeviceId;
                 }
             }
 

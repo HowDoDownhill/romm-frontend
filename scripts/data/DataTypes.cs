@@ -13,6 +13,15 @@ public class RomFile
 
     [JsonPropertyName("full_path")]
     public string FullPath { get; set; }
+
+    [JsonPropertyName("crc_hash")]
+    public string CrcHash { get; set; }
+
+    [JsonPropertyName("md5_hash")]
+    public string Md5Hash { get; set; }
+
+    [JsonPropertyName("sha1_hash")]
+    public string Sha1Hash { get; set; }
 }
 
 public class GameSystem
@@ -37,6 +46,70 @@ public class GameSystem
     public string PrefferedFirmware { get; set; }
 
     public List<Firmware> AvailableFirmwares { get; set; }
+
+    public bool IsCollection { get; set; }
+
+    public bool IsFavoriteCollection { get; set; }
+}
+
+public class NetplayAdvertisement
+{
+    [JsonPropertyName("instance_id")]
+    public string InstanceId { get; set; }
+
+    [JsonPropertyName("romm_host")]
+    public string RommHost { get; set; }
+
+    [JsonPropertyName("username")]
+    public string Username { get; set; }
+
+    [JsonPropertyName("rom_id")]
+    public int RomId { get; set; }
+
+    [JsonPropertyName("game_name")]
+    public string GameName { get; set; }
+
+    [JsonPropertyName("lobby_port")]
+    public int LobbyPort { get; set; }
+
+    [JsonPropertyName("member_count")]
+    public int MemberCount { get; set; }
+}
+
+public class CollectionRomsPayload
+{
+    [JsonPropertyName("rom_ids")]
+    public List<int> RomIds { get; set; }
+}
+
+public class Collection
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; }
+
+    public string Description { get; set; }
+
+    [JsonPropertyName("rom_ids")]
+    public List<int> RomIds { get; set; }
+
+    [JsonPropertyName("rom_count")]
+    public int RomCount { get; set; }
+
+    [JsonPropertyName("is_favorite")]
+    public bool IsFavorite { get; set; }
+
+    [JsonPropertyName("is_smart")]
+    public bool IsSmart { get; set; }
+
+    [JsonPropertyName("is_virtual")]
+    public bool IsVirtual { get; set; }
+
+    [JsonPropertyName("path_cover_small")]
+    public string PathCoverSmall { get; set; }
+
+    [JsonPropertyName("path_cover_large")]
+    public string PathCoverLarge { get; set; }
 }
 
 

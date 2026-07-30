@@ -2,7 +2,7 @@
   "name": "RetroArch",
   "executable_name": {
     "windows": "retroarch.exe",
-    "linux": "retroarch"
+    "linux": "RetroArch-Linux-x86_64.AppImage"
   },
   "emulator_dir_name": {
     "windows": "retroarch",
@@ -11,7 +11,7 @@
   },
   "emulator_bios_path": {
     "windows": "system",
-    "linux": "system",
+    "linux": "RetroArch-Linux-x86_64.AppImage.home/.config/retroarch/system",
     "macos": "system"
   },
   "relative_save_path": {
@@ -30,7 +30,15 @@
       "version_regex": "(\\d+\\.\\d+\\.\\d+)/",
       "url_template": "https://buildbot.libretro.com/stable/{version}/windows/x86_64/RetroArch.7z",
       "extract": true,
-      "extract_folder_regex": "RetroArch-*"
+      "extract_folder_regex": "RetroArch-*",
+      "extra_downloads": [
+        {
+          "url": "https://buildbot.libretro.com/stable/{version}/windows/x86_64/RetroArch_cores.7z",
+          "destination": "",
+          "extract": true,
+          "extract_folder_regex": "RetroArch-*"
+        }
+      ]
     },
     "linux": {
       "type": "web_scrape",
@@ -38,10 +46,31 @@
       "version_regex": "(\\d+\\.\\d+\\.\\d+)/",
       "url_template": "https://buildbot.libretro.com/stable/{version}/linux/x86_64/RetroArch.7z",
       "extract": true,
-      "extract_folder_regex": "RetroArch-*"
+      "extract_folder_regex": "RetroArch-*",
+      "extra_downloads": [
+        {
+          "url": "https://buildbot.libretro.com/stable/{version}/linux/x86_64/RetroArch_cores.7z",
+          "destination": "",
+          "extract": true,
+          "extract_folder_regex": "RetroArch-*"
+        }
+      ]
     }
   },
-  "launch_args_with_game": "--config retroarch.cfg {system} {settings} \"{rom_path}\"",
+  "launch_args_with_game": "--config retroarch.cfg {system} {settings} {netplay} \"{rom_path}\"",
+  "netplay": {
+    "transport": "launch_args",
+    "host_args": "--host --port {local_port} --nick \"{player_name}\"",
+    "join_args": "--connect {peer_address} --port {peer_port} --nick \"{player_name}\"",
+    "max_players": 2,
+    "default_port": 55435,
+    "requires_identical_rom": true,
+    "unsupported_systems": [
+      "n64",
+      "dc",
+      "psp"
+    ]
+  },
   "launch_args_without_game": "--config retroarch.cfg",
   "settings_fields": [
     {
@@ -98,8 +127,8 @@
       "melondsds"
     ],
     "psx": [
-      "swanstation",
-      "mednafen_psx_hw"
+      "mednafen_psx_hw",
+      "swanstation"
     ],
     "psp": [
       "ppsspp"
@@ -202,13 +231,12 @@
       "melondsds"
     ]
   },
-  "core_directory": "cores",
+  "core_directory": {
+    "windows": "cores",
+    "linux": "RetroArch-Linux-x86_64.AppImage.home/.config/retroarch/cores"
+  },
   "core_file_name": {
     "windows": "{core}_libretro.dll",
     "linux": "{core}_libretro.so"
-  },
-  "core_download_url": {
-    "windows": "https://buildbot.libretro.com/nightly/windows/x86_64/latest/{core}_libretro.dll.zip",
-    "linux": "https://buildbot.libretro.com/nightly/linux/x86_64/latest/{core}_libretro.so.zip"
   }
 }

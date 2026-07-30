@@ -11,7 +11,7 @@ script = ExtResource("4_damper")
 [sub_resource type="Resource" id="Resource_drag"]
 script = ExtResource("4_damper")
 
-[node name="StartMenuPanel" type="Control" node_paths=PackedStringArray("ContentRoot", "menuView", "biosView", "optionsList", "biosList", "launchEmulatorButton", "updateEmulatorButton", "uninstallEmulatorButton", "selectBiosButton", "settingsButton", "randomGameButton", "refreshAllGamesButton", "refreshCurrentSystemButton", "quitButton")]
+[node name="StartMenuPanel" type="Control" node_paths=PackedStringArray("ContentRoot", "menuView", "biosView", "optionsList", "biosList", "launchEmulatorButton", "updateEmulatorButton", "uninstallEmulatorButton", "selectBiosButton", "favoriteGameButton", "hostNetplayButton", "joinNetplayButton", "netplayView", "netplayCodeLabel", "netplayInfoLabel", "settingsButton", "randomGameButton", "refreshAllGamesButton", "refreshCurrentSystemButton", "quitButton")]
 visible = false
 custom_minimum_size = Vector2(400, 600)
 layout_mode = 3
@@ -36,6 +36,12 @@ launchEmulatorButton = NodePath("Panel/StartMenuContainer/StartMenu/LaunchEmulat
 updateEmulatorButton = NodePath("Panel/StartMenuContainer/StartMenu/UpdateEmulatorButton")
 uninstallEmulatorButton = NodePath("Panel/StartMenuContainer/StartMenu/UninstallEmulatorButton")
 selectBiosButton = NodePath("Panel/StartMenuContainer/StartMenu/SelectBiosButton")
+favoriteGameButton = NodePath("Panel/StartMenuContainer/StartMenu/FavoriteGameButton")
+hostNetplayButton = NodePath("Panel/StartMenuContainer/StartMenu/HostNetplayButton")
+joinNetplayButton = NodePath("Panel/StartMenuContainer/StartMenu/JoinNetplayButton")
+netplayView = NodePath("Panel/NetplayContainer")
+netplayCodeLabel = NodePath("Panel/NetplayContainer/NetplayView/NetplayCodeLabel")
+netplayInfoLabel = NodePath("Panel/NetplayContainer/NetplayView/NetplayInfoLabel")
 settingsButton = NodePath("Panel/StartMenuContainer/StartMenu/SettingsButton")
 randomGameButton = NodePath("Panel/StartMenuContainer/StartMenu/RandomGameButton")
 refreshAllGamesButton = NodePath("Panel/StartMenuContainer/StartMenu/RefreshAllGamesButton")
@@ -86,6 +92,18 @@ text = "Uninstall Current Emulator"
 [node name="SelectBiosButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
 layout_mode = 2
 text = "Select Bios For Emulator"
+
+[node name="FavoriteGameButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+layout_mode = 2
+text = "Add to Favorites"
+
+[node name="HostNetplayButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+layout_mode = 2
+text = "Host Session"
+
+[node name="JoinNetplayButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+layout_mode = 2
+text = "Join Session"
 
 [node name="SettingsButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
 layout_mode = 2
@@ -143,3 +161,35 @@ layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 metadata/_smooth_scroll_default_mouse_filter_set = true
+
+[node name="NetplayContainer" type="MarginContainer" parent="Panel"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 5
+theme_override_constants/margin_top = 5
+theme_override_constants/margin_right = 5
+theme_override_constants/margin_bottom = 5
+
+[node name="NetplayView" type="VBoxContainer" parent="Panel/NetplayContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 8
+alignment = 1
+
+[node name="NetplayCodeLabel" type="Label" parent="Panel/NetplayContainer/NetplayView"]
+layout_mode = 2
+text = "----------"
+horizontal_alignment = 1
+
+[node name="NetplayInfoLabel" type="Label" parent="Panel/NetplayContainer/NetplayView"]
+layout_mode = 2
+text = ""
+horizontal_alignment = 1
+autowrap_mode = 3
+

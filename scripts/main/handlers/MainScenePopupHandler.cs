@@ -16,12 +16,13 @@ public class MainScenePopupHandler
 
     public void OnLaunchEmulatorPressed()
     {
-        if (mainScene.GameListHandler.gameSystems == null || mainScene.GameListHandler.currentGameSystemIndex < 0 || mainScene.GameListHandler.currentGameSystemIndex >= mainScene.GameListHandler.gameSystems.Count)
+        var system = GetCurrentPlatformSystem();
+
+        if (system == null)
         {
             return;
         }
 
-        var system = mainScene.GameListHandler.gameSystems[mainScene.GameListHandler.currentGameSystemIndex];
         string mappedEmulator = appInstance.emulatorManager.GetMappedEmulator(system.Slug);
 
         if (string.IsNullOrEmpty(mappedEmulator))
@@ -43,20 +44,42 @@ public class MainScenePopupHandler
         mainScene.gameList?.GrabFocus();
     }
 
-    private string GetCurrentSystemEmulator()
+    private GameSystem GetCurrentPlatformSystem()
     {
+        var selectedGame = mainScene.GameListHandler.currentlySelectedGame;
+
+        if (selectedGame?.System != null)
+        {
+            return selectedGame.System;
+        }
+
         if (mainScene.GameListHandler.gameSystems == null || mainScene.GameListHandler.currentGameSystemIndex < 0 || mainScene.GameListHandler.currentGameSystemIndex >= mainScene.GameListHandler.gameSystems.Count)
         {
             return null;
         }
 
         var system = mainScene.GameListHandler.gameSystems[mainScene.GameListHandler.currentGameSystemIndex];
-        return appInstance.emulatorManager.GetMappedEmulator(system.Slug);
+
+        return system.IsCollection ? null : system;
+    }
+
+    private string GetCurrentEmulator()
+    {
+        var platformSystem = GetCurrentPlatformSystem();
+
+        if (platformSystem != null)
+        {
+            return appInstance.emulatorManager.GetMappedEmulator(platformSystem.Slug);
+        }
+
+        string platformSlug = mainScene.GameListHandler.currentlySelectedGame?.PlatformSlug;
+
+        return string.IsNullOrEmpty(platformSlug) ? null : appInstance.emulatorManager.GetMappedEmulator(platformSlug);
     }
 
     public void RefreshEmulatorMenuOptions()
     {
-        string mappedEmulator = GetCurrentSystemEmulator();
+        string mappedEmulator = GetCurrentEmulator();
         bool isInstalled = !string.IsNullOrEmpty(mappedEmulator) && appInstance.emulatorManager.IsEmulatorInstalled(mappedEmulator);
         bool isInstalling = !string.IsNullOrEmpty(mappedEmulator) && appInstance.emulatorManager.IsEmulatorInstalling(mappedEmulator);
 
@@ -100,21 +123,224 @@ public class MainScenePopupHandler
             }
         }
 
+        string emulatorLabelName = string.IsNullOrEmpty(mappedEmulator) ? null : appInstance.emulatorManager.GetEmulatorDisplayName(mappedEmulator);
+
         if (updateBtn != null)
         {
             updateBtn.Disabled = !isInstalled || isBusy;
-            updateBtn.Text = isInstalling ? "Installing Emulator..." : "Update Emulator";
+
+            if (isInstalling)
+            {
+                updateBtn.Text = $"Installing {emulatorLabelName}...";
+            }
+
+            else
+            {
+                updateBtn.Text = string.IsNullOrEmpty(emulatorLabelName) ? "Update Emulator" : $"Update {emulatorLabelName}";
+            }
         }
 
         if (uninstallBtn != null)
         {
             uninstallBtn.Disabled = !isInstalled || isBusy;
+            uninstallBtn.Text = string.IsNullOrEmpty(emulatorLabelName) ? "Uninstall Emulator" : $"Uninstall {emulatorLabelName}";
         }
+
+        RefreshFavoriteMenuOption();
+        RefreshNetplayMenuOption();
+    }
+
+    public void RefreshNetplayMenuOption()
+    {
+        Button hostNetplayBtn = mainScene.startMenuPanel?.hostNetplayButton;
+
+        if (hostNetplayBtn == null)
+        {
+            return;
+        }
+
+        bool isAlreadyInSession = appInstance.netplayLobby != null && appInstance.netplayLobby.IsInLobby;
+
+        hostNetplayBtn.Text = "Host Session";
+        hostNetplayBtn.Disabled = isAlreadyInSession;
+
+        Button joinNetplayBtn = mainScene.startMenuPanel?.joinNetplayButton;
+
+        if (joinNetplayBtn != null)
+        {
+            joinNetplayBtn.Text = "Join Session";
+            joinNetplayBtn.Disabled = isAlreadyInSession;
+        }
+    }
+
+    public async void OnHostNetplayPressed()
+    {
+        if (appInstance.netplayManager == null || appInstance.netplayLobby == null || appInstance.netplayLobby.IsInLobby)
+        {
+            return;
+        }
+
+        int hostPort = appInstance.netplayManager.ResolveDefaultPort(null);
+
+        string localAddress = appInstance.netplayManager.ResolveLocalHostAddress();
+
+        if (string.IsNullOrEmpty(localAddress))
+        {
+            mainScene.startMenuPanel?.ShowNetplayView("Failed", "No local network address was found, so a join code cannot be generated.\nPress Back to return.");
+            return;
+        }
+
+        appInstance.netplayManager.BeginHosting(hostPort);
+
+        mainScene.startMenuPanel?.ShowNetplayView("Hosting", "Starting the session and asking the router to open a port...");
+
+        int lobbyPort = appInstance.netplayLobby.ResolveLobbyPort();
+
+        bool portsMapped = appInstance.netplayPortMapper != null && await appInstance.netplayPortMapper.TryMapPortsAsync(hostPort, lobbyPort);
+        string externalAddress = portsMapped ? appInstance.netplayPortMapper.ExternalAddress : null;
+        bool isInternetReachable = portsMapped
+            && !string.IsNullOrEmpty(externalAddress)
+            && appInstance.netplayPortMapper.IsPortMapped(hostPort)
+            && appInstance.netplayPortMapper.IsPortMapped(lobbyPort);
+
+        string codeAddress = isInternetReachable ? externalAddress : localAddress;
+        string joinCode = appInstance.netplayManager.BuildJoinCode(codeAddress, hostPort);
+
+        if (string.IsNullOrEmpty(joinCode))
+        {
+            appInstance.netplayManager.EndSession();
+            appInstance.netplayPortMapper?.ReleasePorts();
+            mainScene.startMenuPanel?.ShowNetplayView("Failed", $"Could not build a join code for {codeAddress}.\nPress Back to return.");
+            return;
+        }
+
+        string reachabilityNote = isInternetReachable
+            ? $"Reachable from the internet at {externalAddress}:{hostPort}."
+            : $"Local network only. For internet play, forward ports {lobbyPort} and {hostPort} (UDP and TCP) to {localAddress}. {appInstance.netplayPortMapper?.LastFailureReason}";
+
+        if (mainScene.NetplayHandler == null || !mainScene.NetplayHandler.HostLobby(joinCode))
+        {
+            appInstance.netplayManager.EndSession();
+            appInstance.netplayPortMapper?.ReleasePorts();
+            GD.PrintErr($"[Netplay] Could not open the lobby on port {lobbyPort}; not handing out a join code.");
+            mainScene.startMenuPanel?.ShowNetplayView("Failed", $"Could not open the lobby on port {lobbyPort}.\nAnother copy of this app may already be hosting.\nPress Back to return.");
+            return;
+        }
+
+        mainScene.startMenuPanel?.ShowMenuView();
+        mainScene.startMenuPanel?.Close();
+
+        GD.Print($"[Netplay] Lobby open with code {joinCode}. {reachabilityNote}");
+    }
+
+    public void OnJoinNetplayPressed()
+    {
+        if (appInstance.netplayManager == null || appInstance.netplayLobby == null)
+        {
+            return;
+        }
+
+        var discoveredSession = appInstance.netplayDiscovery?.Sessions.FirstOrDefault();
+
+        if (discoveredSession != null)
+        {
+            JoinResolvedLobby(discoveredSession.HostAddress, discoveredSession.LobbyPort, $"{discoveredSession.Username} on this network");
+            return;
+        }
+
+        string clipboardText = DisplayServer.ClipboardGet();
+
+        if (!appInstance.netplayManager.TryParseJoinCode(clipboardText, out string hostAddress, out int netplayPort))
+        {
+            mainScene.startMenuPanel?.ShowNetplayView("----------", "No lobby found on this network, and the clipboard does not contain a join code.\nCopy the host's code, then choose Join again.");
+            return;
+        }
+
+        appInstance.netplayManager.BeginJoining(hostAddress, netplayPort);
+        JoinResolvedLobby(hostAddress, appInstance.netplayLobby.ResolveLobbyPort(), $"{hostAddress}:{netplayPort}");
+    }
+
+    private void JoinResolvedLobby(string hostAddress, int lobbyPort, string description)
+    {
+        if (mainScene.NetplayHandler == null || !mainScene.NetplayHandler.JoinLobby(hostAddress, lobbyPort))
+        {
+            mainScene.startMenuPanel?.ShowNetplayView("----------", $"Could not connect to {description}.");
+            return;
+        }
+
+        mainScene.startMenuPanel?.ShowMenuView();
+        mainScene.startMenuPanel?.Close();
+
+        GD.Print($"[Netplay] Joining lobby: {description}");
+    }
+
+    public void OnNetplayCancelPressed()
+    {
+        appInstance.netplayManager?.EndSession();
+        appInstance.netplayPortMapper?.ReleasePorts();
+        mainScene.startMenuPanel?.ShowMenuView();
+    }
+
+    public void RefreshFavoriteMenuOption()
+    {
+        Button favoriteBtn = mainScene.startMenuPanel?.favoriteGameButton;
+
+        if (favoriteBtn == null)
+        {
+            return;
+        }
+
+        var selectedGame = mainScene.GameListHandler.currentlySelectedGame;
+
+        if (!appInstance.dataBus.HasFavoriteCollection)
+        {
+            favoriteBtn.Disabled = true;
+            favoriteBtn.Text = "No Favorites Collection On Server";
+            return;
+        }
+
+        favoriteBtn.Disabled = selectedGame == null;
+
+        if (selectedGame == null)
+        {
+            favoriteBtn.Text = "Add to Favorites";
+            return;
+        }
+
+        favoriteBtn.Text = appInstance.dataBus.IsFavorite(selectedGame.Id) ? "Remove from Favorites" : "Add to Favorites";
+    }
+
+    public async void OnFavoriteGamePressed()
+    {
+        var selectedGame = mainScene.GameListHandler.currentlySelectedGame;
+
+        if (selectedGame == null || !appInstance.dataBus.HasFavoriteCollection)
+        {
+            return;
+        }
+
+        Button favoriteBtn = mainScene.startMenuPanel?.favoriteGameButton;
+        bool shouldBecomeFavorite = !appInstance.dataBus.IsFavorite(selectedGame.Id);
+
+        if (favoriteBtn != null)
+        {
+            favoriteBtn.Disabled = true;
+            favoriteBtn.Text = shouldBecomeFavorite ? "Adding..." : "Removing...";
+        }
+
+        bool changeSucceeded = await appInstance.rommApi.SetRomInCollectionAsync(appInstance.dataBus.favoriteCollectionId, selectedGame.Id, shouldBecomeFavorite);
+
+        if (changeSucceeded)
+        {
+            appInstance.dataBus.ApplyFavoriteChange(selectedGame, shouldBecomeFavorite);
+        }
+
+        RefreshFavoriteMenuOption();
     }
 
     public void OnUpdateEmulatorPressed()
     {
-        string mappedEmulator = GetCurrentSystemEmulator();
+        string mappedEmulator = GetCurrentEmulator();
 
         if (string.IsNullOrEmpty(mappedEmulator) || appInstance.emulatorManager.IsEmulatorInstalling(mappedEmulator))
         {
@@ -128,7 +354,7 @@ public class MainScenePopupHandler
 
     public void OnUninstallEmulatorPressed()
     {
-        string mappedEmulator = GetCurrentSystemEmulator();
+        string mappedEmulator = GetCurrentEmulator();
 
         if (string.IsNullOrEmpty(mappedEmulator) || !appInstance.emulatorManager.IsEmulatorInstalled(mappedEmulator))
         {
@@ -149,6 +375,11 @@ public class MainScenePopupHandler
 
     public void OnSelectBiosMenuPressed()
     {
+        if (mainScene.GameListHandler.CurrentSystemIsCollection)
+        {
+            return;
+        }
+
         mainScene.startMenuPanel?.ShowBiosView();
     }
 
@@ -232,11 +463,16 @@ public class MainScenePopupHandler
             return;
         }
 
+        GameSystem currentSystem = mainScene.GameListHandler.gameSystems[mainScene.GameListHandler.currentGameSystemIndex];
+
+        if (currentSystem.IsCollection)
+        {
+            return;
+        }
+
         mainScene.startMenuPanel?.Close();
 
         mainScene.progressPanel?.ShowStatus("Refreshing games...");
-
-        GameSystem currentSystem = mainScene.GameListHandler.gameSystems[mainScene.GameListHandler.currentGameSystemIndex];
         List<Game> allGamesForSystem = new List<Game>();
         int currentPage = 1;
         const int chunkSize = 100;

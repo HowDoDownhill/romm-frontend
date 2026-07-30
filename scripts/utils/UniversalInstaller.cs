@@ -11,11 +11,15 @@ using System.Linq;
 
 public static class UniversalInstaller
 {
+    private const int TransferBufferSizeBytes = 1024 * 1024;
+
+    private static readonly string[] OperatingSystemConfigFolderNames = { "windows", "linux", "macos" };
+
     private static readonly System.Net.Http.HttpClient sharedHttpClient;
 
     static UniversalInstaller()
     {
-        sharedHttpClient = new System.Net.Http.HttpClient();
+        sharedHttpClient = new System.Net.Http.HttpClient { Timeout = System.Threading.Timeout.InfiniteTimeSpan };
         sharedHttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("RomM-Frontend/1.0");
     }
 
@@ -44,7 +48,7 @@ public static class UniversalInstaller
 
         string temporaryArchiveFilePath = Path.Combine(appInstance.configManager.DownloadsPath, $"{emulatorName}download.archive");
 
-        bool downloadSucceeded = await DownloadFileAsync(selectedRelease.DownloadUrl, temporaryArchiveFilePath);
+        bool downloadSucceeded = await DownloadFileAsync(appInstance, selectedRelease.DownloadUrl, temporaryArchiveFilePath, emulatorName);
 
         if (!downloadSucceeded)
         {
@@ -127,22 +131,43 @@ public static class UniversalInstaller
             }
 
             File.Move(temporaryArchiveFilePath, destinationExecutablePath);
-
-            if (currentOperatingSystem != "windows")
-            {
-                try { Process.Start("chmod", $"+x \"{destinationExecutablePath}\""); } catch { }
-            }
         }
 
-        if (!await DownloadExtraFiles(appInstance, emulatorName, installRecipe, emulatorTargetDirectory))
+        if (currentOperatingSystem != "windows")
+        {
+            EnsureExecutableBit(ResolveInstalledExecutablePath(emulatorMetadata, currentOperatingSystem, emulatorTargetDirectory));
+        }
+
+        if (!await DownloadExtraFiles(appInstance, emulatorName, installRecipe, emulatorTargetDirectory, selectedRelease.VersionLabel))
         {
             return false;
         }
 
         CopyDefaultConfigurations(appInstance, emulatorName, emulatorTargetDirectory);
         SaveStore.LinkEmulatorSaveDirectories(appInstance, emulatorName, emulatorMetadata, currentOperatingSystem, null);
+        WriteInstalledVersion(emulatorTargetDirectory, selectedRelease.VersionLabel);
 
         return true;
+    }
+
+    public const string InstalledVersionFileName = "installed_version.txt";
+
+    private static void WriteInstalledVersion(string emulatorTargetDirectory, string versionLabel)
+    {
+        if (string.IsNullOrWhiteSpace(versionLabel))
+        {
+            return;
+        }
+
+        try
+        {
+            File.WriteAllText(Path.Combine(emulatorTargetDirectory, InstalledVersionFileName), versionLabel.Trim());
+        }
+
+        catch (Exception exception)
+        {
+            GD.PrintErr($"Could not record the installed version: {exception.Message}");
+        }
     }
 
     public static async Task<bool> EnsureCoreInstalled(AppInstance appInstance, string emulatorName, EmulatorMeta emulatorMetadata, string coreName, string currentOperatingSystem)
@@ -166,7 +191,7 @@ public static class UniversalInstaller
 
         if (string.IsNullOrEmpty(coreDownloadUrl))
         {
-            GD.PrintErr($"No core download URL for {coreName} on {currentOperatingSystem}.");
+            GD.PrintErr($"The {coreName} core is missing from {emulatorName} and no per-core download is configured. Reinstall {emulatorName} to restore its cores.");
             return false;
         }
 
@@ -176,7 +201,7 @@ public static class UniversalInstaller
         string temporaryArchiveFilePath = Path.Combine(appInstance.configManager.DownloadsPath, $"{emulatorName}core.archive");
         GD.Print($"Downloading the {coreName} core for {emulatorName}...");
 
-        if (!await DownloadFileAsync(coreDownloadUrl, temporaryArchiveFilePath))
+        if (!await DownloadFileAsync(appInstance, coreDownloadUrl, temporaryArchiveFilePath, $"{emulatorName} {coreName} core"))
         {
             GD.PrintErr($"Failed to download the {coreName} core from {coreDownloadUrl}.");
             return false;
@@ -195,7 +220,58 @@ public static class UniversalInstaller
         return true;
     }
 
-    private static async Task<bool> DownloadExtraFiles(AppInstance appInstance, string emulatorName, InstallRecipe installRecipe, string emulatorTargetDirectory)
+    private static string ApplyVersionPlaceholder(string templateUrl, string versionLabel)
+    {
+        return string.IsNullOrEmpty(templateUrl) || string.IsNullOrEmpty(versionLabel)
+            ? templateUrl
+            : templateUrl.Replace("{version}", versionLabel);
+    }
+
+    private static string FindExtractedFolder(string stagingDirectory, string extractFolderRegex)
+    {
+        var extractFolderPattern = new Regex("^" + extractFolderRegex.Replace("*", ".*") + "$", RegexOptions.IgnoreCase);
+
+        return Directory.GetDirectories(stagingDirectory).FirstOrDefault(directoryPath => extractFolderPattern.IsMatch(new DirectoryInfo(directoryPath).Name));
+    }
+
+    private static async Task<bool> ExtractExtraDownload(AppInstance appInstance, string archiveFilePath, string destinationDirectory, string extractFolderRegex)
+    {
+        if (string.IsNullOrEmpty(extractFolderRegex))
+        {
+            return await ExtractArchiveAsync(appInstance, archiveFilePath, destinationDirectory);
+        }
+
+        string stagingDirectory = Path.Combine(appInstance.configManager.DownloadsPath, "extradownloadstaging");
+
+        if (Directory.Exists(stagingDirectory))
+        {
+            Directory.Delete(stagingDirectory, true);
+        }
+
+        Directory.CreateDirectory(stagingDirectory);
+
+        try
+        {
+            if (!await ExtractArchiveAsync(appInstance, archiveFilePath, stagingDirectory))
+            {
+                return false;
+            }
+
+            string contentSourceDirectory = FindExtractedFolder(stagingDirectory, extractFolderRegex) ?? stagingDirectory;
+            CopyDirectoryRecursively(contentSourceDirectory, destinationDirectory);
+            return true;
+        }
+
+        finally
+        {
+            if (Directory.Exists(stagingDirectory))
+            {
+                Directory.Delete(stagingDirectory, true);
+            }
+        }
+    }
+
+    private static async Task<bool> DownloadExtraFiles(AppInstance appInstance, string emulatorName, InstallRecipe installRecipe, string emulatorTargetDirectory, string versionLabel)
     {
         if (installRecipe.ExtraDownloads == null || installRecipe.ExtraDownloads.Count == 0)
         {
@@ -211,24 +287,26 @@ public static class UniversalInstaller
                 continue;
             }
 
+            string resolvedDownloadUrl = ApplyVersionPlaceholder(extraDownload.Url, versionLabel);
+
             string destinationDirectory = string.IsNullOrWhiteSpace(extraDownload.Destination)
                 ? emulatorTargetDirectory
                 : Path.Combine(emulatorTargetDirectory, extraDownload.Destination.Replace('/', Path.DirectorySeparatorChar));
 
             Directory.CreateDirectory(destinationDirectory);
 
-            string downloadedFileName = extraDownload.Url.Split('/').LastOrDefault();
+            string downloadedFileName = resolvedDownloadUrl.Split('/').LastOrDefault();
             string temporaryFilePath = Path.Combine(appInstance.configManager.DownloadsPath, $"{emulatorName}extra{extraDownloadIndex}.archive");
 
-            if (!await DownloadFileAsync(extraDownload.Url, temporaryFilePath))
+            if (!await DownloadFileAsync(appInstance, resolvedDownloadUrl, temporaryFilePath, $"{emulatorName} {downloadedFileName}"))
             {
-                GD.PrintErr($"Failed to download {extraDownload.Url} for {emulatorName}.");
+                GD.PrintErr($"Failed to download {resolvedDownloadUrl} for {emulatorName}.");
                 return false;
             }
 
             if (extraDownload.Extract)
             {
-                bool extractionSucceeded = await ExtractArchiveAsync(appInstance, temporaryFilePath, destinationDirectory);
+                bool extractionSucceeded = await ExtractExtraDownload(appInstance, temporaryFilePath, destinationDirectory, extraDownload.ExtractFolderRegex);
                 File.Delete(temporaryFilePath);
 
                 if (!extractionSucceeded)
@@ -516,21 +594,46 @@ public static class UniversalInstaller
         return releaseOptions;
     }
 
-    private static async Task<bool> DownloadFileAsync(string downloadUrl, string destinationFilePath)
+    private static async Task<bool> DownloadFileAsync(AppInstance appInstance, string downloadUrl, string destinationFilePath, string displayName)
     {
+        var externalTransfer = appInstance?.downloadManager?.BeginExternalTransfer(displayName);
+
         try
         {
             var httpResponse = await sharedHttpClient.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
             httpResponse.EnsureSuccessStatusCode();
 
-            using var destinationFileStream = new FileStream(destinationFilePath, FileMode.Create, System.IO.FileAccess.Write, FileShare.None);
-            await httpResponse.Content.CopyToAsync(destinationFileStream);
+            long totalBytes = httpResponse.Content.Headers.ContentLength ?? 0;
+
+            using (var contentStream = await httpResponse.Content.ReadAsStreamAsync())
+            using (var destinationFileStream = new FileStream(destinationFilePath, FileMode.Create, System.IO.FileAccess.Write, FileShare.None, TransferBufferSizeBytes, true))
+            {
+                var transferBuffer = new byte[TransferBufferSizeBytes];
+                long bytesTransferred = 0;
+
+                while (true)
+                {
+                    int bytesRead = await contentStream.ReadAsync(transferBuffer, 0, transferBuffer.Length);
+
+                    if (bytesRead == 0)
+                    {
+                        break;
+                    }
+
+                    await destinationFileStream.WriteAsync(transferBuffer, 0, bytesRead);
+                    bytesTransferred += bytesRead;
+                    appInstance?.downloadManager?.ReportExternalTransferProgress(externalTransfer, bytesTransferred, totalBytes);
+                }
+            }
+
+            appInstance?.downloadManager?.CompleteExternalTransfer(externalTransfer, true);
             return true;
         }
 
         catch (Exception exception)
         {
             GD.PrintErr($"Download error: {exception.Message}");
+            appInstance?.downloadManager?.CompleteExternalTransfer(externalTransfer, false);
             return false;
         }
     }
@@ -599,7 +702,15 @@ public static class UniversalInstaller
         {
             try
             {
-                CopyDirectoryRecursively(defaultConfigDirectory, emulatorTargetDirectory);
+                CopyDirectoryRecursively(defaultConfigDirectory, emulatorTargetDirectory, OperatingSystemConfigFolderNames);
+
+                string operatingSystemConfigDirectory = Path.Combine(defaultConfigDirectory, OS.GetName().ToLower());
+
+                if (Directory.Exists(operatingSystemConfigDirectory))
+                {
+                    CopyDirectoryRecursively(operatingSystemConfigDirectory, emulatorTargetDirectory);
+                }
+
                 GD.Print($"Copied default configurations for {emulatorName}");
             }
 
@@ -686,12 +797,16 @@ public static class UniversalInstaller
         }
     }
 
-    private static void CopyDirectoryRecursively(string sourceDirectory, string targetDirectory)
+    private static void CopyDirectoryRecursively(string sourceDirectory, string targetDirectory, IEnumerable<string> excludedDirectoryNames = null)
     {
         if (!Directory.Exists(targetDirectory))
         {
             Directory.CreateDirectory(targetDirectory);
         }
+
+        var excludedNames = excludedDirectoryNames == null
+            ? null
+            : new HashSet<string>(excludedDirectoryNames, StringComparer.OrdinalIgnoreCase);
 
         foreach (string filePath in Directory.GetFiles(sourceDirectory))
         {
@@ -705,7 +820,55 @@ public static class UniversalInstaller
                 continue;
             }
 
-            CopyDirectoryRecursively(subdirectoryPath, Path.Combine(targetDirectory, new DirectoryInfo(subdirectoryPath).Name));
+            string subdirectoryName = new DirectoryInfo(subdirectoryPath).Name;
+
+            if (excludedNames != null && excludedNames.Contains(subdirectoryName))
+            {
+                continue;
+            }
+
+            CopyDirectoryRecursively(subdirectoryPath, Path.Combine(targetDirectory, subdirectoryName));
+        }
+    }
+
+    private static string ResolveInstalledExecutablePath(EmulatorMeta emulatorMetadata, string currentOperatingSystem, string emulatorTargetDirectory)
+    {
+        if (emulatorMetadata.ExecutableName != null
+            && emulatorMetadata.ExecutableName.TryGetValue(currentOperatingSystem, out string declaredExecutableName)
+            && !string.IsNullOrEmpty(declaredExecutableName))
+        {
+            return Path.Combine(emulatorTargetDirectory, declaredExecutableName);
+        }
+
+        if (emulatorMetadata.ExecutableRegex != null
+            && emulatorMetadata.ExecutableRegex.TryGetValue(currentOperatingSystem, out string executableRegex)
+            && Directory.Exists(emulatorTargetDirectory))
+        {
+            var executablePattern = new Regex(executableRegex, RegexOptions.IgnoreCase);
+
+            return Directory.GetFiles(emulatorTargetDirectory)
+                .FirstOrDefault(candidatePath => executablePattern.IsMatch(Path.GetFileName(candidatePath)));
+        }
+
+        return null;
+    }
+
+    private static void EnsureExecutableBit(string executableFilePath)
+    {
+        if (OperatingSystem.IsWindows() || string.IsNullOrEmpty(executableFilePath) || !File.Exists(executableFilePath))
+        {
+            return;
+        }
+
+        try
+        {
+            File.SetUnixFileMode(executableFilePath, File.GetUnixFileMode(executableFilePath)
+                | UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
+        }
+
+        catch (Exception exception)
+        {
+            GD.PrintErr($"Could not mark {executableFilePath} executable: {exception.Message}");
         }
     }
 }

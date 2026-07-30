@@ -82,20 +82,22 @@ public partial class SystemCarousel : HBoxContainer
         }
     }
 
-    public void Next()
+    public bool Next()
     {
-        if (Systems.Count == 0) return;
+        if (Systems.Count <= 1) return false;
         int newIndex = SelectedIndex + 1;
         if (newIndex >= Systems.Count) newIndex = 0;
         SetSelectionWithTimer(newIndex, 1);
+        return true;
     }
 
-    public void Previous()
+    public bool Previous()
     {
-        if (Systems.Count == 0) return;
+        if (Systems.Count <= 1) return false;
         int newIndex = SelectedIndex - 1;
         if (newIndex < 0) newIndex = Systems.Count - 1;
         SetSelectionWithTimer(newIndex, -1);
+        return true;
     }
 
     private void SlideInFrom(int direction)
