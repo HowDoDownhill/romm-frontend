@@ -168,6 +168,7 @@ public class MainSceneDownloadHandler
 
         mainScene.GameListHandler.UpdateDetailsPanelButtons(game);
         mainScene.GameListHandler.RefreshGameList();
+        mainScene.NetplayHandler?.OnLocalRomLibraryChanged();
     }
 
     public void OnDownloadCompleted(string fileName, bool success)

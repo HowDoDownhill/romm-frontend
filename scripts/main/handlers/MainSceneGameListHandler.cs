@@ -70,6 +70,10 @@ public partial class MainSceneGameListHandler
 
     private int pendingRomIdToSelect;
 
+    private bool IsFollowingALobby => appInstance.netplayLobby != null
+        && appInstance.netplayLobby.IsInLobby
+        && !appInstance.netplayLobby.IsHosting;
+
     public void SelectGameById(int romId)
     {
         if (currentlyShownGames == null)
@@ -392,7 +396,7 @@ public partial class MainSceneGameListHandler
                 currentlyShownGames = cachedGames;
             }
 
-            if (showOnlyInstalledGames)
+            if (showOnlyInstalledGames && !IsFollowingALobby)
             {
                 currentlyShownGames = currentlyShownGames.Where(g => CheckIfGameIsDownloaded(g)).ToList();
             }

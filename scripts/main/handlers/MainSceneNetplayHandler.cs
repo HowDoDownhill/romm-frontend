@@ -620,6 +620,11 @@ public class MainSceneNetplayHandler
 
     private void OnAnyDownloadCompleted(string fileName, bool wasSuccessful)
     {
+        OnLocalRomLibraryChanged();
+    }
+
+    public void OnLocalRomLibraryChanged()
+    {
         ResetLocalRomVerification();
         VerifyLocalRomAgainstHost();
         ReportPreparednessIfInLobby();
@@ -650,14 +655,13 @@ public class MainSceneNetplayHandler
         string localVersion = ResolveLocalEmulatorVersion();
         string readinessSignature = $"{isPrepared}|{isReady}|{preparednessText}|{localVersion}";
 
-        if (readinessSignature == lastReportedReadinessSignature)
+        if (readinessSignature != lastReportedReadinessSignature)
         {
-            return;
+            lastReportedReadinessSignature = readinessSignature;
+            GD.Print($"[Netplay] preparedness now \"{preparednessText}\" (prepared={isPrepared} ready={isReady}).");
+            appInstance.netplayLobby.ReportLocalReadiness(isPrepared, isReady, preparednessText, localVersion);
         }
 
-        lastReportedReadinessSignature = readinessSignature;
-
-        appInstance.netplayLobby.ReportLocalReadiness(isPrepared, isReady, preparednessText, localVersion);
         RefreshLobbyPanel();
         AutoStartHostedGameIfRequested();
     }
@@ -1219,11 +1223,17 @@ public class MainSceneNetplayHandler
     {
         activeJoinCode = null;
         isLocallyReady = false;
+        lastReportedReadinessSignature = null;
+        lobbyHostAddress = null;
+        IsBrowsingForLobbyGame = false;
 
         appInstance.netplayDiscovery?.StopAdvertising();
         appInstance.netplayManager?.EndSession();
+        appInstance.netplayPortMapper?.ReleasePorts();
 
         ApplyLobbyVisibility();
+        mainScene.RefreshBrowseSourceForLobby();
+        mainScene.gameList?.GrabFocus();
 
         GD.Print($"[Netplay] Lobby closed: {reason}");
     }

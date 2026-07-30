@@ -295,6 +295,61 @@ Nothing reset the ready flags when an emulator exited, so a lobby returning from
 still Ready. The host could then start the next game before anyone had confirmed they wanted it or
 finished downloading it. Ending a session now clears readiness on the host and locally on each client.
 
+### The readiness signature suppresses the message, never the panel refresh
+Reporting readiness is idempotent so that recomputing on `MembersChanged` cannot loop, and the first
+version of that returned early on an unchanged signature — skipping `RefreshLobbyPanel` along with the
+RPC. The guard exists to stop redundant *network messages*; a local repaint is free and there is never
+a reason to skip it. The refresh now always runs and only the RPC is gated.
+
+Preparedness transitions are logged when the signature changes, which is naturally low-volume — one
+line per real state change — and is what confirms whether a stuck panel is a missed refresh or a
+preparedness ladder returning the wrong answer.
+
+This guard was initially blamed for a lobby that did not notice a *download* finishing. It was not the
+cause — see below.
+
+### A finished download is not a finished ROM; preparedness must wait for extraction
+`DownloadManager.HandleDownloadFinished` invokes the completion callback, which starts extraction on a
+background thread, and then emits `DownloadCompleted` synchronously — so the signal always arrives
+*before* the ROM exists at `roms/<slug>/<file>`. Preparedness is derived from `CheckIfGameIsDownloaded`,
+which tests exactly that path, so recomputing on `DownloadCompleted` reads the file as still missing.
+
+The lobby therefore settled on `Needs game` the moment a download completed, and nothing recomputed
+again once extraction landed. This is why the symptom survived making `RefreshLobbyPanel` unconditional:
+the repaint was running, it was just painting a correct answer to a question asked too early.
+
+The same ordering silently skipped the ROM hash check. `VerifyLocalRomAgainstHost` returns early when
+the file does not exist, so a freshly downloaded ROM was never hashed against the host's and
+`isLocalRomMatchingHost` kept its optimistic default — the match check failed open rather than running.
+
+`HandleExtractionFinished` now notifies netplay via `OnLocalRomLibraryChanged`, which is the first
+moment the file is real. The `DownloadCompleted` subscription is kept because a *failed* download never
+reaches extraction and still has to repaint.
+
+Emulator installs do not have this problem: `InstallEmulator` awaits the installer to completion before
+emitting, so that signal already fires when the state it describes is true.
+
+### A client must not have its game list filtered out from under the host's choice
+`showOnlyInstalledGames` hides anything not downloaded, which is right when browsing your own library
+and wrong in a lobby: the host picks from *their* library, and the whole point of a client's lobby is
+to see that game and download it. With the filter on, the host's pick was simply absent from
+`currentlyShownGames`, so `SelectGameById` found nothing and the client's carousel sat still while the
+host browsed.
+
+The filter is therefore suppressed while following a lobby — a non-hosting member of a lobby — and left
+alone for the host, who is choosing from what they have. It composes with
+`FilterSystemsForNetplayHost`, which narrows *systems* for both roles.
+
+### Closing a lobby has to restore the browse source, not just hide the panel
+`LeaveLobby` re-ran `GetCache` so the carousel returned to the full system list, but `OnLobbyClosed` —
+the path taken when the *host* quits or the connection drops — only hid the panel. A client left after
+the host quit therefore stayed narrowed to netplay-capable systems and could not see any other
+platform until something else forced a rebuild.
+
+`OnLobbyClosed` now performs the same teardown as leaving deliberately: refresh the browse source,
+return focus to the game list, release ports, and clear the cached lobby address, readiness signature
+and browsing flag. The two paths differ in *why* the lobby ended, not in what has to be undone.
+
 ### Readiness never starts a session; only the host pressing Start does
 Readiness says "I am able to play this", not "go". The host decides when a session begins, and nothing
 else may decide for it — otherwise a player finishing a download is enough to drag everyone into a
