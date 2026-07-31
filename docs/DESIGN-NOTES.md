@@ -757,6 +757,50 @@ A missing version file is therefore not a cosmetic gap: for any emulator install
 frontend, or before version tracking existed, the convergence check silently passes and the mismatch
 surfaces as an unexplained emulator-side error instead.
 
+### A netplay session has to plug in the second controller itself
+Flycast's default maple layout is `device1 = 0` (a controller in port A) and `device2 = 10`, where
+10 is *None*. The emulated Dreamcast therefore has exactly one controller plugged in, so a netplay
+session connects, synchronises and plays — while the second player simply does not exist as far as
+the game is concerned.
+
+`input:device2=0` puts a controller in port B for netplay launches only. It is deliberately not set
+outside netplay, where a phantom second pad can change how a single-player game behaves.
+
+The expansion slots are left alone. Port A carries VMUs (`device1.1 = 1`), port B keeps the existing
+`10`. Adding a VMU to port B would change the emulated machine on one side only unless it were set on
+both, and that is exactly the kind of divergence GGPO rejects.
+
+### Digital inputs always cross GGPO; the analog stick only if you ask
+`network:GGPOAnalogAxes` is a three-way enum — 0 `Disabled`, 1 `Horizontal`, 2 `Full` — and it
+defaults to 0. Buttons and the d-pad travel regardless, so a session with it unset looks *almost*
+right: two players, both responsive, and a completely dead thumbstick.
+
+Netplay launches now force `2` on both sides. It has to be identical on both, because Flycast treats
+a difference as a hard error rather than degrading — `GGPO analog settings are different from peer`.
+Passing it from the launch arguments is what guarantees that, since each machine's own `emu.cfg` is
+free to disagree.
+
+### Netplay peers must share the emulated console's state, not just the ROM
+`Peer verification failed` was traced to `dc_nvmem.bin` and the game's VMU save differing between the
+two machines. `dc_boot.bin` and `dc_flash.bin` matched; the NVRAM did not, because it is per-machine
+state that drifts as each install is used. Copying the host's NVRAM and VMU to the client was what
+finally let a session start.
+
+**The frontend does not enforce this yet.** It already refuses to start when the *ROM* differs, and
+the same reasoning applies to everything else that makes up the emulated machine. For Flycast that is
+`dc_nvmem.bin` plus the per-game VMU files — both already named in `sync_include`, which is why they
+exist on both machines but with per-device contents. Until a client adopts the host's copies, Flycast
+netplay works only when the two installs happen to have converged.
+
+### `installed_version.txt` is what makes version convergence real
+`GetInstalledVersion` reads that file from the emulator directory and returns null when it is absent.
+Neither machine had one for Flycast, so the lobby compared null to null, reported agreement, and let
+the session start. Both builds happened to be v2.6, so nothing broke — but a genuine mismatch would
+have passed the same check and surfaced as an unexplained emulator-side failure.
+
+An emulator installed outside the frontend, or before version tracking existed, has no version file.
+Treat a null version as *unknown*, not as *matching*.
+
 ### Flycast's config keys were read out of the binary, not guessed
 `flycast -help` documents only `-config section:key=value`, so the key names had to come from
 somewhere. They are laid out as string literals in the executable: the `network` section is

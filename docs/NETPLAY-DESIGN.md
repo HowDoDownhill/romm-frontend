@@ -493,22 +493,26 @@ Verified on the two-machine rig:
 - GGPO activates on both (each opens UDP 19713, and Flycast takes its netplay `.state.net` path)
 - the 210 MB ROM hashes once and is served from `romhashes.cache` on every later run
 
-- the peers **connect**: GGPO reaches its verification step, which only happens over a working transport
+- a session **runs**: both emulators sustain a real CPU load, two players respond, and the analog
+  stick works
 
-**Not yet verified: that a session actually runs.** Both sides now stop with
-`Flycast has stopped: Peer verification failed`. Ruled out by measurement: the firewall (the host's
-inbound Block rules for `flycast.exe` were changed to Allow), BIOS parity, and the per-machine render
-settings, which were made identical with no effect.
+Getting there needed four things beyond enabling GGPO, each of which failed silently on its own:
 
-The open suspect is the emulator build. `installed_version.txt` is missing for Flycast on both
-machines, so `GetInstalledVersion` returns null, the lobby's version convergence compares null to null
-and passes, and two different Flycast releases are allowed into the same session — Windows reports
-`v2.6` from January 2026, the Linux AppImage was installed in July 2026.
+| Symptom | Cause |
+|---|---|
+| Both peers stuck at `Starting Network` | GGPO is symmetric; the host had no peer address |
+| `Peer verification failed` | `dc_nvmem.bin` and the VMU save differed between machines |
+| Session plays, but there is no player 2 | Port B is `device2 = 10` (None) by default |
+| Player 2 works, but the stick is dead | `GGPOAnalogAxes` defaults to 0 (`Disabled`) |
 
-Next step is to reinstall Flycast on both machines *through the frontend*, so both land on the same
-release and both get a version file, then re-run the LAN test. If verification still fails with
-matched builds, the remaining candidates are the settings Flycast itself considers part of the
-verification payload.
+Ruled out by measurement along the way: the firewall, BIOS parity (`dc_boot.bin` and `dc_flash.bin`
+match), render settings, and the emulator build — both machines run v2.6, contrary to an early guess
+based on install dates.
+
+**Still open.** NVRAM and VMU parity was established by hand; the frontend enforces an identical ROM
+but not an identical emulated machine, so a client whose NVRAM has drifted will fail verification with
+nothing pointing at the reason. And internet play still needs 19713 forwarded rather than the
+lobby-time 55435.
 
 Internet play additionally needs the port-mapping change described in `DESIGN-NOTES.md`: the
 frontend forwards the lobby-time session port, so Flycast's 19713 is never opened.

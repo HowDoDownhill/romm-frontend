@@ -34,8 +34,8 @@
   "launch_args_without_game": "",
   "netplay": {
     "transport": "launch_args",
-    "host_args": "-config network:GGPO=yes -config network:ActAsServer=yes -config network:server={peer_address}:{peer_port} -config network:EnableUPnP=no",
-    "join_args": "-config network:GGPO=yes -config network:ActAsServer=no -config network:server={peer_address}:{peer_port} -config network:EnableUPnP=no",
+    "host_args": "-config network:GGPO=yes -config network:ActAsServer=yes -config network:server={peer_address}:{peer_port} -config network:EnableUPnP=no -config network:GGPOAnalogAxes=2 -config input:device2=0",
+    "join_args": "-config network:GGPO=yes -config network:ActAsServer=no -config network:server={peer_address}:{peer_port} -config network:EnableUPnP=no -config network:GGPOAnalogAxes=2 -config input:device2=0",
     "max_players": 2,
     "default_port": 19713,
     "requires_identical_rom": true
