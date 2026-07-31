@@ -148,10 +148,10 @@ public partial class NetplayManager : Node
         return firstUsableAddress;
     }
 
-    public void BeginHosting(int port)
+    public void BeginHosting(int port, string peerAddress = null)
     {
         Role = NetplayRole.Host;
-        PeerAddress = null;
+        PeerAddress = peerAddress;
         Port = port > 0 ? port : FallbackPort;
     }
 

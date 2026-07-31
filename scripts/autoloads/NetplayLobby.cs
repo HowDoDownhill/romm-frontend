@@ -33,6 +33,36 @@ public partial class NetplayLobby : Node
         public bool IsReady;
         public string Status;
         public string EmulatorVersion;
+        public string RemoteAddress;
+    }
+
+    public string ResolveFirstRemoteMemberAddress()
+    {
+        if (!IsHosting)
+        {
+            return null;
+        }
+
+        foreach (var member in membersByPeerId.Values)
+        {
+            if (member.PeerId != HostPeerId && !string.IsNullOrEmpty(member.RemoteAddress))
+            {
+                return member.RemoteAddress;
+            }
+        }
+
+        return null;
+    }
+
+    private string ResolveConnectedPeerAddress(long peerId)
+    {
+        if (lobbyPeer == null || peerId == HostPeerId)
+        {
+            return null;
+        }
+
+        var connectedPeer = lobbyPeer.GetPeer((int)peerId);
+        return connectedPeer?.GetRemoteAddress();
     }
 
     [Signal]
@@ -305,7 +335,8 @@ public partial class NetplayLobby : Node
             HasGame = false,
             IsReady = false,
             Status = "",
-            EmulatorVersion = ""
+            EmulatorVersion = "",
+            RemoteAddress = ResolveConnectedPeerAddress(senderPeerId)
         };
 
         BroadcastMembers();

@@ -1264,7 +1264,14 @@ public class MainSceneNetplayHandler
     {
         var lobby = appInstance.netplayLobby;
 
-        appInstance.netplayManager?.BeginHosting(appInstance.netplayManager.ResolveDefaultPort(null));
+        string opponentAddress = lobby?.ResolveFirstRemoteMemberAddress();
+
+        if (!string.IsNullOrEmpty(opponentAddress))
+        {
+            GD.Print($"[Netplay] Hosting against {opponentAddress}.");
+        }
+
+        appInstance.netplayManager?.BeginHosting(appInstance.netplayManager.ResolveDefaultPort(null), opponentAddress);
 
         int netplayPort = appInstance.netplayManager?.Port ?? 0;
 

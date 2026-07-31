@@ -493,11 +493,22 @@ Verified on the two-machine rig:
 - GGPO activates on both (each opens UDP 19713, and Flycast takes its netplay `.state.net` path)
 - the 210 MB ROM hashes once and is served from `romhashes.cache` on every later run
 
-**Not yet verified: that a session actually synchronises.** Both peers sat at ~0.5% CPU with no
-`Connected to peer`, because the Windows host has two *enabled inbound Block* firewall rules for
-`flycast.exe` (TCP and UDP, Private+Public). That is a machine setting, not a code path — the
-frontend cannot and should not rewrite it. Re-run the LAN test once those rules are removed or
-changed to Allow, and confirm `Connected to peer` and a CPU load consistent with emulation.
+- the peers **connect**: GGPO reaches its verification step, which only happens over a working transport
+
+**Not yet verified: that a session actually runs.** Both sides now stop with
+`Flycast has stopped: Peer verification failed`. Ruled out by measurement: the firewall (the host's
+inbound Block rules for `flycast.exe` were changed to Allow), BIOS parity, and the per-machine render
+settings, which were made identical with no effect.
+
+The open suspect is the emulator build. `installed_version.txt` is missing for Flycast on both
+machines, so `GetInstalledVersion` returns null, the lobby's version convergence compares null to null
+and passes, and two different Flycast releases are allowed into the same session — Windows reports
+`v2.6` from January 2026, the Linux AppImage was installed in July 2026.
+
+Next step is to reinstall Flycast on both machines *through the frontend*, so both land on the same
+release and both get a version file, then re-run the LAN test. If verification still fails with
+matched builds, the remaining candidates are the settings Flycast itself considers part of the
+verification payload.
 
 Internet play additionally needs the port-mapping change described in `DESIGN-NOTES.md`: the
 frontend forwards the lobby-time session port, so Flycast's 19713 is never opened.

@@ -718,6 +718,45 @@ the internet would have 55435 forwarded and 19713 closed. LAN is unaffected. Fix
 mapping the port once the host commits a game, which is the same UPnP-lifetime area that already
 caused the second-launch bugs, so it is deliberately left for its own change.
 
+### Flycast GGPO is symmetric: both peers need the other's address
+`ActAsServer` and `LocalPort` belong to the **Naomi** networking tab — their tooltips are "Create a
+local server for Naomi network games" and "The local UDP port to use". The GGPO tab has no server
+concept at all: it has `Play as Player 1` ("Deselect to play as player 2") and a single `Peer` field
+("Your peer IP address and optional port"). The "leave blank to find a server automatically" tooltip
+that suggests a listening mode belongs to Naomi's `Server`, not to GGPO's `Peer`.
+
+So there is no host that merely listens. Both sides dial each other and the only asymmetry is who is
+player 1. With only the client given an address, both peers sat at `Starting Network` forever.
+
+The host therefore has to learn the client's address. `NetplayLobby` records each member's
+`RemoteAddress` from the ENet connection when its identity arrives, and `StartHostedGame` passes the
+first remote member's address into `BeginHosting`, so `{peer_address}` resolves on both sides. This is
+also why the lobby is limited to two players for Flycast — `max_players` is 2 and GGPO is a pair.
+
+Once that landed the peers genuinely connect, which is what turned an indefinite `Starting Network`
+hang into a fast, explicit failure.
+
+### `Peer verification failed` is Flycast rejecting a mismatched peer, not a network problem
+After the peers connect, GGPO exchanges a verification step, and any mismatch stops both sides with
+`GGPOException in ggpo_idle: Verification mismatch` on the side that detects it and
+`Peer reported verification failure` on the other. It is not a connectivity failure — reaching this
+error is proof the transport works.
+
+Two causes were ruled out by measurement: BIOS (both load real BIOS under the frontend; only a
+hand-rolled launch without `XDG_DATA_HOME` fell back to `reios`) and the render settings the frontend
+appends per machine, which were made identical and changed nothing.
+
+**The emulator builds are not verified to match.** `GetInstalledVersion` reads
+`installed_version.txt` from the emulator directory, and neither machine has one for Flycast, so it
+returns null on both. The lobby's version convergence compares null to null, reports agreement, and
+lets the session start. The Windows build reports `v2.6` dated January 2026 while the Linux AppImage
+was installed in July 2026 — almost certainly different releases, which is exactly what GGPO's
+verification exists to reject.
+
+A missing version file is therefore not a cosmetic gap: for any emulator installed outside the
+frontend, or before version tracking existed, the convergence check silently passes and the mismatch
+surfaces as an unexplained emulator-side error instead.
+
 ### Flycast's config keys were read out of the binary, not guessed
 `flycast -help` documents only `-config section:key=value`, so the key names had to come from
 somewhere. They are laid out as string literals in the executable: the `network` section is
