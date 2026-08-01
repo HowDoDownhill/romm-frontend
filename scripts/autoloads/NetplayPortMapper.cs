@@ -32,6 +32,39 @@ public partial class NetplayPortMapper : Node
         return await Task.Run(() => MapPorts(portsToMap));
     }
 
+    public async Task<bool> TryMapAdditionalPortAsync(int portToMap)
+    {
+        if (portToMap <= 0 || upnpDevice == null)
+        {
+            return false;
+        }
+
+        if (mappedPorts.Contains(portToMap))
+        {
+            return true;
+        }
+
+        return await Task.Run(() => MapAdditionalPort(portToMap));
+    }
+
+    private bool MapAdditionalPort(int portToMap)
+    {
+        int mapResultUdp = upnpDevice.AddPortMapping(portToMap, portToMap, PortMappingDescription, "UDP", PortMappingDurationSeconds);
+        int mapResultTcp = upnpDevice.AddPortMapping(portToMap, portToMap, PortMappingDescription, "TCP", PortMappingDurationSeconds);
+
+        if (mapResultUdp != (int)Upnp.UpnpResult.Success && mapResultTcp != (int)Upnp.UpnpResult.Success)
+        {
+            LastFailureReason = $"The router refused to map port {portToMap}.";
+            GD.Print($"[Netplay] {LastFailureReason} (udp {mapResultUdp}, tcp {mapResultTcp})");
+            return false;
+        }
+
+        mappedPorts.Add(portToMap);
+        GD.Print($"[Netplay] Mapped emulator port {portToMap} via UPnP.");
+
+        return true;
+    }
+
     private bool MapPorts(int[] portsToMap)
     {
         var discoveredUpnp = new Upnp();

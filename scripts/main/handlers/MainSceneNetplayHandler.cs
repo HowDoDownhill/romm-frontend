@@ -228,8 +228,34 @@ public class MainSceneNetplayHandler
         appInstance.netplayDiscovery?.UpdateAdvertisement(selectedGame.Id, selectedGame.Name, appInstance.netplayLobby.Members.Count);
 
         PublishHostRomHashWhenComputed(selectedGame);
+        MapEmulatorNetplayPort(hostEmulatorName);
 
         RefreshLobbyPanel();
+    }
+
+    private int ResolveEmulatorNetplayPort(string emulatorName)
+    {
+        var emulatorMetadata = appInstance.emulatorManager.LoadEmulatorMetadataFromDisk(emulatorName);
+        return appInstance.netplayManager.ResolveEmulatorNetplayPort(emulatorMetadata);
+    }
+
+    private async void MapEmulatorNetplayPort(string emulatorName)
+    {
+        var portMapper = appInstance.netplayPortMapper;
+
+        if (portMapper == null || !portMapper.HasMappedPorts || string.IsNullOrEmpty(emulatorName))
+        {
+            return;
+        }
+
+        int emulatorPort = ResolveEmulatorNetplayPort(emulatorName);
+
+        if (emulatorPort <= 0 || portMapper.IsPortMapped(emulatorPort))
+        {
+            return;
+        }
+
+        await portMapper.TryMapAdditionalPortAsync(emulatorPort);
     }
 
     private const double BrowsingBroadcastSettleSeconds = 0.2;
@@ -1271,9 +1297,9 @@ public class MainSceneNetplayHandler
             GD.Print($"[Netplay] Hosting against {opponentAddress}.");
         }
 
-        appInstance.netplayManager?.BeginHosting(appInstance.netplayManager.ResolveDefaultPort(null), opponentAddress);
+        int netplayPort = ResolveEmulatorNetplayPort(ResolveRequiredEmulatorName());
 
-        int netplayPort = appInstance.netplayManager?.Port ?? 0;
+        appInstance.netplayManager?.BeginHosting(netplayPort, opponentAddress);
 
         hasHostedGameRunning = true;
         appInstance.emulatorManager.LaunchEmulatorWithGame(selectedGame);
@@ -1321,9 +1347,10 @@ public class MainSceneNetplayHandler
     {
         try
         {
-            return IPGlobalProperties.GetIPGlobalProperties()
-                .GetActiveTcpListeners()
-                .Any(listeningEndPoint => listeningEndPoint.Port == port);
+            var networkProperties = IPGlobalProperties.GetIPGlobalProperties();
+
+            return networkProperties.GetActiveTcpListeners().Any(listeningEndPoint => listeningEndPoint.Port == port)
+                || networkProperties.GetActiveUdpListeners().Any(boundEndPoint => boundEndPoint.Port == port);
         }
 
         catch (System.Exception)

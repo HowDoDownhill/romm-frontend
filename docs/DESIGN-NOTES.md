@@ -801,6 +801,28 @@ have passed the same check and surfaced as an unexplained emulator-side failure.
 An emulator installed outside the frontend, or before version tracking existed, has no version file.
 Treat a null version as *unknown*, not as *matching*.
 
+### The emulator's port is mapped when a game is committed, not when the lobby opens
+`TryMapPortsAsync` runs at lobby-open, before anyone has picked a game, so it can only map the lobby
+port and the generic session port. Flycast's GGPO uses 19713, which was therefore never forwarded and
+made internet play impossible while LAN play worked.
+
+Remapping the whole set later is the obvious fix and the wrong one: `TryMapPortsAsync` calls
+`ReleasePorts` and rediscovers the gateway, so it would briefly unmap the lobby port out from under a
+live lobby. `TryMapAdditionalPortAsync` instead reuses the already-discovered `Upnp` device and adds a
+single mapping, and `ReleasePorts` already tears down everything in `mappedPorts` regardless of how it
+got there. The host maps the emulator port once, when it commits a game and the emulator is finally
+known.
+
+### Listening detection has to look at UDP, or it always waits the full timeout
+`ReleaseMembersOnceHostIsListening` holds the other players back until the host's emulator is actually
+accepting connections. It checked `GetActiveTcpListeners` only. RetroArch happens to listen on TCP;
+Flycast's GGPO binds **UDP** 19713 and nothing else, so the check could never succeed and every
+Dreamcast session sat through the entire 60-second timeout before releasing anyone.
+
+Checking `GetActiveUdpListeners` as well takes that from 60 seconds to `listening on 19713 after 1.0s`.
+The symptom was easy to misread as netplay being slow to connect, because the session did eventually
+work — the clients simply started a minute late.
+
 ### Flycast's config keys were read out of the binary, not guessed
 `flycast -help` documents only `-config section:key=value`, so the key names had to come from
 somewhere. They are laid out as string literals in the executable: the `network` section is
