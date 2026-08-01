@@ -28,7 +28,7 @@ Verified July 2026.
 |---|---|---|---|
 | Dreamcast, Naomi | Flycast | GGPO rollback | Launch args (`-config network:*`) |
 | Many | RetroArch | Lockstep + public lobby | Launch args (`--host`, `--connect`, `--port`) |
-| N64 | gopher64 | P2P mesh, TURN fallback | Server address; self-hostable server |
+| N64 | gopher64 | GGRS rollback over WebRTC | **Blocked** — GUI only, see below |
 | PSP | PPSSPP | Ad-hoc over network, relay in 1.20+ | `ppsspp.ini` |
 | GC, Wii | Dolphin | Traversal server, mature | **Blocked** — no CLI, PR #13288 open since Jan 2025 |
 | 3DS | Azahar | Public/private rooms | GUI only |
@@ -81,10 +81,11 @@ good. That is enough to build the plumbing against.
 RetroArch. The current default cannot netplay at all. This is the only case where the declared
 fallback rescued a system, which is why the whole list was walked rather than just the defaults.
 
-**n64, dc and psp have no libretro path** and move to their standalone emulators. That is not a
-loss: gopher64 has P2P netplay with TURN fallback, Flycast has GGPO rollback, and PPSSPP has
-ad-hoc. All three are better served standalone, so the netplay-capable emulator for those
-systems is the standalone one and phase 4 covers them.
+**n64, dc and psp have no libretro path** and move to their standalone emulators. Flycast has GGPO
+rollback and is now working; PPSSPP has ad-hoc, which is driven from `ppsspp.ini` and is really about
+play over the internet rather than a LAN. gopher64 also has rollback netplay but cannot be started
+without its GUI — see [gopher64 status](#gopher64-status-blocked-gui-only) — so **n64 has no netplay
+path at all** for now, and phase 4 covers dc and psp only.
 
 **Sega CD needs its BIOS staged before it will boot**, which the frontend does at launch. The
 first matrix run bypassed the frontend and recorded a false failure until `bios_CD_*.bin` were
@@ -474,8 +475,8 @@ not offer. Adequate for friends on a home server; not a security boundary.
    to build anything here. Confirmed necessary: the host logged
    `Your room is not connectable from the internet` after UPnP failed, so direct connection is
    not a realistic default.
-4. **Standalone coverage.** Flycast GGPO, gopher64, then PPSSPP via `config_file` — the three
-   systems libretro cannot serve. Dolphin when PR #13288 lands.
+4. **Standalone coverage.** Flycast GGPO (**done**), then PPSSPP via `config_file`. gopher64 is
+   blocked on being GUI-only, so n64 is uncovered. Dolphin when PR #13288 lands.
 
 Phase 1 is only useful on a LAN. That is intentional — it proves the launch path before any
 network service exists.
@@ -517,10 +518,34 @@ lobby-time 55435.
 Internet play additionally needs the port-mapping change described in `DESIGN-NOTES.md`: the
 frontend forwards the lobby-time session port, so Flycast's 19713 is never opened.
 
-## Open questions
+## gopher64 status: blocked, GUI only
 
-- Does gopher64 accept a server address from the command line, or only via its UI and LAN
-  discovery? Determines whether it lands in phase 4 or needs a config-file path.
+Measured against gopher64 v1.1.34. **Neither transport the schema supports can start a session.**
+
+`--help` lists no netplay options, but the binary carries four *hidden* clap arguments —
+`--netplay-server-addr`, `--netplay-player-number`, `--netplay-number-of-players`,
+`--netplay-input-delay`, each with a matching `NETPLAY_*` environment variable. They are real
+arguments, and they are also not sufficient.
+
+Launched with all four set and a room in the URL, gopher64 booted the ROM and ran it at full speed
+with **no TCP sockets, no UDP sockets and no netplay log line of any kind**. That is a no-op rather
+than a failed connection: the binary contains `Failed to connect to netplay:`, and reaching a
+connection attempt at all would have produced either that message or a socket. Verified on both
+machines.
+
+The config file is not an alternative either. `portable_data/config/config.json` has exactly four
+sections — `input`, `video`, `emulation`, `ui` — and no netplay key, so there is nothing to write.
+
+The reason is visible in the UI strings: netplay needs a **Session Name** and an optional
+**Password**, and there is no command-line argument for either. Sessions are created or joined
+through a WebSocket signalling server (`wss://netplay.gopher64.com`, overridable) with a browsable
+session list, and peers then connect by WebRTC using GGRS for rollback. The hidden flags are best
+read as an internal detail applied *after* the UI has established a session, not as an entry point.
+
+gopher64 therefore joins Azahar and Dolphin as GUI-only. Do not build UI automation for it — the same
+rule the Dolphin entry already sets. Revisit if upstream exposes a session name on the command line.
+
+## Open questions
 - Is `--mitm-session` enough for internet play, or is a self-hosted relay still wanted for
   privacy and reliability?
 
