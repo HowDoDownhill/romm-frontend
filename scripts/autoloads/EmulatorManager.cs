@@ -2354,7 +2354,7 @@ public partial class EmulatorManager : Node
         }
     }
 
-    public void LaunchEmulatorWithoutGame(string emulatorName, GameSystem currentGameSystem)
+    public async void LaunchEmulatorWithoutGame(string emulatorName, GameSystem currentGameSystem)
     {
         if (string.IsNullOrEmpty(emulatorName))
         {
@@ -2408,6 +2408,12 @@ public partial class EmulatorManager : Node
 
             launchArguments = AppendDynamicSettingsToArguments(launchArguments, emulatorName, emulatorMetadata);
             appInstance.inputLayer?.BeginSession(currentGameSystem?.Slug, emulatorMetadata);
+
+            if (appInstance.inputLayer != null)
+            {
+                await appInstance.inputLayer.WaitForVirtualPadsToEnumerate();
+            }
+
             WriteInputLayerDeviceBindings(emulatorMetadata, emulatorInstallDirectory);
 
             Process emulatorProcess = BuildAndStartEmulatorProcess(fullExecutablePath, launchArguments, emulatorInstallDirectory, emulatorMetadata);

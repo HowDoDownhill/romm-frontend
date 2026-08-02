@@ -2652,3 +2652,19 @@ the launch path awaits it before writing.
 Every other macro — the index ones and the device name — is known at creation time and needed no
 wait. This one is a property Godot reports about the device, not one we chose, which is why it is the
 only asynchronous input to the writer.
+
+### The two launch paths must stay in step, and a missing line in the log is the tell
+
+`LaunchEmulatorWithGameInternal` and `LaunchEmulatorWithoutGame` both start a layer session and write
+emulator config, and a hook added to one and not the other fails in a way that looks like the hook
+itself is broken. The enumeration wait was added to the game path only, so opening an emulator to
+inspect its controls wrote configs before Godot had seen the virtual pads and resolved
+`{controller_guid}` to an empty string.
+
+It was diagnosed by what the log did *not* contain. The configure path prints neither
+`Launching <emulator> for <system>` nor `Controller mapping is suspended`, so their absence
+identifies which path ran. Reading the log for missing lines was faster than three rounds of
+reasoning about the wait itself, which was never at fault.
+
+`LaunchEmulatorWithoutGame` is `async void` for this reason: it has no caller to await it, but it now
+has to await enumeration before writing config.
