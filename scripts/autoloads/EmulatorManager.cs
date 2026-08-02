@@ -2636,6 +2636,7 @@ public partial class EmulatorManager : Node
         }
 
         return deviceTemplate
+            .Replace("{sdl_index_after_hidden_plus_one}", (inputLayer.PhysicalPadsEnumeratedAheadOfOurs + playerIndex + 1).ToString())
             .Replace("{sdl_index_after_hidden}", (inputLayer.PhysicalPadsEnumeratedAheadOfOurs + playerIndex).ToString())
             .Replace("{sdl_index}", playerIndex.ToString())
             .Replace("{xinput_index}", xinputSlot.ToString())

@@ -39,5 +39,18 @@
   "preserve_on_reinstall": [
     "snes9x.conf",
     "config/snes9x/snes9x.conf"
-  ]
+  ],
+  "controller_config": {
+    "max_controllers": 1,
+    "config_file_relative_path": "snes9x.conf",
+    "format": "ini",
+    "controller_sections": [
+      {
+        "section_template": "Controls\\Win",
+        "port_start": 1,
+        "device_binding_pattern": "\\(J\\d+\\)",
+        "device_binding_template": "(J{sdl_index_after_hidden_plus_one})"
+      }
+    ]
+  }
 }

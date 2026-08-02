@@ -77,5 +77,18 @@
       "asset_regex": "Azahar-.*-anylinux-x86_64\\.AppImage$",
       "extract": false
     }
+  },
+  "controller_config": {
+    "max_controllers": 1,
+    "config_file_relative_path": "user/config/qt-config.ini",
+    "format": "ini",
+    "controller_sections": [
+      {
+        "section_template": "Controls",
+        "port_start": 1,
+        "device_binding_pattern": "port:\\d+",
+        "device_binding_template": "port:{sdl_index_after_hidden}"
+      }
+    ]
   }
 }
