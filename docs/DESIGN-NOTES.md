@@ -2407,3 +2407,49 @@ block every legitimate install, and it could not be exercised on the development
 ViGEmBus is already present there and the install path never runs. Untested code that gates a
 required install is worse than a documented gap. It is the obvious hardening step if this is ever
 exercised on a clean machine.
+
+### Emulators fall into three groups by how they select a controller
+
+Surveyed from the shipped `default_config` of every installed emulator. This determines what pinning
+is even possible, and it is a smaller problem than "test every emulator".
+
+**Group A — one key names the device.** Pinnable cheaply, and done:
+
+| Emulator | Key | Status |
+|---|---|---|
+| Dolphin | `Device = SDL/{n}/{name}` | written at launch |
+| RetroArch | `input_player{n}_joypad_index` | written at launch |
+| melonDS | `JoystickID` under `[Instance{n}]` | pinnable, not yet written |
+
+**Group B — the device index is embedded in every binding.** PCSX2 and DuckStation use
+`SDL-0/FaceSouth`, Azahar `port:0`, ares `/0/3/0`, snes9x `(J1)`. There is no single key to write;
+changing the device means rewriting every binding line, which is the suspended config writer's job
+and a much larger change.
+
+**These emulators are already correct if — and only if — our virtual pad is enumeration index 0.**
+That is exactly what the SDL allowlist achieves, and only for emulators enumerating through SDL's
+gamepad API. So for Group B the question is never "how do we pin it" but "is it filtered".
+
+**Group C — no device selection at all.** mGBA binds globally under `[gba.input.SDLB]`, and Flycast,
+PPSSPP and gopher64 auto-map whatever SDL hands them. Nothing to write; they take what they are
+given, so with both physical and virtual pads visible the result is unpredictable.
+
+### What that leaves to test, and the predictions
+
+Only Dolphin (filtered) and RetroArch (not filtered) are measured. The rest are inferences, recorded
+so a wrong prediction is visible as a wrong prediction:
+
+- **DuckStation and PCSX2** — expected filtered. Their `SDL-0/FaceSouth` vocabulary is SDL's
+  *gamepad*-layer naming, the same world Dolphin lives in, and Dolphin is measured filtered. If so
+  they already work with no change.
+- **ares** — expected **not** filtered. Its binary imports `SDL_Joystick*` from SDL3 with no gamepad
+  imports, and RetroArch proved joystick-layer enumeration ignores the allowlist. Its `/0/` bindings
+  would then address the physical pad. This is the highest-value test because it is the one predicted
+  broken.
+- **melonDS** — unknown, but cheap either way because it is Group A.
+- **Azahar, snes9x, mGBA** — unknown.
+
+A pinnable index is only useful once the enumeration is known: writing `JoystickID = 0` is right when
+the emulator is filtered and wrong when it is not, because our pad then sits behind the physical
+ones. So Group A pinning for melonDS is deliberately deferred until its filtering is measured, rather
+than guessing an index the way earlier config writers guessed device identities.
