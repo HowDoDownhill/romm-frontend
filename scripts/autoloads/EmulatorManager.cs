@@ -2662,6 +2662,40 @@ public partial class EmulatorManager : Node
         if (rewrittenBindingCount > 0)
         {
             GD.Print($"[InputLayer] retargeted {rewrittenBindingCount} binding(s) in [{sectionName}] to {deviceReplacement}");
+            return;
+        }
+
+        WriteSectionBindingsFromMappings(controllerSection, configFilePath, sectionName, playerIndex, inputLayer, deviceReplacement);
+    }
+
+    private void WriteSectionBindingsFromMappings(ControllerSection controllerSection, string configFilePath, string sectionName, int playerIndex, InputLayer inputLayer, string deviceReplacement)
+    {
+        if (controllerSection.Mappings == null || controllerSection.Mappings.Count == 0)
+        {
+            return;
+        }
+
+        var devicePattern = new System.Text.RegularExpressions.Regex(controllerSection.DeviceBindingPattern);
+        var iniUpdater = new IniConfigurationUpdater();
+        int writtenBindingCount = 0;
+
+        foreach (var mapping in controllerSection.Mappings)
+        {
+            string bindingValue = ResolveDeviceBindingMacros(mapping.Value, playerIndex, inputLayer);
+
+            if (bindingValue.Contains('{'))
+            {
+                continue;
+            }
+
+            bindingValue = devicePattern.Replace(bindingValue, deviceReplacement);
+            iniUpdater.UpdateValue(configFilePath, sectionName, mapping.Key, bindingValue, bindingValue);
+            writtenBindingCount++;
+        }
+
+        if (writtenBindingCount > 0)
+        {
+            GD.Print($"[InputLayer] wrote {writtenBindingCount} binding(s) into [{sectionName}] for {deviceReplacement}");
         }
     }
 
