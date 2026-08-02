@@ -2580,3 +2580,38 @@ a section is per-player, as in PCSX2's `[Pad1]`, it is simply omitted.
 snes9x's player-two mapping templates were derived from bindings snes9x itself wrote after a manual
 mapping pass, rather than hand-typed, so the button vocabulary comes from the emulator rather than
 from a guess about it.
+
+### ares writes our virtual pad's GUID, which does not survive to the next run
+
+After a manual mapping pass ares stored the device by GUID:
+
+```
+Pad.Up: 03007ba65e0400008e02000014017801/0/1/1/Lo;;
+```
+
+That is our virtual pad's GUID — and ViGEm's name CRC **changes between runs**, measured as `ba66`,
+`7ba6` and `3a64` across three sessions. So a GUID ares captures today silently matches nothing
+tomorrow. It also defeats retargeting, because the GUID sits between the colon and the device index
+where the pattern expected the index to be.
+
+`controller-followups.md` established that ares accepts **GUID-less** bindings, matching on the
+device index. The device pattern therefore matches an optional GUID as well as the index and rewrites
+both back to the index-only form, which is stable by construction:
+
+```
+Pad.Up: 03007ba6.../0/1/1/Lo;;   ->   Pad.Up: /0/1/1/Lo;;
+```
+
+This is the one place where the layer must actively *undo* what the emulator wrote, rather than
+merely filling something in. Every other emulator either leaves our value alone or rewrites it to
+something equivalent.
+
+### ares ships one virtual pad, so player two had to be created
+
+The shipped `settings.bml` seeds `VirtualPad1` only; ares creates `VirtualPad2` through `VirtualPad5`
+itself with every binding empty (`Pad.Up: ;;`). Nothing to retarget, so player two never worked.
+
+Its mapping templates were derived from the bindings ares itself wrote for player one, with the
+device portion replaced by the index macro — the same approach used for snes9x. The button
+vocabulary (`Pad.Up`, `A..South`, `L-Bumper`, and the `;;` slot suffix) therefore comes from ares
+rather than from a reading of its format.

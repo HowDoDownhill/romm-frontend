@@ -141,15 +141,41 @@
     }
   ],
   "controller_config": {
-    "max_controllers": 1,
+    "max_controllers": 2,
     "config_file_relative_path": "settings.bml",
     "format": "bml",
     "controller_sections": [
       {
         "section_template": "VirtualPad{port}",
         "port_start": 1,
-        "device_binding_pattern": ": /\\d+/",
-        "device_binding_template": ": /{sdl_index_after_hidden}/"
+        "device_binding_pattern": ": [0-9a-fA-F]*/\\d+/",
+        "device_binding_template": ": /{sdl_index}/",
+        "mappings": {
+          "Pad.Up": "/{sdl_index}/1/1/Lo;;",
+          "Pad.Down": "/{sdl_index}/1/1/Hi;;",
+          "Pad.Left": "/{sdl_index}/1/0/Lo;;",
+          "Pad.Right": "/{sdl_index}/1/0/Hi;;",
+          "Select": "/{sdl_index}/3/6;;",
+          "Start": "/{sdl_index}/3/7;;",
+          "A..South": "/{sdl_index}/3/0;;",
+          "B..East": "/{sdl_index}/3/1;;",
+          "X..West": "/{sdl_index}/3/2;;",
+          "Y..North": "/{sdl_index}/3/3;;",
+          "L-Bumper": "/{sdl_index}/3/4;;",
+          "R-Bumper": "/{sdl_index}/3/5;;",
+          "L-Trigger": "/{sdl_index}/0/2/Hi;;",
+          "R-Trigger": "/{sdl_index}/0/5/Hi;;",
+          "L-Stick..Click": "/{sdl_index}/3/8;;",
+          "R-Stick..Click": "/{sdl_index}/3/9;;",
+          "L-Up": "/{sdl_index}/0/1/Lo;;",
+          "L-Down": "/{sdl_index}/0/1/Hi;;",
+          "L-Left": "/{sdl_index}/0/0/Lo;;",
+          "L-Right": "/{sdl_index}/0/0/Hi;;",
+          "R-Up": "/{sdl_index}/0/4/Lo;;",
+          "R-Down": "/{sdl_index}/0/4/Hi;;",
+          "R-Left": "/{sdl_index}/0/3/Lo;;",
+          "R-Right": "/{sdl_index}/0/3/Hi;;"
+        }
       }
     ]
   }
