@@ -112,6 +112,41 @@ public class MainSceneInputHandler
         return connectedControllers != null && connectedControllers.Count > 0 ? connectedControllers[0].GodotDeviceId : -1;
     }
 
+    private const string ControllerLayerOfferBody =
+        "[b]Set up your controllers automatically?[/b]\n\n" +
+        "RomM can present every controller to your emulators as an Xbox 360 pad, and configure each emulator's controls for you.\n\n" +
+        "• Any controller works the same. PlayStation, Switch Pro, 8BitDo and others are translated to the Xbox 360 layout emulators expect.\n" +
+        "• Player 1 stays Player 1, in the order you plug controllers in.\n" +
+        "• Emulator controls are set up for you, instead of configuring each one by hand.\n\n" +
+        "This writes controller settings into your emulator configuration files. You can turn it off at any time in Settings.";
+
+    public void OfferControllerLayerIfNotYetAsked()
+    {
+        if (appInstance.configManager.ControllerMappingConsent != ConfigManager.ControllerMappingConsentUnasked)
+        {
+            return;
+        }
+
+        if (mainScene.changelogPanel == null || mainScene.panelStack.HasOpenPanel)
+        {
+            return;
+        }
+
+        mainScene.changelogPanel.ShowControllerLayerOffer(ControllerLayerOfferBody, "Set Up Controllers", "No Thanks");
+    }
+
+    public void OnControllerLayerOfferAccepted()
+    {
+        appInstance.configManager.SaveControllerMappingConsent(ConfigManager.ControllerMappingConsentAccepted);
+        GD.Print("[InputLayer] the user accepted automatic controller mapping.");
+    }
+
+    public void OnControllerLayerOfferDeclined()
+    {
+        appInstance.configManager.SaveControllerMappingConsent(ConfigManager.ControllerMappingConsentDeclined);
+        GD.Print("[InputLayer] the user declined automatic controller mapping; emulators keep their own controller settings.");
+    }
+
     public void UpdateEmulatorCloseHotkeysBtnText()
     {
         if (mainScene.emulatorCloseHotkeysBtn != null)

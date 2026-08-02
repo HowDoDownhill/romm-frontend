@@ -40,9 +40,7 @@ public partial class InputLayer : Node
 
         physicalPadReader = new GodotPhysicalPadReader();
         virtualPadBackend = new ViGEmPadBackend();
-        deviceHider = OperatingSystem.IsWindows()
-            ? new HidHideDeviceHider(appInstance.configManager)
-            : new NullDeviceHider();
+        deviceHider = new NullDeviceHider();
 
         Input.JoyConnectionChanged += OnJoyConnectionChanged;
         SetProcess(false);

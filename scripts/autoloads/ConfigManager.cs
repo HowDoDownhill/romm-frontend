@@ -190,8 +190,6 @@ public partial class ConfigManager : Node
     public int EmulatorCloseHotkeyCount { get; private set; }
     public float EmulatorCloseHoldSeconds { get; private set; }
     public string ControllerMappingConsent { get; private set; }
-    public Godot.Collections.Array HiddenInputDevicePaths { get; private set; }
-    public bool HidHideCloakEnabledByFrontend { get; private set; }
     public Godot.Collections.Array EmulatorCloseHotkeys { get; private set; }
 
     public System.Collections.Generic.Dictionary<string, string> PreferredEmulators { get; private set; } = new System.Collections.Generic.Dictionary<string, string>();
@@ -355,8 +353,6 @@ public partial class ConfigManager : Node
         EmulatorCloseHotkeys = (Godot.Collections.Array)configurationFile.GetValue("Input", "EmulatorCloseHotkeys", defaultHotkeyButtons);
         EmulatorCloseHoldSeconds = (float)configurationFile.GetValue("Input", "EmulatorCloseHoldSeconds", DefaultEmulatorCloseHoldSeconds);
         ControllerMappingConsent = (string)configurationFile.GetValue("Input", "ControllerMappingConsent", ControllerMappingConsentUnasked);
-        HiddenInputDevicePaths = (Godot.Collections.Array)configurationFile.GetValue("Input", "HiddenInputDevicePaths", new Godot.Collections.Array());
-        HidHideCloakEnabledByFrontend = (bool)configurationFile.GetValue("Input", "HidHideCloakEnabledByFrontend", false);
 
         if (configurationFile.HasSection("PreferredEmulators"))
         {
@@ -451,8 +447,6 @@ public partial class ConfigManager : Node
         configurationFile.SetValue("Input", "EmulatorCloseHotkeys", EmulatorCloseHotkeys);
         configurationFile.SetValue("Input", "EmulatorCloseHoldSeconds", EmulatorCloseHoldSeconds);
         configurationFile.SetValue("Input", "ControllerMappingConsent", ControllerMappingConsent ?? ControllerMappingConsentUnasked);
-        configurationFile.SetValue("Input", "HiddenInputDevicePaths", HiddenInputDevicePaths ?? new Godot.Collections.Array());
-        configurationFile.SetValue("Input", "HidHideCloakEnabledByFrontend", HidHideCloakEnabledByFrontend);
 
         if (PreferredEmulators != null)
         {
@@ -556,12 +550,6 @@ public partial class ConfigManager : Node
         SaveConfig();
     }
 
-    public void SaveHiddenInputDevices(Godot.Collections.Array hiddenDevicePaths, bool cloakEnabledByFrontend)
-    {
-        HiddenInputDevicePaths = hiddenDevicePaths;
-        HidHideCloakEnabledByFrontend = cloakEnabledByFrontend;
-        SaveConfig();
-    }
 
     public void ApplyInputMap()
     {

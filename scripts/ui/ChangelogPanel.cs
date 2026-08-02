@@ -30,8 +30,18 @@ public partial class ChangelogPanel : UiPanel
         }
     }
 
+    public enum PromptSubject
+    {
+        ApplicationUpdate,
+        ControllerLayer
+    }
+
+    public PromptSubject ActiveSubject { get; private set; } = PromptSubject.ApplicationUpdate;
+
     public void ShowUpdate(string version, string releaseNotes)
     {
+        ActiveSubject = PromptSubject.ApplicationUpdate;
+
         if (notesLabel != null)
         {
             string sanitizedNotes = releaseNotes.Replace("\r", "").Replace("\b", "");
@@ -40,6 +50,21 @@ public partial class ChangelogPanel : UiPanel
 
         if (acceptButton != null) acceptButton.Text = "Install";
         if (cancelButton != null) cancelButton.Text = "Close";
+
+        Open();
+    }
+
+    public void ShowControllerLayerOffer(string bodyText, string acceptText, string declineText)
+    {
+        ActiveSubject = PromptSubject.ControllerLayer;
+
+        if (notesLabel != null)
+        {
+            notesLabel.Text = bodyText;
+        }
+
+        if (acceptButton != null) acceptButton.Text = acceptText;
+        if (cancelButton != null) cancelButton.Text = declineText;
 
         Open();
     }

@@ -2179,6 +2179,19 @@ since it filters beneath every backend and every API. Where the allowlist does n
 still relays and normalizes correctly — the failure mode is the physical pad remaining visible
 alongside the virtual one, giving double input and unreliable player order, not a broken layer.
 
+### HidHide was integrated, then removed
+
+`HidHideDeviceHider` existed briefly and was deleted once measurement showed hiding cannot solve the
+case it was added for — see "HidHide cannot hide an Xbox controller from XInput" below. The layer now
+ships no hiding on Windows, and `IDeviceHider` resolves to `NullDeviceHider`.
+
+The seam is kept rather than deleted because Linux hiding is a different mechanism that does work:
+`EVIOCGRAB` on an evdev node genuinely prevents other processes reading it, and that is the same path
+Linux emulators read through. Phase 3 will implement it there.
+
+The sections below are retained because they are the evidence for the decision, and because anyone
+reconsidering HidHide will otherwise re-derive them from scratch.
+
 ### HidHide: measured facts that a naive integration gets wrong
 
 Installed and exercised on the dev machine (v1.5.230, Advanced Installer bootstrapper around an MSI).
@@ -2256,3 +2269,57 @@ we enabled it.
 
 Clearing the lists wholesale would have been simpler and wrong, for the reason above: they are
 shared with every other application that uses HidHide.
+
+### HidHide cannot hide an Xbox controller from XInput — so hiding is not the answer
+
+Measured, with handle-caching eliminated by probing from a fresh, non-allowlisted process:
+
+```
+control (nothing hidden):   XInput slots: [0]
+device hidden + cloak on:   XInput slots: [0]
+```
+
+`--dev-list` confirmed the device was hidden and `--cloak-state` reported `--cloak-on` throughout.
+HidHide is a **HID class filter**; XInput reaches Xbox-family pads through `xusb22.sys`, which sits
+outside the filtered path. The README documents no such limitation, so this is worth knowing.
+
+This is not a tuning problem. For the most common controller family there is **no hiding mechanism
+available at all**: the SDL allowlist misses XInput-native consumers, and HidHide misses XInput
+devices. RetroArch reading an Xbox pad is unreachable by either.
+
+HidHide would still hide non-XInput pads (DualShock, DualSense, generic HID), which is the use case
+it is popular for — hiding a physical DS4 while a virtual X360 pad stands in. It just cannot help
+where we needed it most.
+
+### Pinning the emulator's config at our virtual pad supersedes hiding
+
+Hiding existed to buy three things: guaranteed player order, no double input, and the emulator using
+our normalized pad instead of raw hardware. Writing the emulator's device binding delivers all three
+*directly* — the emulator is told which device to use, rather than being denied the alternative.
+
+**The reason config writing failed before does not apply here.** Every earlier attempt had to predict
+the user's own device identity — Azahar's GUID, ares' GUID, Dolphin's device name — which varies per
+controller model and per SDL backend, and fails silently when wrong. That history is why
+`ApplyControllerMappings` is suspended.
+
+The virtual pad inverts it. We create the device, so its name is a constant we choose and its index
+is one we can observe. `SDL/0/Xbox 360 Controller` is not a guess about the user's hardware; it is a
+fact about hardware we manufactured. That is precisely why the Dolphin device line worked where
+three previous approaches did not.
+
+Index determinism comes from two places, and both are already established:
+
+- **Gamepad-API emulators** — the SDL allowlist makes our pads the only SDL devices, so they occupy
+  indices `0..N-1` in creation order. Verified with Dolphin.
+- **XInput-native emulators** — arrival ordering puts our pads in the slots after any physical pad,
+  and the slots are directly observable via `XInputGetState` after creation. So the index can be
+  *measured at launch* and written, rather than assumed.
+
+The residual gap is emulators that read every device and merge input regardless of configuration,
+rather than binding a chosen device. Those would still double up. Which emulators behave that way is
+**not yet established** and needs a per-emulator check.
+
+What this costs, honestly: it reopens config-file writing, which this project retired for good
+reasons, and it needs per-emulator knowledge of which key names the device index. What it avoids: a
+kernel driver, an elevated install, a system-wide side effect that survives process death, and a
+crash-safety net for that side effect — none of which would have fixed RetroArch anyway.

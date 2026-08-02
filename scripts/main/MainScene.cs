@@ -13,6 +13,8 @@ public partial class MainScene : Control
     [Export] public Control gameList;
     [Export] public PackedScene gameListEntryScene;
 
+    private const float ControllerLayerOfferDelaySeconds = 1.5f;
+
     [ExportGroup("DetailsPanel")]
     [Export] public Control detailsPanel;
     [Export] public VBoxContainer detailsPanelContainer;
@@ -200,8 +202,8 @@ public partial class MainScene : Control
         if (changelogPanel != null)
         {
             panelStack.Register(changelogPanel);
-            changelogPanel.Accepted += UpdaterHandler.OnAcceptUpdatePressed;
-            changelogPanel.Dismissed += UpdaterHandler.OnCancelUpdatePressed;
+            changelogPanel.Accepted += OnChangelogPanelAccepted;
+            changelogPanel.Dismissed += OnChangelogPanelDismissed;
         }
 
         GameListHandler.SelectSystemByIndex(0);
@@ -222,6 +224,13 @@ public partial class MainScene : Control
         MicaShadow.AttachToAll(this, micaMaterial, panelShadowColor, panelShadowSize, panelShadowOffset);
 
         NetplayHandler.ApplyStartupSessionArguments();
+        OfferControllerLayerOnceTheInterfaceHasSettled();
+    }
+
+    private async void OfferControllerLayerOnceTheInterfaceHasSettled()
+    {
+        await ToSignal(GetTree().CreateTimer(ControllerLayerOfferDelaySeconds), "timeout");
+        InputHandler.OfferControllerLayerIfNotYetAsked();
     }
 
     public void ApplyTheme()
@@ -582,6 +591,30 @@ public partial class MainScene : Control
                 systemCarousel.ClearOverride();
                 break;
         }
+    }
+
+    private void OnChangelogPanelAccepted()
+    {
+        if (changelogPanel.ActiveSubject == ChangelogPanel.PromptSubject.ControllerLayer)
+        {
+            changelogPanel.Close();
+            InputHandler.OnControllerLayerOfferAccepted();
+            return;
+        }
+
+        UpdaterHandler.OnAcceptUpdatePressed();
+    }
+
+    private void OnChangelogPanelDismissed()
+    {
+        if (changelogPanel.ActiveSubject == ChangelogPanel.PromptSubject.ControllerLayer)
+        {
+            changelogPanel.Close();
+            InputHandler.OnControllerLayerOfferDeclined();
+            return;
+        }
+
+        UpdaterHandler.OnCancelUpdatePressed();
     }
 
     private bool ShouldFrontendIgnoreInput()
