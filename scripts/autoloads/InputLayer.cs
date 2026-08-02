@@ -40,7 +40,9 @@ public partial class InputLayer : Node
 
         physicalPadReader = new GodotPhysicalPadReader();
         virtualPadBackend = new ViGEmPadBackend();
-        deviceHider = new NullDeviceHider();
+        deviceHider = OperatingSystem.IsWindows()
+            ? new HidHideDeviceHider(appInstance.configManager)
+            : new NullDeviceHider();
 
         Input.JoyConnectionChanged += OnJoyConnectionChanged;
         SetProcess(false);
@@ -105,6 +107,7 @@ public partial class InputLayer : Node
         int playerCount = Math.Min(physicalPads.Count, ResolveMaximumPlayers(emulatorMetadata));
 
         joypadsPresentBeforeSession = Input.GetConnectedJoypads().Select(deviceId => (int)deviceId).ToHashSet();
+        HidePhysicalPadsBeforeCreatingVirtualOnes(physicalPads);
 
         if (!virtualPadBackend.TryCreatePads(playerCount))
         {
@@ -121,6 +124,17 @@ public partial class InputLayer : Node
 
         GD.Print($"[InputLayer] session started for '{systemSlug}' with {playerCount} virtual pad(s).");
         return true;
+    }
+
+    private void HidePhysicalPadsBeforeCreatingVirtualOnes(List<ConnectedController> physicalPads)
+    {
+        if (!deviceHider.IsAvailable)
+        {
+            GD.Print($"[InputLayer] {deviceHider.UnavailableReason}.");
+            return;
+        }
+
+        deviceHider.HidePhysicalPads(physicalPads);
     }
 
     private bool ShouldRunLayerForSession()

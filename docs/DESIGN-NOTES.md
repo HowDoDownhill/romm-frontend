@@ -2178,3 +2178,81 @@ moves from "reduces how often hiding is needed" to "the only mechanism that work
 since it filters beneath every backend and every API. Where the allowlist does not reach, the layer
 still relays and normalizes correctly — the failure mode is the physical pad remaining visible
 alongside the virtual one, giving double input and unreliable player order, not a broken layer.
+
+### HidHide: measured facts that a naive integration gets wrong
+
+Installed and exercised on the dev machine (v1.5.230, Advanced Installer bootstrapper around an MSI).
+
+**The CLI needs no elevation.** Previously inferred from the absence of a build manifest; now
+measured. From a confirmed non-elevated shell, `--cloak-state`, `--dev-list` and `--app-list` all
+returned exit 0 with real output. The frontend can therefore hide and unhide silently per session
+with no UAC prompt, which is what makes the whole approach viable for a couch frontend.
+
+**Silent install works, but the exit code lies.** `/exenoui /qn` installed the driver, registered the
+service and created the uninstall entry — and returned **exit code 1**. Success must be verified by
+probing for the `HidHide` service or `HidHide.sys`, never by the process exit code. (`/exelog <path>`
+as a single quoted argument was mis-parsed and produced no log; pass it separately or omit it.)
+
+**The tools live in an `x64\` subdirectory**, not the install root:
+
+```
+%ProgramFiles%\Nefarius Software Solutions\HidHide\HidHide.man
+%ProgramFiles%\Nefarius Software Solutions\HidHide\x64\HidHideCLI.exe
+```
+
+A check for `HidHideCLI.exe` directly under `InstallLocation` — which is what the uninstall registry
+entry reports — finds nothing. `ResolveCommandLineToolPath` probes both.
+
+**No reboot was required.** The installer set a `PendingFileRename` signal, but the driver was live
+and the CLI talked to it immediately.
+
+**The application allowlist is not empty by default.** A fresh install already contains:
+
+```
+--app-reg "C:\Program Files\Nefarius Software Solutions\HidHide\x64\HidHideCLI.exe"
+```
+
+So cleanup must remove **only our own** entry with `--app-unreg`. Using `--app-clean`, or clearing
+the list, would break HidHide's own tooling and any other application using it (DS4Windows and
+similar share these lists).
+
+**`--dev-gaming` reports stale devices.** The JSON is an array of containers, each with a `devices`
+array, and entries persist for pads that are no longer attached:
+
+```json
+[ { "friendlyName": "Controller (Xbox One For Windows)", "devices": [
+  { "present": true,  "gamingDevice": true,  "usage": "Gamepad",
+    "deviceInstancePath": "HID\\VID_045E&PID_02FF&IG_00\\b&193883fd&0&0000" },
+  { "present": false, "gamingDevice": false, "usage": "absent",
+    "deviceInstancePath": "HID\\VID_045E&PID_02FF&IG_00\\b&32345211&0&0000" } ] } ]
+```
+
+Both entries are the *same physical pad* on different USB enumerations. Filtering on
+`present && gamingDevice` is mandatory; hiding a phantom path is at best useless and at worst
+hides a device the user later plugs in.
+
+`--cloak-state` answers by echoing the command form — `--cloak-on` or `--cloak-off` — not a boolean.
+
+### Hiding by instance path is what defeats the 360-pad collision
+
+The SDL allowlist cannot distinguish our virtual pad from a real wired Xbox 360 controller, because
+both report `045E:028E`. HidHide blocks by **device instance path**, which is unique per device, so
+it has no such ambiguity.
+
+The ordering constraint makes it simpler still. Hiding must happen *before* pads are created so the
+virtual pads land in XInput slots deterministically — which means **no virtual pad exists at the
+moment we enumerate**, and every gaming device present is physical by construction. The layer never
+has to tell its own output apart from real hardware. The slot-ordering requirement and the
+correctness argument for hiding turn out to be the same constraint.
+
+### Crash safety records what we hid, rather than clearing the lists
+
+Hiding is global and survives process death, so a frontend crash mid-session would leave the user's
+controllers invisible system-wide. `ConfigManager.HiddenInputDevicePaths` persists exactly which
+instance paths this app hid, and `HidHideCloakEnabledByFrontend` records whether *we* were the ones
+who turned cloaking on. `InputLayer._Ready` calls `UnhideAll` unconditionally at startup, which
+unhides precisely those paths, removes only our own allowlist entry, and restores cloaking only if
+we enabled it.
+
+Clearing the lists wholesale would have been simpler and wrong, for the reason above: they are
+shared with every other application that uses HidHide.
