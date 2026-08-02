@@ -5,7 +5,9 @@ using System.Text.RegularExpressions;
 
 public class SectionDeviceIndexRewriter
 {
-    public int RewriteSection(string configurationFilePath, string targetSection, string devicePattern, string deviceReplacement, string requiredKeyPrefix = null)
+    public const string IndentedSectionStyle = "bml";
+
+    public int RewriteSection(string configurationFilePath, string targetSection, string devicePattern, string deviceReplacement, string requiredKeyPrefix = null, string sectionStyle = null)
     {
         if (!File.Exists(configurationFilePath) || string.IsNullOrEmpty(devicePattern))
         {
@@ -33,7 +35,17 @@ public class SectionDeviceIndexRewriter
         {
             string trimmedLine = currentLine.Trim();
 
-            if (trimmedLine.StartsWith("[") && trimmedLine.EndsWith("]"))
+            if (sectionStyle == IndentedSectionStyle)
+            {
+                if (trimmedLine.Length > 0 && !char.IsWhiteSpace(currentLine[0]))
+                {
+                    isInsideTargetSection = trimmedLine.Split(':')[0].Trim() == targetSection;
+                    rewrittenLines.Add(currentLine);
+                    continue;
+                }
+            }
+
+            else if (trimmedLine.StartsWith("[") && trimmedLine.EndsWith("]"))
             {
                 isInsideTargetSection = trimmedLine.Substring(1, trimmedLine.Length - 2) == targetSection;
                 rewrittenLines.Add(currentLine);

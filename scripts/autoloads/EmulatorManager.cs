@@ -2554,12 +2554,12 @@ public partial class EmulatorManager : Node
 
     private static bool SupportsDeviceBindingWrites(string configurationFormat)
     {
-        return configurationFormat == "ini" || configurationFormat == "flat";
+        return configurationFormat == "ini" || configurationFormat == "flat" || configurationFormat == SectionDeviceIndexRewriter.IndentedSectionStyle;
     }
 
     private void WriteDeviceBindingsForSection(ControllerSection controllerSection, ControllerConfig controllerConfig, string configFilePath, InputLayer inputLayer)
     {
-        bool writesSections = controllerConfig.Format == "ini";
+        bool writesSections = controllerConfig.Format == "ini" || controllerConfig.Format == SectionDeviceIndexRewriter.IndentedSectionStyle;
 
         if (writesSections && string.IsNullOrEmpty(controllerSection.SectionTemplate))
         {
@@ -2602,7 +2602,7 @@ public partial class EmulatorManager : Node
                     ? null
                     : controllerSection.BindingKeyPrefixTemplate.Replace("{port}", portNumber);
 
-                RewriteSectionDeviceBindings(controllerSection, configFilePath, sectionName, playerIndex, inputLayer, bindingKeyPrefix);
+                RewriteSectionDeviceBindings(controllerSection, controllerConfig, configFilePath, sectionName, playerIndex, inputLayer, bindingKeyPrefix);
             }
 
             if (!writesDeviceBinding)
@@ -2650,7 +2650,7 @@ public partial class EmulatorManager : Node
             .Replace("{controller_name}", inputLayer.VirtualPadSdlDeviceName);
     }
 
-    private void RewriteSectionDeviceBindings(ControllerSection controllerSection, string configFilePath, string sectionName, int playerIndex, InputLayer inputLayer, string bindingKeyPrefix)
+    private void RewriteSectionDeviceBindings(ControllerSection controllerSection, ControllerConfig controllerConfig, string configFilePath, string sectionName, int playerIndex, InputLayer inputLayer, string bindingKeyPrefix)
     {
         if (string.IsNullOrEmpty(controllerSection.DeviceBindingPattern) || string.IsNullOrEmpty(controllerSection.DeviceBindingTemplate))
         {
@@ -2664,8 +2664,10 @@ public partial class EmulatorManager : Node
             return;
         }
 
+        GD.Print($"[InputLayer] retargeting [{sectionName}] player {playerIndex + 1} to {deviceReplacement} (key prefix {bindingKeyPrefix ?? "<none>"})");
+
         int rewrittenBindingCount = new SectionDeviceIndexRewriter().RewriteSection(
-            configFilePath, sectionName, controllerSection.DeviceBindingPattern, deviceReplacement, bindingKeyPrefix);
+            configFilePath, sectionName, controllerSection.DeviceBindingPattern, deviceReplacement, bindingKeyPrefix, controllerConfig.Format);
 
         if (rewrittenBindingCount > 0)
         {

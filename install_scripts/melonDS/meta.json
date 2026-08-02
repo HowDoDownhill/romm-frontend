@@ -71,5 +71,18 @@
         "8x": "8"
       }
     }
-  ]
+  ],
+  "controller_config": {
+    "max_controllers": 1,
+    "config_file_relative_path": "portable/melonDS.toml",
+    "format": "ini",
+    "controller_sections": [
+      {
+        "section_template": "Instance{port}",
+        "port_start": 0,
+        "device_key": "JoystickID",
+        "device_template": "{sdl_index}"
+      }
+    ]
+  }
 }

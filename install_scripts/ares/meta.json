@@ -139,5 +139,18 @@
       "launch_arg_true": "--setting General/AutoSaveMemory=true",
       "launch_arg_false": "--setting General/AutoSaveMemory=false"
     }
-  ]
+  ],
+  "controller_config": {
+    "max_controllers": 1,
+    "config_file_relative_path": "settings.bml",
+    "format": "bml",
+    "controller_sections": [
+      {
+        "section_template": "VirtualPad{port}",
+        "port_start": 1,
+        "device_binding_pattern": ": /\\d+/",
+        "device_binding_template": ": /{sdl_index_after_hidden}/"
+      }
+    ]
+  }
 }
