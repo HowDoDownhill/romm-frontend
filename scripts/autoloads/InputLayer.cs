@@ -198,12 +198,15 @@ public partial class InputLayer : Node
         }
 
         int elapsedMilliseconds = 0;
+        GD.Print($"[InputLayer] waiting for virtual pads to enumerate: {ownVirtualDeviceIdsInPlayerOrder.Count} of {ActivePlayerCount} seen.");
 
         while (ownVirtualDeviceIdsInPlayerOrder.Count < ActivePlayerCount && elapsedMilliseconds < VirtualPadEnumerationTimeoutMilliseconds)
         {
             await ToSignal(GetTree().CreateTimer(VirtualPadEnumerationPollMilliseconds / 1000.0f), SceneTreeTimer.SignalName.Timeout);
             elapsedMilliseconds += VirtualPadEnumerationPollMilliseconds;
         }
+
+        GD.Print($"[InputLayer] enumeration wait finished after {elapsedMilliseconds} ms with {ownVirtualDeviceIdsInPlayerOrder.Count} pad(s).");
 
         if (ownVirtualDeviceIdsInPlayerOrder.Count < ActivePlayerCount)
         {

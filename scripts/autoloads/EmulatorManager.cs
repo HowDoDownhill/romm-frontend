@@ -2682,10 +2682,10 @@ public partial class EmulatorManager : Node
             return;
         }
 
-        WriteSectionBindingsFromMappings(controllerSection, configFilePath, sectionName, playerIndex, inputLayer, deviceReplacement);
+        WriteSectionBindingsFromMappings(controllerSection, controllerConfig, configFilePath, sectionName, playerIndex, inputLayer, deviceReplacement);
     }
 
-    private void WriteSectionBindingsFromMappings(ControllerSection controllerSection, string configFilePath, string sectionName, int playerIndex, InputLayer inputLayer, string deviceReplacement)
+    private void WriteSectionBindingsFromMappings(ControllerSection controllerSection, ControllerConfig controllerConfig, string configFilePath, string sectionName, int playerIndex, InputLayer inputLayer, string deviceReplacement)
     {
         if (controllerSection.Mappings == null || controllerSection.Mappings.Count == 0)
         {
@@ -2694,6 +2694,7 @@ public partial class EmulatorManager : Node
 
         var devicePattern = new System.Text.RegularExpressions.Regex(controllerSection.DeviceBindingPattern);
         var iniUpdater = new IniConfigurationUpdater();
+        var indentedUpdater = new IndentedConfigurationUpdater();
         int writtenBindingCount = 0;
 
         foreach (var mapping in controllerSection.Mappings)
@@ -2706,7 +2707,17 @@ public partial class EmulatorManager : Node
             }
 
             bindingValue = devicePattern.Replace(bindingValue, deviceReplacement);
-            iniUpdater.UpdateValue(configFilePath, sectionName, mapping.Key, bindingValue, bindingValue);
+
+            if (controllerConfig.Format == SectionDeviceIndexRewriter.IndentedSectionStyle)
+            {
+                indentedUpdater.UpdateValue(configFilePath, sectionName, mapping.Key, bindingValue);
+            }
+
+            else
+            {
+                iniUpdater.UpdateValue(configFilePath, sectionName, mapping.Key, bindingValue, bindingValue);
+            }
+
             writtenBindingCount++;
         }
 
