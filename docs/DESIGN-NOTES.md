@@ -2323,3 +2323,48 @@ What this costs, honestly: it reopens config-file writing, which this project re
 reasons, and it needs per-emulator knowledge of which key names the device index. What it avoids: a
 kernel driver, an elevated install, a system-wide side effect that survives process death, and a
 crash-safety net for that side effect — none of which would have fixed RetroArch anyway.
+
+### RetroArch's joypad index is its XInput slot, and the key is not what the binary suggests
+
+RetroArch cannot be hidden from — the SDL allowlist misses it because it enumerates joysticks, and
+HidHide misses it because XInput bypasses the HID stack. It can, however, be told which pad belongs
+to which player, which achieves the same three goals directly.
+
+**The key is `input_player<N>_joypad_index`**, documented in RetroArch's own shipped
+`retroarch.default.cfg`:
+
+```
+# If desired, it is possible to override which joypads are being used for user 1 through 8.
+# First joypad available is 0.
+# input_player1_joypad_index = 0
+```
+
+Searching the binary instead turns up `input_device_p`, `input_device_reserved_device_p` and
+`input_libretro_device_p`, none of which are this setting. Guessing from those strings would have
+written a key RetroArch ignores, failing silently — the same trap that made the old config writer
+untrustworthy. Read the shipped default config, not the binary.
+
+**The index is the XInput slot.** Measured with two physical pads attached: the virtual pads landed
+in XInput slots 2 and 3, `input_player1_joypad_index = 2` and `input_player2_joypad_index = 3` were
+written, and the controller then drove the game correctly. So under the `xinput` joypad driver
+RetroArch's numbering and XInput's agree.
+
+The slot is **measured, not assumed** — `XInputSlots.ReadConnectedSlots()` is read before and after
+the virtual pads are created and the difference is ours. A hardcoded guess of `1` would have been
+correct with one physical pad and wrong with two, and `IXbox360Controller.UserIndex` was already
+found to report the wrong slot entirely.
+
+### `retroarch.cfg` is flat, and the INI updater fails silently on it
+
+It is `key = "value"` with no `[section]` headers at all. `IniConfigurationUpdater` tracks whether it
+is inside a matching section and never enters one in such a file, so it writes **nothing** and
+reports no error. `FlatConfigurationUpdater` handles this shape, appending the key when absent.
+
+The device *key* is templated per port (`input_player{port}_joypad_index`) rather than the section
+name, which is why `ControllerSection` now substitutes `{port}` into `device_key` as well as
+`section_template`.
+
+Ports beyond the active player count are deliberately left alone rather than cleared, so an index
+from a previous two-player session can persist into a one-player one. Harmless in practice — the
+index simply names a pad that is not there — but it is why player 2 may appear configured when only
+one controller is attached.
