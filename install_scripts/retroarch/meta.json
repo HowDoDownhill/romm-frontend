@@ -238,5 +238,17 @@
   "core_file_name": {
     "windows": "{core}_libretro.dll",
     "linux": "{core}_libretro.so"
+  },
+  "controller_config": {
+    "max_controllers": 4,
+    "config_file_relative_path": "retroarch.cfg",
+    "format": "flat",
+    "controller_sections": [
+      {
+        "port_start": 1,
+        "device_key": "input_player{port}_joypad_index",
+        "device_template": "{xinput_index}"
+      }
+    ]
   }
 }

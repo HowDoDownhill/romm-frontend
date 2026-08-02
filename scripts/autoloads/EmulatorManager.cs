@@ -2517,7 +2517,7 @@ public partial class EmulatorManager : Node
 
         var controllerConfig = emulatorMetadata?.ControllerConfig;
 
-        if (controllerConfig?.ControllerSections == null || controllerConfig.Format != "ini")
+        if (controllerConfig?.ControllerSections == null || !SupportsDeviceBindingWrites(controllerConfig.Format))
         {
             return;
         }
@@ -2543,27 +2543,36 @@ public partial class EmulatorManager : Node
         }
     }
 
+    private static bool SupportsDeviceBindingWrites(string configurationFormat)
+    {
+        return configurationFormat == "ini" || configurationFormat == "flat";
+    }
+
     private void WriteDeviceBindingsForSection(ControllerSection controllerSection, ControllerConfig controllerConfig, string configFilePath, InputLayer inputLayer)
     {
-        if (string.IsNullOrEmpty(controllerSection.SectionTemplate)
-            || string.IsNullOrEmpty(controllerSection.DeviceKey)
-            || string.IsNullOrEmpty(controllerSection.DeviceTemplate))
+        if (string.IsNullOrEmpty(controllerSection.DeviceKey) || string.IsNullOrEmpty(controllerSection.DeviceTemplate))
+        {
+            return;
+        }
+
+        bool writesSections = controllerConfig.Format == "ini";
+
+        if (writesSections && string.IsNullOrEmpty(controllerSection.SectionTemplate))
         {
             return;
         }
 
         var iniUpdater = new IniConfigurationUpdater();
+        var flatUpdater = new FlatConfigurationUpdater();
         int portCount = controllerConfig.MaxControllers > 0 ? controllerConfig.MaxControllers : inputLayer.ActivePlayerCount;
 
         for (int playerIndex = 0; playerIndex < portCount; playerIndex++)
         {
-            string sectionName = controllerSection.SectionTemplate.Replace("{port}", (controllerSection.PortStart + playerIndex).ToString());
+            string portNumber = (controllerSection.PortStart + playerIndex).ToString();
             bool playerIsPresent = playerIndex < inputLayer.ActivePlayerCount;
 
             string deviceValue = playerIsPresent
-                ? controllerSection.DeviceTemplate
-                    .Replace("{sdl_index}", playerIndex.ToString())
-                    .Replace("{controller_name}", inputLayer.VirtualPadSdlDeviceName)
+                ? ResolveDeviceBindingMacros(controllerSection.DeviceTemplate, playerIndex, inputLayer)
                 : controllerSection.DeviceDisconnected;
 
             if (string.IsNullOrEmpty(deviceValue))
@@ -2571,9 +2580,34 @@ public partial class EmulatorManager : Node
                 continue;
             }
 
-            iniUpdater.UpdateValue(configFilePath, sectionName, controllerSection.DeviceKey, deviceValue, deviceValue);
-            GD.Print($"[InputLayer] {sectionName}/{controllerSection.DeviceKey} = {deviceValue}");
+            string deviceKey = controllerSection.DeviceKey.Replace("{port}", portNumber);
+
+            if (writesSections)
+            {
+                string sectionName = controllerSection.SectionTemplate.Replace("{port}", portNumber);
+                iniUpdater.UpdateValue(configFilePath, sectionName, deviceKey, deviceValue, deviceValue);
+                GD.Print($"[InputLayer] {sectionName}/{deviceKey} = {deviceValue}");
+                continue;
+            }
+
+            flatUpdater.UpdateValue(configFilePath, deviceKey, deviceValue);
+            GD.Print($"[InputLayer] {deviceKey} = {deviceValue}");
         }
+    }
+
+    private static string ResolveDeviceBindingMacros(string deviceTemplate, int playerIndex, InputLayer inputLayer)
+    {
+        int xinputSlot = inputLayer.ResolveVirtualPadXInputSlot(playerIndex);
+
+        if (deviceTemplate.Contains("{xinput_index}") && xinputSlot < 0)
+        {
+            return "";
+        }
+
+        return deviceTemplate
+            .Replace("{sdl_index}", playerIndex.ToString())
+            .Replace("{xinput_index}", xinputSlot.ToString())
+            .Replace("{controller_name}", inputLayer.VirtualPadSdlDeviceName);
     }
 
     private void ApplyControllerMappings(EmulatorMeta emulatorMetadata, string emulatorInstallDirectory, GameSystem currentGameSystem)

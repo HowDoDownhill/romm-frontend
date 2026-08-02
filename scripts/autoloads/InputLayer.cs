@@ -137,6 +137,8 @@ public partial class InputLayer : Node
         joypadsPresentBeforeSession = Input.GetConnectedJoypads().Select(deviceId => (int)deviceId).ToHashSet();
         HidePhysicalPadsBeforeCreatingVirtualOnes(physicalPads);
 
+        List<int> xinputSlotsBeforeCreatingPads = XInputSlots.ReadConnectedSlots();
+
         if (!virtualPadBackend.TryCreatePads(playerCount))
         {
             LastSessionFailureReason = virtualPadBackend.UnavailableReason;
@@ -145,6 +147,7 @@ public partial class InputLayer : Node
         }
 
         BuildSessionMappings(systemSlug, emulatorMetadata, physicalPads, playerCount);
+        RecordVirtualPadXInputSlots(xinputSlotsBeforeCreatingPads);
 
         IsSessionActive = true;
         LastSessionFailureReason = "";
@@ -152,6 +155,30 @@ public partial class InputLayer : Node
 
         GD.Print($"[InputLayer] session started for '{systemSlug}' with {playerCount} virtual pad(s).");
         return true;
+    }
+
+    private readonly List<int> virtualPadXInputSlots = new List<int>();
+
+    private void RecordVirtualPadXInputSlots(List<int> slotsBeforeCreatingPads)
+    {
+        virtualPadXInputSlots.Clear();
+
+        foreach (int slotIndex in XInputSlots.ReadConnectedSlots())
+        {
+            if (!slotsBeforeCreatingPads.Contains(slotIndex))
+            {
+                virtualPadXInputSlots.Add(slotIndex);
+            }
+        }
+
+        GD.Print(virtualPadXInputSlots.Count > 0
+            ? $"[InputLayer] virtual pads occupy XInput slot(s) [{string.Join(", ", virtualPadXInputSlots)}]."
+            : "[InputLayer] no new XInput slots appeared; emulators reading XInput may not see the virtual pads.");
+    }
+
+    public int ResolveVirtualPadXInputSlot(int playerIndex)
+    {
+        return playerIndex >= 0 && playerIndex < virtualPadXInputSlots.Count ? virtualPadXInputSlots[playerIndex] : -1;
     }
 
     private void HidePhysicalPadsBeforeCreatingVirtualOnes(List<ConnectedController> physicalPads)
@@ -240,6 +267,7 @@ public partial class InputLayer : Node
         deviceHider.UnhideAll();
 
         sessionPhysicalDeviceIds.Clear();
+        virtualPadXInputSlots.Clear();
         sessionMappingTables.Clear();
         sessionPhysicalStates.Clear();
         sessionVirtualStates.Clear();
