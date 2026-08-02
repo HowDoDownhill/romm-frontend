@@ -17,6 +17,11 @@ public partial class ChangelogPanel : UiPanel
     {
         base._Ready();
 
+        if (notesLabel != null)
+        {
+            notesLabel.BbcodeEnabled = true;
+        }
+
         if (acceptButton != null)
         {
             acceptButton.Pressed += EmitAccepted;
@@ -44,7 +49,7 @@ public partial class ChangelogPanel : UiPanel
 
         if (notesLabel != null)
         {
-            string sanitizedNotes = releaseNotes.Replace("\r", "").Replace("\b", "");
+            string sanitizedNotes = EscapeMarkup(releaseNotes.Replace("\r", "").Replace("\b", ""));
             notesLabel.Text = $"[b]A new version ({version}) of Romm Frontend is available.[/b]\n\nRelease Notes:\n{sanitizedNotes}";
         }
 
@@ -83,6 +88,11 @@ public partial class ChangelogPanel : UiPanel
         }
 
         return true;
+    }
+
+    private static string EscapeMarkup(string untrustedText)
+    {
+        return untrustedText.Replace("[", "[lb]");
     }
 
     private void EmitAccepted()
