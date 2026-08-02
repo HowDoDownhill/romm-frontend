@@ -594,7 +594,7 @@ public static class UniversalInstaller
         return releaseOptions;
     }
 
-    private static async Task<bool> DownloadFileAsync(AppInstance appInstance, string downloadUrl, string destinationFilePath, string displayName)
+    public static async Task<bool> DownloadFileAsync(AppInstance appInstance, string downloadUrl, string destinationFilePath, string displayName)
     {
         var externalTransfer = appInstance?.downloadManager?.BeginExternalTransfer(displayName);
 

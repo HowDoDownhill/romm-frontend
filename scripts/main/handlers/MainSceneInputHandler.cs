@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 public class MainSceneInputHandler
 {
@@ -144,6 +145,8 @@ public class MainSceneInputHandler
         return connectedControllers != null && connectedControllers.Count > 0 ? connectedControllers[0].GodotDeviceId : -1;
     }
 
+    private const float DriverInstallResultVisibleSeconds = 3.0f;
+
     private const string ControllerLayerOfferBody =
         "[b]Set up your controllers automatically?[/b]\n\n" +
         "RomM can present every controller to your emulators as an Xbox 360 pad, and configure each emulator's controls for you.\n\n" +
@@ -167,10 +170,37 @@ public class MainSceneInputHandler
         mainScene.changelogPanel.ShowControllerLayerOffer(ControllerLayerOfferBody, "Set Up Controllers", "No Thanks");
     }
 
-    public void OnControllerLayerOfferAccepted()
+    public async void OnControllerLayerOfferAccepted()
     {
         appInstance.configManager.SaveControllerMappingConsent(ConfigManager.ControllerMappingConsentAccepted);
         GD.Print("[InputLayer] the user accepted automatic controller mapping.");
+
+        await InstallVirtualPadDriverIfMissing();
+    }
+
+    private async Task InstallVirtualPadDriverIfMissing()
+    {
+        InputLayer inputLayer = appInstance.inputLayer;
+
+        if (inputLayer == null || inputLayer.IsVirtualPadBackendAvailable || !VirtualPadDriverInstaller.IsSupportedPlatform)
+        {
+            return;
+        }
+
+        mainScene.progressPanel?.ShowStatus("Preparing the controller driver...");
+
+        bool driverIsReady = await VirtualPadDriverInstaller.DownloadAndInstall(
+            appInstance,
+            () => inputLayer.IsVirtualPadBackendAvailable,
+            status => mainScene.progressPanel?.SetStatus(status));
+
+        await mainScene.ToSignal(mainScene.GetTree().CreateTimer(DriverInstallResultVisibleSeconds), "timeout");
+        mainScene.progressPanel?.Close();
+
+        if (!driverIsReady)
+        {
+            GD.PrintErr("[InputLayer] the virtual controller driver is unavailable; emulators will keep their own controller settings.");
+        }
     }
 
     public void OnControllerLayerOfferDeclined()

@@ -2368,3 +2368,42 @@ Ports beyond the active player count are deliberately left alone rather than cle
 from a previous two-player session can persist into a one-player one. Harmless in practice — the
 index simply names a pad that is not there — but it is why player 2 may appear configured when only
 one controller is attached.
+
+### Installing ViGEmBus: one UAC prompt is the floor, and the exit code cannot be trusted
+
+Accepting the controller offer installs ViGEmBus if it is missing, because otherwise the user agrees
+to a feature and silently receives nothing but a settings status line.
+
+**A UAC prompt is unavoidable and correct.** ViGEmBus is a kernel-mode driver, and Windows requires
+consent to install one. Anything that circumvented that would be malware behaviour. What automation
+removes is the file hunting and the wizard, not the consent. The installer is launched with
+`Verb = "runas"`, so the elevation prompt is raised by Windows rather than by us.
+
+**Success is verified by capability, not by exit code.** Measured with HidHide, which uses the same
+Advanced Installer bootstrapper: `/exenoui /qn` installed the driver, registered the service and
+created the uninstall entry, and returned **exit code 1**. So the installer polls
+`ViGEmPadBackend.IsAvailable` — which attempts a real `ViGEmClient` connection — until the driver
+answers or 90 seconds pass. That tests the thing we actually need rather than a proxy for it.
+
+Both ViGEmBus (`setup/ViGEmBus.aip`) and HidHide use Advanced Installer, so `/exenoui /qn` applies to
+both. Pass `/exelog` as a separate argument or not at all; quoting it as one argument silently
+mis-parses and produces no log.
+
+**The download URL is pinned rather than resolved from the releases API.** ViGEmBus is archived and
+v1.22.0 is final, so there will never be a newer release to discover. Pinning also lets the expected
+size be pinned, which is half the verification.
+
+### The installer is verified by size and publisher, not by full Authenticode validation
+
+The download is checked for an exact byte count (6278576) and for a signing certificate whose subject
+contains `Nefarius Software Solutions`, read via `X509Certificate.CreateFromSignedFile`.
+
+**That extracts the embedded certificate; it does not validate the signature.** A tampered file would
+still carry the original certificate, so this combination detects a truncated or substituted download
+but not a modified one. Full validation needs a `WinVerifyTrust` P/Invoke.
+
+That was deliberately not added: a subtly wrong `WINTRUST_DATA` layout fails closed, which would
+block every legitimate install, and it could not be exercised on the development machine because
+ViGEmBus is already present there and the install path never runs. Untested code that gates a
+required install is worse than a documented gap. It is the obvious hardening step if this is ever
+exercised on a clean machine.
