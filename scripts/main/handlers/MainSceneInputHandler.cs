@@ -50,7 +50,13 @@ public class MainSceneInputHandler
 
     public void UpdateEmulatorCloseHold(double delta)
     {
-        if (appInstance.emulatorManager == null || !appInstance.emulatorManager.IsEmulatorRunning || !AreEmulatorCloseHotkeysHeld())
+        bool hotkeysAreHeld = appInstance.emulatorManager != null
+            && appInstance.emulatorManager.IsEmulatorRunning
+            && AreEmulatorCloseHotkeysHeld();
+
+        ReportCloseHotkeyHoldChange(hotkeysAreHeld);
+
+        if (!hotkeysAreHeld)
         {
             secondsEmulatorCloseHotkeysHeld = 0.0;
             emulatorCloseRequestedThisHold = false;
@@ -72,6 +78,29 @@ public class MainSceneInputHandler
         emulatorCloseRequestedThisHold = true;
         GD.Print($"[Input] emulator close hotkeys held for {appInstance.configManager.EmulatorCloseHoldSeconds}s; closing the emulator.");
         appInstance.emulatorManager.CloseEmulator();
+    }
+
+    private bool wasHoldingEmulatorCloseHotkeys;
+
+    private void ReportCloseHotkeyHoldChange(bool hotkeysAreHeld)
+    {
+        if (hotkeysAreHeld == wasHoldingEmulatorCloseHotkeys)
+        {
+            return;
+        }
+
+        wasHoldingEmulatorCloseHotkeys = hotkeysAreHeld;
+
+        if (hotkeysAreHeld)
+        {
+            GD.Print($"[Input] emulator close hotkeys are down on device {ResolveCloseHotkeyDeviceId()}; hold for {appInstance.configManager.EmulatorCloseHoldSeconds:0.#}s to close.");
+            return;
+        }
+
+        if (!emulatorCloseRequestedThisHold && secondsEmulatorCloseHotkeysHeld > 0.0)
+        {
+            GD.Print($"[Input] emulator close hotkeys released after {secondsEmulatorCloseHotkeysHeld:0.#}s; not closing.");
+        }
     }
 
     private bool AreEmulatorCloseHotkeysHeld()
