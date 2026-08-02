@@ -2129,3 +2129,52 @@ allowlist and producing double input.
 
 When one is available, the test is therefore not "do the face buttons work" but "does the emulator's
 device list show one device or two". `SDL_HIDAPI_IGNORE_DEVICES` is the lever if it shows two.
+
+### CORRECTION: the allowlist filters SDL's gamepad layer, not "SDL-based emulators"
+
+An earlier note in this section claimed `SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT` covers "nearly the
+whole shipped inventory — PCSX2, DuckStation, Flycast, melonDS, Dolphin, ares, mGBA, Azahar, snes9x,
+PPSSPP and gopher64". **That claim was wrong**, because "does the emulator use SDL" is the wrong
+predicate.
+
+Measured with RetroArch, its joypad driver forced to `sdl2`, the allowlist set to `0x045E/0x028E`,
+and the only attached pad being an Xbox Series X reporting `045E/02FF` — a device the allowlist
+should exclude:
+
+```
+[INFO] [Input] Found joypad driver: "sdl2".
+[INFO] [Autoconf] Controller (Xbox One For Windows) (3/0) not configured, using fallback.
+```
+
+The `sdl2` driver took effect, so this is not a silent fallback to dinput, and the excluded pad
+enumerated anyway.
+
+The hint gates `SDL_ShouldIgnoreGameController`, which governs the **GameController/Gamepad** layer.
+A filtered device stops being a *gamepad* but remains a *joystick*, so anything enumerating through
+`SDL_NumJoysticks` / `SDL_JoystickOpen` still sees it. RetroArch does exactly that. Its bundled SDL
+is **2.0.14**, whose only ignore hints are `SDL_GAMECONTROLLER_IGNORE_DEVICES[_EXCEPT]` — there is no
+joystick-level equivalent, so **no environment variable can hide a pad from RetroArch**.
+
+The correct predicate is which API the emulator enumerates through:
+
+| Emulator | Status |
+|---|---|
+| Dolphin | **filtered** — measured, device list showed only our virtual pad |
+| RetroArch | **not filtered** — measured, as above |
+| everything else | **unknown** |
+
+Scanning binaries for `SDL_GameController*` versus `SDL_Joystick*` symbols does not settle it —
+Dolphin, Flycast, PPSSPP, melonDS, Azahar, snes9x and gopher64 all link SDL statically and expose no
+matching symbols, yet Dolphin is demonstrably filtered. The one useful reading was **ares**, which
+imports `SDL_Joystick*` from `SDL3.dll` with no gamepad imports, suggesting it is not filtered.
+
+Suggestively, the emulators recorded elsewhere in these notes as using **raw joystick button
+indices** (ares, mGBA, melonDS, Azahar, snes9x) are precisely those most likely to enumerate at the
+joystick layer — the same trait that makes their bindings index-based makes them invisible to a
+gamepad-layer filter. That is an inference, not a measurement; each needs a device-list count.
+
+**Consequence for the tiering.** Tier 1 is narrower and less predictable than assumed, so HidHide
+moves from "reduces how often hiding is needed" to "the only mechanism that works everywhere",
+since it filters beneath every backend and every API. Where the allowlist does not reach, the layer
+still relays and normalizes correctly — the failure mode is the physical pad remaining visible
+alongside the virtual one, giving double input and unreliable player order, not a broken layer.
