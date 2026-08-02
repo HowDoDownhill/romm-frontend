@@ -2453,3 +2453,46 @@ A pinnable index is only useful once the enumeration is known: writing `Joystick
 the emulator is filtered and wrong when it is not, because our pad then sits behind the physical
 ones. So Group A pinning for melonDS is deliberately deferred until its filtering is measured, rather
 than guessing an index the way earlier config writers guessed device identities.
+
+### PCSX2's SDL index is not 0, so "filtered implies index 0" was wrong
+
+Measured with **one** physical pad attached and the layer running. PCSX2's device list showed:
+
+```
+SDL-1: XInput Controller        <- our virtual pad, the only SDL device
+XInput-0: XInput Controller 0
+XInput-1: XInput Controller 1
+```
+
+The allowlist **is** working — the physical pad is absent from the SDL source. But our pad is
+`SDL-1`, not `SDL-0`, so the shipped `[Pad1] Up = SDL-0/DPadUp` bindings addressed nothing and the
+controls were dead.
+
+Dolphin, under identical conditions, reported `SDL/0/Xbox 360 Controller`. So **the two emulators
+number SDL devices differently**, and a single `{sdl_index}` meaning cannot serve both.
+
+The likely cause is the same gamepad-versus-joystick split that explained RetroArch: PCSX2 filters at
+the gamepad layer, so the physical pad is unusable, but numbers by joystick index, where the ignored
+pad still occupies slot 0. Dolphin numbers only the devices it opened. That would make PCSX2's index
+`physical pad count + player index` — **one observation, not yet a rule**, and it needs a two-pad
+test before anything relies on it.
+
+### PCSX2 ships player 2 bound to the same device, which the layer turns into double input
+
+`controller-followups.md` records approvingly that PCSX2 "ships a working player 2 (`[Pad2]` on
+`SDL-1/`, full bindings)". With the layer running and one controller, our virtual pad *is* `SDL-1`,
+so `[Pad1]` and `[Pad2]` both read it. Every press reaches both PS2 ports, and anything accepting
+input from either port sees it twice.
+
+This is not config drift; the shipped default does it for every user. It is an unlucky collision
+between the index PCSX2 ships for player 2 and the index our pad happens to occupy.
+
+`WriteInputLayerDeviceBindings` therefore writes port occupancy as well as device bindings: ports up
+to the active player count get `type_connected`, the rest get `type_disconnected`. PCSX2 and
+DuckStation both declare `type_key`, so both are covered, and the fix does not depend on resolving
+the index question above.
+
+A side effect worth knowing: DuckStation ships `[Pad2] Type = None`, which is why a second pad works
+on PS2 but not PS1 — an open item in `controller-followups.md`. The layer now sets it to
+`AnalogController` when a second player is assigned. That enables the port but does **not** create
+bindings for it, since DuckStation ships none, so player two there is not yet complete.

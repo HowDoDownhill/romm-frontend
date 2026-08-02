@@ -2550,14 +2550,17 @@ public partial class EmulatorManager : Node
 
     private void WriteDeviceBindingsForSection(ControllerSection controllerSection, ControllerConfig controllerConfig, string configFilePath, InputLayer inputLayer)
     {
-        if (string.IsNullOrEmpty(controllerSection.DeviceKey) || string.IsNullOrEmpty(controllerSection.DeviceTemplate))
+        bool writesSections = controllerConfig.Format == "ini";
+
+        if (writesSections && string.IsNullOrEmpty(controllerSection.SectionTemplate))
         {
             return;
         }
 
-        bool writesSections = controllerConfig.Format == "ini";
+        bool writesDeviceBinding = !string.IsNullOrEmpty(controllerSection.DeviceKey) && !string.IsNullOrEmpty(controllerSection.DeviceTemplate);
+        bool writesPortOccupancy = writesSections && !string.IsNullOrEmpty(controllerSection.TypeKey);
 
-        if (writesSections && string.IsNullOrEmpty(controllerSection.SectionTemplate))
+        if (!writesDeviceBinding && !writesPortOccupancy)
         {
             return;
         }
@@ -2570,6 +2573,23 @@ public partial class EmulatorManager : Node
         {
             string portNumber = (controllerSection.PortStart + playerIndex).ToString();
             bool playerIsPresent = playerIndex < inputLayer.ActivePlayerCount;
+            string sectionName = writesSections ? controllerSection.SectionTemplate.Replace("{port}", portNumber) : "";
+
+            if (writesPortOccupancy)
+            {
+                string portType = playerIsPresent ? controllerSection.TypeConnected : controllerSection.TypeDisconnected;
+
+                if (!string.IsNullOrEmpty(portType))
+                {
+                    iniUpdater.UpdateValue(configFilePath, sectionName, controllerSection.TypeKey, portType, portType);
+                    GD.Print($"[InputLayer] {sectionName}/{controllerSection.TypeKey} = {portType}");
+                }
+            }
+
+            if (!writesDeviceBinding)
+            {
+                continue;
+            }
 
             string deviceValue = playerIsPresent
                 ? ResolveDeviceBindingMacros(controllerSection.DeviceTemplate, playerIndex, inputLayer)
@@ -2584,7 +2604,6 @@ public partial class EmulatorManager : Node
 
             if (writesSections)
             {
-                string sectionName = controllerSection.SectionTemplate.Replace("{port}", portNumber);
                 iniUpdater.UpdateValue(configFilePath, sectionName, deviceKey, deviceValue, deviceValue);
                 GD.Print($"[InputLayer] {sectionName}/{deviceKey} = {deviceValue}");
                 continue;
