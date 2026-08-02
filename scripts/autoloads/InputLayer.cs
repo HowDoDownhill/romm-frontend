@@ -76,12 +76,42 @@ public partial class InputLayer : Node
         return availablePads.Count > 0 ? availablePads[0].GodotDeviceId : -1;
     }
 
+    private readonly List<int> playerAssignmentDeviceIds = new List<int>();
+
+    public IReadOnlyList<int> PlayerAssignmentDeviceIds => playerAssignmentDeviceIds;
+
+    public void SetPlayerAssignment(IEnumerable<int> orderedDeviceIds)
+    {
+        playerAssignmentDeviceIds.Clear();
+        playerAssignmentDeviceIds.AddRange(orderedDeviceIds);
+        GD.Print($"[InputLayer] player order set to devices [{string.Join(", ", playerAssignmentDeviceIds)}].");
+    }
+
+    public void ClearPlayerAssignment()
+    {
+        if (playerAssignmentDeviceIds.Count == 0)
+        {
+            return;
+        }
+
+        playerAssignmentDeviceIds.Clear();
+        GD.Print("[InputLayer] player order cleared; falling back to connection order.");
+    }
+
     private List<ConnectedController> GetAssignablePhysicalPads()
     {
-        return controllerManager
+        var availablePads = controllerManager
             .GetConnectedControllers()
             .Where(candidate => !IsOwnVirtualDevice(candidate.GodotDeviceId))
             .ToList();
+
+        return availablePads.OrderBy(ResolveAssignedPlayerPosition).ToList();
+    }
+
+    private int ResolveAssignedPlayerPosition(ConnectedController pad)
+    {
+        int assignedPosition = playerAssignmentDeviceIds.IndexOf(pad.GodotDeviceId);
+        return assignedPosition >= 0 ? assignedPosition : playerAssignmentDeviceIds.Count + pad.ConnectionOrder;
     }
 
     public bool BeginSession(string systemSlug, EmulatorMeta emulatorMetadata)
@@ -244,6 +274,12 @@ public partial class InputLayer : Node
         if (!connected)
         {
             ownVirtualDeviceIds.Remove(joypadId);
+
+            if (playerAssignmentDeviceIds.Contains(joypadId))
+            {
+                ClearPlayerAssignment();
+            }
+
             return;
         }
 

@@ -19,6 +19,7 @@ public partial class StartMenuPanel : UiPanel
     [Export] public Control netplayView;
     [Export] public Label netplayCodeLabel;
     [Export] public Label netplayInfoLabel;
+    [Export] public Button assignControllersButton;
     [Export] public Button settingsButton;
     [Export] public Button randomGameButton;
     [Export] public Button refreshAllGamesButton;

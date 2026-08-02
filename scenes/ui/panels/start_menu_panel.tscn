@@ -11,7 +11,7 @@ script = ExtResource("4_damper")
 [sub_resource type="Resource" id="Resource_drag"]
 script = ExtResource("4_damper")
 
-[node name="StartMenuPanel" type="Control" node_paths=PackedStringArray("ContentRoot", "menuView", "biosView", "optionsList", "biosList", "launchEmulatorButton", "updateEmulatorButton", "uninstallEmulatorButton", "selectBiosButton", "favoriteGameButton", "hostNetplayButton", "joinNetplayButton", "netplayView", "netplayCodeLabel", "netplayInfoLabel", "settingsButton", "randomGameButton", "refreshAllGamesButton", "refreshCurrentSystemButton", "quitButton")]
+[node name="StartMenuPanel" type="Control" node_paths=PackedStringArray("ContentRoot", "menuView", "biosView", "optionsList", "biosList", "launchEmulatorButton", "updateEmulatorButton", "uninstallEmulatorButton", "selectBiosButton", "favoriteGameButton", "hostNetplayButton", "joinNetplayButton", "netplayView", "netplayCodeLabel", "netplayInfoLabel", "assignControllersButton", "settingsButton", "randomGameButton", "refreshAllGamesButton", "refreshCurrentSystemButton", "quitButton")]
 visible = false
 custom_minimum_size = Vector2(400, 600)
 layout_mode = 3
@@ -42,6 +42,7 @@ joinNetplayButton = NodePath("Panel/StartMenuContainer/StartMenu/JoinNetplayButt
 netplayView = NodePath("Panel/NetplayContainer")
 netplayCodeLabel = NodePath("Panel/NetplayContainer/NetplayView/NetplayCodeLabel")
 netplayInfoLabel = NodePath("Panel/NetplayContainer/NetplayView/NetplayInfoLabel")
+assignControllersButton = NodePath("Panel/StartMenuContainer/StartMenu/AssignControllersButton")
 settingsButton = NodePath("Panel/StartMenuContainer/StartMenu/SettingsButton")
 randomGameButton = NodePath("Panel/StartMenuContainer/StartMenu/RandomGameButton")
 refreshAllGamesButton = NodePath("Panel/StartMenuContainer/StartMenu/RefreshAllGamesButton")
@@ -104,6 +105,10 @@ text = "Host Session"
 [node name="JoinNetplayButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
 layout_mode = 2
 text = "Join Session"
+
+[node name="AssignControllersButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+layout_mode = 2
+text = "Assign Controllers"
 
 [node name="SettingsButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
 layout_mode = 2

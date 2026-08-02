@@ -15,6 +15,8 @@ public partial class MainScene : Control
 
     private const float ControllerLayerOfferDelaySeconds = 1.5f;
 
+    public Button assignControllersButton => startMenuPanel?.assignControllersButton;
+
     [ExportGroup("DetailsPanel")]
     [Export] public Control detailsPanel;
     [Export] public VBoxContainer detailsPanelContainer;
@@ -182,6 +184,7 @@ public partial class MainScene : Control
             if (startMenuPanel.hostNetplayButton != null) startMenuPanel.hostNetplayButton.Pressed += PopupHandler.OnHostNetplayPressed;
             if (startMenuPanel.joinNetplayButton != null) startMenuPanel.joinNetplayButton.Pressed += PopupHandler.OnJoinNetplayPressed;
             if (startMenuPanel.selectBiosButton != null) startMenuPanel.selectBiosButton.Pressed += PopupHandler.OnSelectBiosMenuPressed;
+            if (startMenuPanel.assignControllersButton != null) startMenuPanel.assignControllersButton.Pressed += InputHandler.BeginControllerAssignment;
             if (startMenuPanel.settingsButton != null) startMenuPanel.settingsButton.Pressed += PopupHandler.OnSettingsMenuPressed;
             if (startMenuPanel.refreshAllGamesButton != null) startMenuPanel.refreshAllGamesButton.Pressed += PopupHandler.OnRefreshGamesPressed;
             if (startMenuPanel.refreshCurrentSystemButton != null) startMenuPanel.refreshCurrentSystemButton.Pressed += PopupHandler.OnRefreshCurrentSystemGamesPressed;
@@ -652,6 +655,22 @@ public partial class MainScene : Control
         {
             if (wheelEvent.ButtonIndex == MouseButton.WheelDown) gameCarousel.SelectNext();
             else gameCarousel.SelectPrevious();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (InputHandler.isListeningForControllerAssignment)
+        {
+            if (@event is InputEventJoypadButton assignmentButton && assignmentButton.Pressed)
+            {
+                InputHandler.RecordControllerAssignment(assignmentButton.Device);
+            }
+
+            else if (@event.IsActionPressed("ui_cancel") || @event.IsActionPressed("Back"))
+            {
+                InputHandler.CancelControllerAssignment();
+            }
+
             GetViewport().SetInputAsHandled();
             return;
         }

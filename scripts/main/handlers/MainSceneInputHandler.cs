@@ -10,6 +10,9 @@ public class MainSceneInputHandler
     public bool isListeningForInput = false;
     public Action<string> inputListenCallback;
 
+    public bool isListeningForControllerAssignment = false;
+    private readonly List<int> assignedControllerDeviceIds = new List<int>();
+
     public bool isListeningForEmulatorCloseHotkeys = false;
     public int expectedEmulatorCloseHotkeysCount = 0;
     public Godot.Collections.Array collectedEmulatorCloseHotkeys = new Godot.Collections.Array();
@@ -145,6 +148,83 @@ public class MainSceneInputHandler
     {
         appInstance.configManager.SaveControllerMappingConsent(ConfigManager.ControllerMappingConsentDeclined);
         GD.Print("[InputLayer] the user declined automatic controller mapping; emulators keep their own controller settings.");
+    }
+
+    public void BeginControllerAssignment()
+    {
+        assignedControllerDeviceIds.Clear();
+        isListeningForControllerAssignment = true;
+        appInstance.inputLayer?.ClearPlayerAssignment();
+        UpdateControllerAssignmentPrompt();
+    }
+
+    public void RecordControllerAssignment(int deviceId)
+    {
+        if (assignedControllerDeviceIds.Contains(deviceId) || IsFrontendVirtualPad(deviceId))
+        {
+            return;
+        }
+
+        assignedControllerDeviceIds.Add(deviceId);
+
+        if (assignedControllerDeviceIds.Count >= CountAssignableControllers())
+        {
+            FinishControllerAssignment();
+            return;
+        }
+
+        UpdateControllerAssignmentPrompt();
+    }
+
+    public void CancelControllerAssignment()
+    {
+        if (assignedControllerDeviceIds.Count > 0)
+        {
+            FinishControllerAssignment();
+            return;
+        }
+
+        isListeningForControllerAssignment = false;
+        UpdateControllerAssignmentPrompt();
+    }
+
+    private void FinishControllerAssignment()
+    {
+        isListeningForControllerAssignment = false;
+        appInstance.inputLayer?.SetPlayerAssignment(assignedControllerDeviceIds);
+        UpdateControllerAssignmentPrompt();
+    }
+
+    private bool IsFrontendVirtualPad(int deviceId)
+    {
+        return appInstance.inputLayer != null && appInstance.inputLayer.IsOwnVirtualDevice(deviceId);
+    }
+
+    private int CountAssignableControllers()
+    {
+        var connectedControllers = appInstance.controllerManager?.GetConnectedControllers();
+        return connectedControllers?.Count ?? 0;
+    }
+
+    public void UpdateControllerAssignmentPrompt()
+    {
+        if (mainScene.assignControllersButton == null)
+        {
+            return;
+        }
+
+        if (isListeningForControllerAssignment)
+        {
+            int nextPlayerNumber = assignedControllerDeviceIds.Count + 1;
+            mainScene.assignControllersButton.Text = $"Press a button on Player {nextPlayerNumber}'s controller...";
+            return;
+        }
+
+        var assignedOrder = appInstance.inputLayer?.PlayerAssignmentDeviceIds;
+
+        mainScene.assignControllersButton.Text = assignedOrder == null || assignedOrder.Count == 0
+            ? "Assign Controllers"
+            : $"Assign Controllers [{assignedOrder.Count} in order]";
     }
 
     public void UpdateEmulatorCloseHotkeysBtnText()
