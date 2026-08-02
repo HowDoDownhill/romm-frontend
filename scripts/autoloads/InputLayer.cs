@@ -2,6 +2,7 @@ using Godot;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 
 public enum InputLayerConsent
 {
@@ -26,8 +27,12 @@ public partial class InputLayer : Node
     private readonly List<PadState> sessionPhysicalStates = new List<PadState>();
     private readonly List<PadState> sessionVirtualStates = new List<PadState>();
 
+    private const int VirtualPadEnumerationPollMilliseconds = 50;
+    private const int VirtualPadEnumerationTimeoutMilliseconds = 3000;
+
     private HashSet<int> joypadsPresentBeforeSession = new HashSet<int>();
     private readonly HashSet<int> ownVirtualDeviceIds = new HashSet<int>();
+    private readonly List<int> ownVirtualDeviceIdsInPlayerOrder = new List<int>();
 
     public bool IsSessionActive { get; private set; }
     public string LastSessionFailureReason { get; private set; } = "";
@@ -178,6 +183,34 @@ public partial class InputLayer : Node
             : "[InputLayer] no new XInput slots appeared; emulators reading XInput may not see the virtual pads.");
     }
 
+    public string ResolveVirtualPadGuid(int playerIndex)
+    {
+        return playerIndex >= 0 && playerIndex < ownVirtualDeviceIdsInPlayerOrder.Count
+            ? Input.GetJoyGuid(ownVirtualDeviceIdsInPlayerOrder[playerIndex])
+            : "";
+    }
+
+    public async Task WaitForVirtualPadsToEnumerate()
+    {
+        if (!IsSessionActive)
+        {
+            return;
+        }
+
+        int elapsedMilliseconds = 0;
+
+        while (ownVirtualDeviceIdsInPlayerOrder.Count < ActivePlayerCount && elapsedMilliseconds < VirtualPadEnumerationTimeoutMilliseconds)
+        {
+            await ToSignal(GetTree().CreateTimer(VirtualPadEnumerationPollMilliseconds / 1000.0f), SceneTreeTimer.SignalName.Timeout);
+            elapsedMilliseconds += VirtualPadEnumerationPollMilliseconds;
+        }
+
+        if (ownVirtualDeviceIdsInPlayerOrder.Count < ActivePlayerCount)
+        {
+            GD.PrintErr($"[InputLayer] only {ownVirtualDeviceIdsInPlayerOrder.Count} of {ActivePlayerCount} virtual pad(s) enumerated; emulator config may name the wrong device.");
+        }
+    }
+
     public int ResolveVirtualPadXInputSlot(int playerIndex)
     {
         return playerIndex >= 0 && playerIndex < virtualPadXInputSlots.Count ? virtualPadXInputSlots[playerIndex] : -1;
@@ -273,6 +306,7 @@ public partial class InputLayer : Node
         sessionPhysicalStates.Clear();
         sessionVirtualStates.Clear();
         ownVirtualDeviceIds.Clear();
+        ownVirtualDeviceIdsInPlayerOrder.Clear();
         joypadsPresentBeforeSession.Clear();
 
         GD.Print("[InputLayer] session ended.");
@@ -312,9 +346,9 @@ public partial class InputLayer : Node
             return;
         }
 
-        if (virtualPadBackend.CreatedPadCount > 0 && !joypadsPresentBeforeSession.Contains(joypadId))
+        if (virtualPadBackend.CreatedPadCount > 0 && !joypadsPresentBeforeSession.Contains(joypadId) && ownVirtualDeviceIds.Add(joypadId))
         {
-            ownVirtualDeviceIds.Add(joypadId);
+            ownVirtualDeviceIdsInPlayerOrder.Add(joypadId);
             GD.Print($"[InputLayer] our virtual pad appeared as Godot device {joypadId} \"{Input.GetJoyName(joypadId)}\"; excluding it from input.");
         }
     }

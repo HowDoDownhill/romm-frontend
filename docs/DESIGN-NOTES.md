@@ -2615,3 +2615,40 @@ Its mapping templates were derived from the bindings ares itself wrote for playe
 device portion replaced by the index macro — the same approach used for snes9x. The button
 vocabulary (`Pad.Up`, `A..South`, `L-Bumper`, and the `;;` slot suffix) therefore comes from ares
 rather than from a reading of its format.
+
+### ares requires the GUID, so the layer writes its own — refreshed every launch
+
+Measured by mapping two virtual pads by hand with the layer's writer disabled, so the result survived
+to be read:
+
+```
+VirtualPad1: 03007ba65e0400008e02000014017801/0/1/1/Lo;;
+VirtualPad2: 03003a645e0400008e02000014017801/0/1/1/Lo;;
+```
+
+Three things follow. **The GUID is mandatory** — GUID-less bindings were written and produced no input
+in game, so the `controller-followups.md` finding that ares matches on the device index alone is
+stale. **The index is `/0/` for both pads**, not `/0/` and `/1/`, because the GUID already identifies
+the device and the index is relative to it. **Our two virtual pads carry different GUIDs**, which is
+what makes a shared index of 0 work.
+
+`controller-followups.md` retired the `{controller_guid}` macro because it had to *predict the user's*
+controller GUID, which varies by pad model and SDL backend and fails silently when wrong. That
+objection does not apply here: the layer creates the device, so its GUID can simply be read from
+Godot. The macro is back, meaning something different and knowable.
+
+ViGEm's GUID is not stable — the name CRC was measured as `ba66`, `7ba6` and `3a64` across three
+sessions. Writing it once would break on the next launch. Writing it **every** launch makes that
+irrelevant, because the stored value is never more than one session old. ares is the only emulator so
+far that needs this.
+
+### The virtual pads enumerate asynchronously, so config writing has to wait for them
+
+`{controller_guid}` can only be resolved once Godot has seen the pads, and the session log shows
+`our virtual pad appeared as Godot device N` arriving *after* the config write would otherwise have
+run. `WaitForVirtualPadsToEnumerate` polls until every pad has appeared, with a 3 second ceiling, and
+the launch path awaits it before writing.
+
+Every other macro — the index ones and the device name — is known at creation time and needed no
+wait. This one is a property Godot reports about the device, not one we chose, which is why it is the
+only asynchronous input to the writer.

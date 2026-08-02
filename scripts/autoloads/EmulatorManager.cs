@@ -2200,6 +2200,12 @@ public partial class EmulatorManager : Node
             GameSystem currentGameSystem = appInstance.dataBus.systems.FirstOrDefault(s => s.Id == game.PlatformId);
             ApplyControllerMappings(emulatorMetadata, emulatorInstallDirectory, currentGameSystem);
             appInstance.inputLayer?.BeginSession(game.System?.Slug, emulatorMetadata);
+
+            if (appInstance.inputLayer != null)
+            {
+                await appInstance.inputLayer.WaitForVirtualPadsToEnumerate();
+            }
+
             WriteInputLayerDeviceBindings(emulatorMetadata, emulatorInstallDirectory);
 
             DateTime sessionStart = DateTime.UtcNow;
@@ -2647,7 +2653,8 @@ public partial class EmulatorManager : Node
             .Replace("{sdl_index_after_hidden}", (inputLayer.PhysicalPadsEnumeratedAheadOfOurs + playerIndex).ToString())
             .Replace("{sdl_index}", playerIndex.ToString())
             .Replace("{xinput_index}", xinputSlot.ToString())
-            .Replace("{controller_name}", inputLayer.VirtualPadSdlDeviceName);
+            .Replace("{controller_name}", inputLayer.VirtualPadSdlDeviceName)
+            .Replace("{controller_guid}", inputLayer.ResolveVirtualPadGuid(playerIndex));
     }
 
     private void RewriteSectionDeviceBindings(ControllerSection controllerSection, ControllerConfig controllerConfig, string configFilePath, string sectionName, int playerIndex, InputLayer inputLayer, string bindingKeyPrefix)
