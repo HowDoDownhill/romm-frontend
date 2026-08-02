@@ -515,6 +515,9 @@ public class EmulatorMeta
     [JsonPropertyName("launch_env")]
     public Dictionary<string, Dictionary<string, string>> LaunchEnv { get; set; }
 
+    [JsonPropertyName("input_layer")]
+    public string InputLayer { get; set; }
+
     [JsonPropertyName("system_flags")]
     public Dictionary<string, JsonElement> SystemFlags { get; set; }
 
@@ -1021,6 +1024,7 @@ public partial class EmulatorManager : Node
 
         activeEmulatorProcess = null;
         activeGame = null;
+        appInstance.inputLayer?.EndSession();
         appInstance.netplayManager?.EndSession();
 
         bool lobbyStillOpen = appInstance.netplayLobby != null && appInstance.netplayLobby.IsInLobby;
@@ -2004,8 +2008,25 @@ public partial class EmulatorManager : Node
         DiscreteGpuPreference.ApplyToProcess(processStartInfo, preferDiscreteGpu);
         DiscreteGpuPreference.RegisterWindowsGpuPreference(executablePath, preferDiscreteGpu);
         ApplyLaunchEnvironment(processStartInfo, emulatorMetadata, workingDirectory);
+        ApplyInputLayerEnvironment(processStartInfo, emulatorMetadata);
 
         return Process.Start(processStartInfo);
+    }
+
+    private void ApplyInputLayerEnvironment(ProcessStartInfo processStartInfo, EmulatorMeta emulatorMetadata)
+    {
+        var inputLayerEnvironment = appInstance?.inputLayer?.BuildLaunchEnvironment(emulatorMetadata);
+
+        if (inputLayerEnvironment == null || inputLayerEnvironment.Count == 0)
+        {
+            return;
+        }
+
+        foreach (var environmentVariable in inputLayerEnvironment)
+        {
+            processStartInfo.Environment[environmentVariable.Key] = environmentVariable.Value;
+            GD.Print($"[InputLayer] {environmentVariable.Key}={environmentVariable.Value}");
+        }
     }
 
     private void ApplyLaunchEnvironment(ProcessStartInfo processStartInfo, EmulatorMeta emulatorMetadata, string emulatorInstallDirectory)
@@ -2169,6 +2190,8 @@ public partial class EmulatorManager : Node
 
             GameSystem currentGameSystem = appInstance.dataBus.systems.FirstOrDefault(s => s.Id == game.PlatformId);
             ApplyControllerMappings(emulatorMetadata, emulatorInstallDirectory, currentGameSystem);
+            appInstance.inputLayer?.BeginSession(game.System?.Slug, emulatorMetadata);
+            WriteInputLayerDeviceBindings(emulatorMetadata, emulatorInstallDirectory);
 
             DateTime sessionStart = DateTime.UtcNow;
 
@@ -2191,6 +2214,7 @@ public partial class EmulatorManager : Node
 
             else
             {
+                appInstance.inputLayer?.EndSession();
                 GD.PrintErr("Failed to start emulator process. Process.Start returned null.");
             }
         }
@@ -2368,6 +2392,8 @@ public partial class EmulatorManager : Node
             }
 
             launchArguments = AppendDynamicSettingsToArguments(launchArguments, emulatorName, emulatorMetadata);
+            appInstance.inputLayer?.BeginSession(currentGameSystem?.Slug, emulatorMetadata);
+            WriteInputLayerDeviceBindings(emulatorMetadata, emulatorInstallDirectory);
 
             Process emulatorProcess = BuildAndStartEmulatorProcess(fullExecutablePath, launchArguments, emulatorInstallDirectory, emulatorMetadata);
 
@@ -2381,6 +2407,11 @@ public partial class EmulatorManager : Node
                 {
                     GD.Print("Emulator was closed.");
                 };
+            }
+
+            else
+            {
+                appInstance.inputLayer?.EndSession();
             }
         }
 
@@ -2474,6 +2505,76 @@ public partial class EmulatorManager : Node
     }
 
     private static readonly bool SuspendControllerMapping = true;
+
+    private void WriteInputLayerDeviceBindings(EmulatorMeta emulatorMetadata, string emulatorInstallDirectory)
+    {
+        InputLayer inputLayer = appInstance?.inputLayer;
+
+        if (inputLayer == null || !inputLayer.IsSessionActive)
+        {
+            return;
+        }
+
+        var controllerConfig = emulatorMetadata?.ControllerConfig;
+
+        if (controllerConfig?.ControllerSections == null || controllerConfig.Format != "ini")
+        {
+            return;
+        }
+
+        string configFileRelativePath = controllerConfig.ResolveConfigFileRelativePath(OS.GetName().ToLower());
+
+        if (string.IsNullOrEmpty(configFileRelativePath))
+        {
+            return;
+        }
+
+        string configFilePath = Path.Combine(emulatorInstallDirectory, configFileRelativePath);
+
+        if (!File.Exists(configFilePath))
+        {
+            GD.Print($"[InputLayer] {configFilePath} does not exist yet; leaving device bindings to the emulator.");
+            return;
+        }
+
+        foreach (ControllerSection controllerSection in controllerConfig.ControllerSections)
+        {
+            WriteDeviceBindingsForSection(controllerSection, controllerConfig, configFilePath, inputLayer);
+        }
+    }
+
+    private void WriteDeviceBindingsForSection(ControllerSection controllerSection, ControllerConfig controllerConfig, string configFilePath, InputLayer inputLayer)
+    {
+        if (string.IsNullOrEmpty(controllerSection.SectionTemplate)
+            || string.IsNullOrEmpty(controllerSection.DeviceKey)
+            || string.IsNullOrEmpty(controllerSection.DeviceTemplate))
+        {
+            return;
+        }
+
+        var iniUpdater = new IniConfigurationUpdater();
+        int portCount = controllerConfig.MaxControllers > 0 ? controllerConfig.MaxControllers : inputLayer.ActivePlayerCount;
+
+        for (int playerIndex = 0; playerIndex < portCount; playerIndex++)
+        {
+            string sectionName = controllerSection.SectionTemplate.Replace("{port}", (controllerSection.PortStart + playerIndex).ToString());
+            bool playerIsPresent = playerIndex < inputLayer.ActivePlayerCount;
+
+            string deviceValue = playerIsPresent
+                ? controllerSection.DeviceTemplate
+                    .Replace("{sdl_index}", playerIndex.ToString())
+                    .Replace("{controller_name}", inputLayer.VirtualPadSdlDeviceName)
+                : controllerSection.DeviceDisconnected;
+
+            if (string.IsNullOrEmpty(deviceValue))
+            {
+                continue;
+            }
+
+            iniUpdater.UpdateValue(configFilePath, sectionName, controllerSection.DeviceKey, deviceValue, deviceValue);
+            GD.Print($"[InputLayer] {sectionName}/{controllerSection.DeviceKey} = {deviceValue}");
+        }
+    }
 
     private void ApplyControllerMappings(EmulatorMeta emulatorMetadata, string emulatorInstallDirectory, GameSystem currentGameSystem)
     {

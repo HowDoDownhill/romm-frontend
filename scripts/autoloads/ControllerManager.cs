@@ -74,11 +74,25 @@ public partial class ControllerManager : Node
 
     public List<ConnectedController> GetConnectedControllers()
     {
+        return connectedControllers
+            .Where(c => !IsFrontendVirtualPad(c.GodotDeviceId))
+            .OrderBy(c => c.ConnectionOrder)
+            .ToList();
+    }
+
+    public List<ConnectedController> GetAllControllersIncludingVirtual()
+    {
         return connectedControllers.OrderBy(c => c.ConnectionOrder).ToList();
     }
 
     public int GetControllerCount()
     {
-        return connectedControllers.Count;
+        return GetConnectedControllers().Count;
+    }
+
+    private bool IsFrontendVirtualPad(int godotDeviceId)
+    {
+        InputLayer inputLayer = GetNodeOrNull<InputLayer>("/root/InputLayer");
+        return inputLayer != null && inputLayer.IsOwnVirtualDevice(godotDeviceId);
     }
 }

@@ -27,10 +27,89 @@ public class MainSceneInputHandler
         "RightStick_Up", "RightStick_Down", "RightStick_Left", "RightStick_Right"
     };
 
+    private double secondsEmulatorCloseHotkeysHeld;
+    private bool emulatorCloseRequestedThisHold;
+
     public MainSceneInputHandler(MainScene mainScene, AppInstance appInstance)
     {
         this.mainScene = mainScene;
         this.appInstance = appInstance;
+    }
+
+    public double EmulatorCloseHoldProgress
+    {
+        get
+        {
+            float requiredSeconds = appInstance.configManager.EmulatorCloseHoldSeconds;
+            return requiredSeconds <= 0.0f ? 0.0 : Mathf.Clamp(secondsEmulatorCloseHotkeysHeld / requiredSeconds, 0.0, 1.0);
+        }
+    }
+
+    public void UpdateEmulatorCloseHold(double delta)
+    {
+        if (appInstance.emulatorManager == null || !appInstance.emulatorManager.IsEmulatorRunning || !AreEmulatorCloseHotkeysHeld())
+        {
+            secondsEmulatorCloseHotkeysHeld = 0.0;
+            emulatorCloseRequestedThisHold = false;
+            return;
+        }
+
+        if (emulatorCloseRequestedThisHold)
+        {
+            return;
+        }
+
+        secondsEmulatorCloseHotkeysHeld += delta;
+
+        if (secondsEmulatorCloseHotkeysHeld < appInstance.configManager.EmulatorCloseHoldSeconds)
+        {
+            return;
+        }
+
+        emulatorCloseRequestedThisHold = true;
+        GD.Print($"[Input] emulator close hotkeys held for {appInstance.configManager.EmulatorCloseHoldSeconds}s; closing the emulator.");
+        appInstance.emulatorManager.CloseEmulator();
+    }
+
+    private bool AreEmulatorCloseHotkeysHeld()
+    {
+        int hotkeyCount = appInstance.configManager.EmulatorCloseHotkeyCount;
+        var hotkeyButtons = appInstance.configManager.EmulatorCloseHotkeys;
+
+        if (hotkeyCount <= 0 || hotkeyButtons == null || hotkeyButtons.Count == 0)
+        {
+            return false;
+        }
+
+        int physicalDeviceId = ResolveCloseHotkeyDeviceId();
+
+        if (physicalDeviceId < 0)
+        {
+            return false;
+        }
+
+        for (int hotkeyIndex = 0; hotkeyIndex < hotkeyCount && hotkeyIndex < hotkeyButtons.Count; hotkeyIndex++)
+        {
+            if (!Input.IsJoyButtonPressed(physicalDeviceId, (JoyButton)hotkeyButtons[hotkeyIndex].AsInt32()))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private int ResolveCloseHotkeyDeviceId()
+    {
+        int layerDeviceId = appInstance.inputLayer?.ResolvePlayerOneDeviceId() ?? -1;
+
+        if (layerDeviceId >= 0)
+        {
+            return layerDeviceId;
+        }
+
+        var connectedControllers = appInstance.controllerManager?.GetConnectedControllers();
+        return connectedControllers != null && connectedControllers.Count > 0 ? connectedControllers[0].GodotDeviceId : -1;
     }
 
     public void UpdateEmulatorCloseHotkeysBtnText()
@@ -46,7 +125,7 @@ public class MainSceneInputHandler
                     keyNames.Add(((JoyButton)currentKeys[i].AsInt32()).ToString());
                 }
             }
-            mainScene.emulatorCloseHotkeysBtn.Text = $"Record Hotkeys [{string.Join(", ", keyNames)}]";
+            mainScene.emulatorCloseHotkeysBtn.Text = $"Record Hotkeys [hold {string.Join(" + ", keyNames)} for {appInstance.configManager.EmulatorCloseHoldSeconds:0.#}s]";
         }
     }
 

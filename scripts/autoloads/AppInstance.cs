@@ -16,6 +16,7 @@ public partial class AppInstance : Node
     public NetplayLobby netplayLobby;
     public NetplayDiscovery netplayDiscovery;
     public NetplayPortMapper netplayPortMapper;
+    public InputLayer inputLayer;
     
     public override void _Ready()
     {

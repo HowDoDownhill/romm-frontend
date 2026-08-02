@@ -442,6 +442,33 @@ public class MainSceneSettingsHandler
         scrollContainer.AddChild(vbox);
         mainScene.sectionOptionsContainer.AddChild(formContainer);
 
+        HBoxContainer automaticMappingBox = new HBoxContainer();
+        Label automaticMappingLabel = new Label();
+        automaticMappingLabel.Text = "Automatic Controller Mapping";
+        automaticMappingLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        automaticMappingBox.AddChild(automaticMappingLabel);
+
+        Label automaticMappingStatus = new Label();
+        automaticMappingStatus.Text = DescribeInputLayerAvailability();
+        automaticMappingStatus.AddThemeColorOverride("font_color", new Color(0.6f, 0.6f, 0.6f));
+        automaticMappingBox.AddChild(automaticMappingStatus);
+
+        CheckButton automaticMappingCheckbox = new CheckButton();
+        automaticMappingCheckbox.ButtonPressed = appInstance.configManager.ControllerMappingConsent == ConfigManager.ControllerMappingConsentAccepted;
+
+        automaticMappingCheckbox.Toggled += (bool toggledOn) =>
+        {
+            appInstance.configManager.SaveControllerMappingConsent(toggledOn
+                ? ConfigManager.ControllerMappingConsentAccepted
+                : ConfigManager.ControllerMappingConsentDeclined);
+            automaticMappingStatus.Text = DescribeInputLayerAvailability();
+        };
+
+        automaticMappingBox.AddChild(automaticMappingCheckbox);
+        var automaticMappingEntry = settingsListEntryScene.Instantiate<SettingsListEntry>();
+        automaticMappingEntry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(automaticMappingBox);
+        vbox.AddChild(automaticMappingEntry);
+
         HBoxContainer countBox = new HBoxContainer();
         Label countLabel = new Label();
         countLabel.Text = "Number of Emulator Close Hotkeys";
@@ -457,6 +484,29 @@ public class MainSceneSettingsHandler
         var entry1 = settingsListEntryScene.Instantiate<SettingsListEntry>();
         entry1.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(countBox);
         vbox.AddChild(entry1);
+
+        HBoxContainer holdBox = new HBoxContainer();
+        Label holdLabel = new Label();
+        holdLabel.Text = "Seconds to Hold Before Closing";
+        holdLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        holdBox.AddChild(holdLabel);
+
+        SpinBox holdSpin = new SpinBox();
+        holdSpin.MinValue = 0.5;
+        holdSpin.MaxValue = 10.0;
+        holdSpin.Step = 0.5;
+        holdSpin.Value = appInstance.configManager.EmulatorCloseHoldSeconds;
+        holdBox.AddChild(holdSpin);
+
+        holdSpin.ValueChanged += (double holdSeconds) =>
+        {
+            appInstance.configManager.SaveEmulatorCloseHoldSeconds((float)holdSeconds);
+            mainScene.InputHandler.UpdateEmulatorCloseHotkeysBtnText();
+        };
+
+        var holdEntry = settingsListEntryScene.Instantiate<SettingsListEntry>();
+        holdEntry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(holdBox);
+        vbox.AddChild(holdEntry);
 
         mainScene.emulatorCloseHotkeysBtn = new Button();
         mainScene.InputHandler.UpdateEmulatorCloseHotkeysBtnText();
@@ -754,5 +804,22 @@ public class MainSceneSettingsHandler
         {
             activePanel.Visible = true;
         }
+    }
+
+    private string DescribeInputLayerAvailability()
+    {
+        if (appInstance.inputLayer == null)
+        {
+            return "unavailable";
+        }
+
+        if (appInstance.configManager.ControllerMappingConsent != ConfigManager.ControllerMappingConsentAccepted)
+        {
+            return "emulators use their own controller settings";
+        }
+
+        return appInstance.inputLayer.IsVirtualPadBackendAvailable
+            ? "emulators will see one Xbox 360 pad per player"
+            : appInstance.inputLayer.VirtualPadBackendUnavailableReason;
     }
 }

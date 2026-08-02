@@ -1676,3 +1676,456 @@ disagreeing about a single download is far harder to diagnose than either one be
 
 The preferred total is RomM's `fs_size_bytes`, passed into `DownloadFile` and trusted ahead of the
 response header.
+
+---
+
+## Input layer
+
+Findings from the Phase 0 spike (`scripts/autoloads/InputLayerSpike.cs`, throwaway). Measured on
+Windows 11, Godot 4.6.3 mono, ViGEmBus 1.22.0, against an Xbox Series X pad
+(GUID `0300fa675e040000ff02000000007801`). Anything not measured is marked as such.
+
+### Godot keeps polling joypads while its window is unfocused
+
+**Measured, and it contradicts the obvious prediction.** This is the finding the whole reader design
+hangs on, because during an emulator session the frontend is unfocused by definition.
+
+Godot 4.6 no longer has a Windows joypad backend of its own — `platform/windows/joypad_windows.cpp`
+is gone and joypad handling lives in `drivers/sdl/joypad_sdl.cpp`. Its `initialize()` sets only
+`SDL_HINT_JOYSTICK_THREAD` and `SDL_HINT_NO_SIGNAL_HANDLERS`, *not*
+`SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS`, whose SDL default is off. That predicts background
+input should be dead. It is not.
+
+With the window unfocused, Godot's read tracked a direct `XInputGetState` reference channel exactly
+(`godot 0x0001` against `xinput [0x0001,...]`). The likely reason is that SDL's background-event
+suppression is a *window focus* rule, and Godot initializes SDL for joysticks only without an SDL
+window, so the check never applies. That explanation is inferred; the behaviour is measured.
+
+Consequence: `IPhysicalPadReader` can poll Godot `Input` on the frame loop. A bundled SDL2 on a
+background thread is **not** required for correctness. Do not add one without re-measuring this.
+
+The same finding has a second consequence that has nothing to do with virtual pads: a Godot app
+keeps receiving joypad input while in the background, so the frontend will navigate its own UI from
+a pad the user is holding for something else. See "UI input must be gated on session state" below.
+
+### The virtual pad's GUID name CRC is not stable
+
+Two ViGEm pads created by two frontend instances reported different GUIDs:
+
+```
+0300 ba66 5e04 0000 8e02 0000 1401 7801
+0300 7ba6 5e04 0000 8e02 0000 1401 7801
+     ^^^^ differs
+```
+
+SDL embeds a CRC-16 of the device name in bytes 2-3, and it varies between two otherwise identical
+virtual pads. **Vendor `5e04`, product `8e02` and version `1401` are stable; the name CRC is not.**
+
+The name is useless for identification too — Godot calls both the physical Series X pad and the
+virtual pad `"XInput Controller"`. Any filtering that matched on name would have silently failed.
+
+A product-ID match still cannot be authoritative on its own, because a genuine Xbox 360 pad also
+presents `028E`. The reliable method is the one the spike uses: snapshot the joypad set before
+creating virtual pads and treat anything new as ours. Use the GUID fields only as a cross-check.
+
+### `IXbox360Controller.UserIndex` does not report the XInput slot
+
+Measured wrong twice. It reported slot 0 when XInput enumeration showed the pad in slot 1, and
+reported slot 1 when the pad was in slot 2. It appears to be read before ViGEmBus assigns an index
+and never re-read.
+
+Do not use it to establish player order. Verify against `XInputGetState` enumeration instead. The
+`LedNumber` on the feedback callback did track the assignment (0 then 1 across two runs) and may be
+the better signal, but it has not been tested to four pads.
+
+### XInput slots are assigned in arrival order, so hiding must precede pad creation
+
+Measured: with the physical pad already in slot 0, a new virtual pad took slot 1; with slots 0 and 1
+occupied, the next took slot 2. Creating a virtual pad **adds** a device and never displaces one.
+
+This makes hiding load-bearing rather than a refinement. An XInput-native emulator that defaults to
+"player 1 = slot 0" gets the *physical* pad, and the virtual pad in slot 1 is simply unused — the
+layer is bypassed silently rather than producing visible double input. Guaranteed player order
+requires hiding the physical pads *before* creating virtual ones.
+
+### ViGEm feedback registration can throw with a success code
+
+`IXbox360Controller.FeedbackReceived += ...` intermittently throws
+`Win32Exception: The operation completed successfully` (native error 0) — the signature of a wrapper
+calling `Marshal.GetLastWin32Error()` where the last error was never set. Observed on one run out of
+four, with the pad already successfully created and connected.
+
+Registration must therefore be wrapped separately from creation. Lumping them into one `try` block
+discards a working pad because an optional convenience failed, which is exactly what the spike did
+before it was fixed. Rumble passthrough is a nice-to-have; the pad is not.
+
+### Every frontend instance creates its own virtual pad
+
+Three stacked Godot instances produced three occupied XInput slots. Virtual pads are per-process and
+accumulate. `BeginSession`/`EndSession` must be strictly paired, and single-instance enforcement
+matters more once this ships than it does today.
+
+A clean exit does clean up: `_ExitTree` disconnected the pad and the slot was released, verified by
+re-probing XInput after close. A killed process was not tested.
+
+### The main-loop pump stalls for hundreds of milliseconds under load
+
+Steady state is 165 pumps/s with a 6.2 ms worst gap — comfortably above emulator polling rates. But
+the worst gap reached **686 ms during startup**, 378 ms during collection loading, and 231 ms during
+ordinary carousel navigation. While stalled, the virtual pad's state is frozen.
+
+This is harmless in the frontend's own UI, but it is the one real argument for eventually moving the
+pump off the main thread: save sync, asset loading and the ROM hashing added in `c2fbe67` all do
+main-thread work, and a stall during a session surfaces in-game as stuck or dropped input. Whether
+those stalls actually occur *during* a session (as opposed to at launch and exit) has **not** been
+measured, and should be before any thread is added.
+
+### The pads cannot be renamed on Windows, but can on Linux
+
+`ViGEmClient` exposes only `CreateXbox360Controller(vendorId, productId)` — there is no name
+parameter. The name comes from Microsoft's `xusb22.sys`, which binds to VID `0x045E` / PID `0x028E`;
+changing the VID/PID to something nameable stops the device being an XInput pad at all.
+
+Linux uinput takes an arbitrary name in `UINPUT_SETUP`, so "RomM Pad 1" is available there.
+**Unverified** — no Linux work has been done yet.
+
+Any onboarding copy must therefore describe what users will actually see, which on Windows is N
+identical entries named "Xbox 360 Controller". Distinguishing them relies on hiding making ours the
+only pads present, not on naming.
+
+### ViGEmBus is retired
+
+The repository was archived on 2023-11-02 and the README states the project is retired. v1.22.0 is
+the final release; binaries remain production-signed and downloadable, and the driver works.
+
+There is no maintained Windows alternative — vJoy produces a generic HID joystick and cannot supply
+XInput semantics. This is an accepted standing risk, and the reason `IVirtualPadBackend` should stay
+a thin seam that could be reimplemented against a successor driver.
+
+### HidHide needs elevation to install, but not to hide
+
+Installation is a kernel filter driver: elevated installer, and the README warns a reboot may be
+triggered. **Inferred, not yet confirmed:** runtime hiding needs no elevation and raises no UAC
+prompt, because the README states the configuration utility "runs in the least privileged mode and
+doesn't require elevated rights", and `HidHideCLI/` contains no `.manifest`, so the CLI builds at
+the default `asInvoker` level. Confirm empirically before relying on it — a UAC prompt per launch
+would make the whole approach unusable for a couch frontend.
+
+HidHide's `Watchdog/` component is an ETW diagnostics tracer, **not** an auto-unhide safety net.
+Nothing in HidHide rescues a crashed frontend, so clearing this app's hiding rules at startup is
+load-bearing: hiding is system-wide and persists across process death, leaving the user's pads
+invisible to every other application.
+
+### SDL's device allowlist can hide pads without any driver
+
+`SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT` takes a comma-separated list of hex `VID/PID` pairs.
+The legacy `GAMECONTROLLER` spelling is retained in SDL3 — confirmed by extracting hint strings from
+the Godot 4.6.3 binary, which links SDL3 and contains `SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT`
+with no `SDL_GAMEPAD_` equivalent. One variable therefore covers both SDL generations.
+Set to ViGEm's `0x045E/0x028E` through the existing `launch_env` mechanism, an SDL-based emulator
+enumerates only our virtual pads — no driver, no elevation, and nothing that persists past process
+exit to clean up after a crash.
+
+Per `controller-followups.md` this covers nearly the whole shipped inventory: PCSX2, DuckStation,
+Flycast, melonDS, Dolphin, ares, mGBA, Azahar, snes9x, PPSSPP and gopher64.
+
+**RetroArch is the gap** — its shipped `retroarch.default.cfg` leaves `input_joypad_driver`
+commented out, so it uses the Windows compiled-in default of `xinput` and ignores SDL hints. It can
+be switched to the `sdl2` joypad driver via that same config line, which would close the gap using
+config-writing machinery the project already has.
+
+**All of this is unverified against a real emulator.** It is a strong lead, not a result.
+
+### The SDL allowlist cannot tell our pad from a real Xbox 360 controller
+
+The allowlist is keyed on VID/PID, and ours is `0x045E/0x028E` — which is exactly what a **genuine
+Xbox 360 pad** presents. A user with a real 360 pad would have it pass the allowlist alongside our
+virtual pads, and the layer would be bypassed for that device.
+
+Measured on the dev machine, an Xbox Series X pad is *not* affected: SDL reports it with product
+`0x02FF`, its generic XInput identity, so the allowlist excludes it correctly. The hole is specific
+to devices that genuinely are, or exactly impersonate, a 360 pad.
+
+HidHide filters by device *instance path* and so does not have this hole. This is the concrete
+reason the SDL allowlist reduces how often HidHide is needed without replacing it.
+
+`SDL_HIDAPI_IGNORE_DEVICES` exists as a separate denylist for SDL's HIDAPI backend and is **not**
+currently set. Whether a physical pad can still reach an emulator through the HIDAPI path while the
+gamepad-layer allowlist is active has not been tested.
+
+### UI input is gated on focus as well as on an active session
+
+`MainScene.ShouldFrontendIgnoreInput` suppresses frontend input when an emulator session is running
+**or** when the window does not have focus. The session half was always there; the focus half was
+not, and its absence was a live bug: because Godot delivers joypad input to an unfocused window (see
+above), the frontend kept driving its own carousel while the user was holding the pad for something
+else entirely.
+
+`IsEmulatorLaunching` is deliberately **not** part of the condition. The emulator window takes focus
+as it comes up, so the focus test already covers the launching window, and folding in a flag that
+could stick true on a failed launch would risk locking the user out of their own UI.
+
+### Reading input and acting on it must stay separate
+
+The pump reads physical pads continuously — that is the entire product — while the UI acts on
+nothing. These do not collide, because `SetInputAsHandled()` only stops event propagation to UI
+nodes while the layer reads polled state through `Input.IsJoyButtonPressed`.
+
+The trap is fixing background input the blunt way. Globally ignoring joypad devices, or disabling
+joypad processing while unfocused, would suppress the frontend's navigation *and* silently kill the
+relay to the emulator — which is the one thing that has to keep working while unfocused. Gate at the
+point of acting, never at the point of reading.
+
+### The emulator-close hotkey is a long hold, not a simultaneous chord
+
+It was `LeftShoulder + RightShoulder + Back + Start` pressed together, detected in `_Input`. It is
+now the same configurable button set held continuously for `EmulatorCloseHoldSeconds` (default 2s),
+with the default set reduced to a single `Back`, detected by polling in `_Process`.
+
+Three reasons, all of which a simultaneous chord could not fix:
+
+1. **Emulators bind the same combos.** Once the input layer relays the chord onto the virtual pad
+   the emulator sees it too, and `Back + Start` is a hotkey in several of them. A long hold has no
+   emulator equivalent, so the collision stops existing rather than needing to be managed.
+2. **Accidental triggers while mapping.** `controller-followups.md` notes the old default was "all
+   buttons a user presses while mapping a controller". A hold cannot be hit in passing.
+3. **Hold timing needs polling.** `_Input` only fires when an event arrives, so duration cannot be
+   measured there. `_Process` polling is also the shape the pump will need, so the detector moves
+   into `InputLayer` unchanged when it lands.
+
+Existing installs keep whatever button set they saved; only the hold requirement is new, and it
+makes an accidental close strictly harder rather than easier. `AreEmulatorCloseHotkeysHeld` reads
+the `CloseKey1..N` `InputMap` actions, which are bound with no device filter — so once virtual pads
+exist, **our own relayed output will satisfy the hold too**. That is harmless while the relay is a
+faithful copy, but it stops being harmless the moment remapping can retarget those buttons.
+
+### Every control is a 0..1 value, including sticks
+
+`PadState` stores one float per `PadControl`, and stick axes are split into two half-range controls
+(`LeftStickLeft` / `LeftStickRight`) rather than a signed axis. Recombining them
+(`ResolveAxis(negative, positive)`) is lossless, and it makes the mapping table uniform: a remap is
+always control → control, so "d-pad drives the left stick" and "left stick drives the d-pad" fall
+out for free instead of needing special cases. Several retro systems want exactly that.
+
+Digital controls read back through `IsPressed`, which thresholds at 0.5 — so mapping an analog
+trigger onto a face button works without the caller caring.
+
+### The mapping direction is destination ← source, not source → destination
+
+`controller_config.platform_layout` maps a platform button to the SDL control the **emulator**
+expects, e.g. `"A": "FaceSouth"`. `ConfigManager.PlatformInputMappings` stores what the **user**
+picked for that same platform button. So for each entry the virtual pad's `platform_layout` control
+is the destination, and the user's choice is the source it reads from:
+
+```
+virtual[ platform_layout[button] ]  ←  physical[ PlatformInputMappings[slug][player][button] ]
+```
+
+Getting this backwards produces a mapping that looks plausible and is inverted, which is exactly the
+class of silent wrongness that made the config-file writer untrustworthy. Emulators with no
+`controller_config` get an identity table and pass through unchanged.
+
+### An explicit remap must silence the source's own default output
+
+Given identity mapping plus a user remap of platform A to `FaceEast`, the table would hold
+`FaceSouth ← FaceEast` *and* the leftover identity `FaceEast ← FaceEast`. One physical press then
+drives two virtual buttons, and since shipped emulator configs bind their A and B to those two
+controls, pressing east would fire both A and B in-game.
+
+`SilenceReroutedSources` therefore unmaps any control used as an explicit source unless it was also
+explicitly given a source of its own. Mapping one button "moves" it rather than duplicating it, and
+mapping a pair swaps them, which is what a user means by remapping.
+
+### The UI gate includes the layer's session, not just the emulator process
+
+`BeginSession` runs before `await SyncBeforeLaunch`, so virtual pads exist for as long as a save sync
+takes while `IsEmulatorRunning` is still false. Without `IsSessionActive` in the gate, the frontend
+spends that window acting on both the physical pad and its own virtual output — the same press
+counted twice. The pads have to be created before the emulator starts so it enumerates them, so the
+window cannot be removed, only gated.
+
+### Virtual pads are identified by arrival, not by name or GUID
+
+`joypadsPresentBeforeSession` is captured immediately before `TryCreatePads`, and any joypad that
+connects afterwards while pads exist is recorded as ours. This is the only reliable method — see the
+Phase 0 findings on the name being `"XInput Controller"` for both physical and virtual pads and the
+GUID's name CRC being unstable between two virtual pads.
+
+The known limitation: a **physical** pad hot-plugged during a session is misidentified as ours and
+excluded from input. Player assignment mid-session is a Phase 4 concern and this should be revisited
+with it.
+
+### The SDL allowlist works, but it filters one backend, not one emulator
+
+Verified against Dolphin with a layer session active. Its device list showed exactly one SDL
+device — `SDL/0/Xbox 360 Controller`, our virtual pad — with the physical Xbox Series X pad absent
+from the SDL enumeration entirely. `SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT` does what it claims.
+
+But Dolphin exposes four input backends, and the same list also contained:
+
+```
+WGInput/0/Xbox 360 Controller for Windows     our virtual pad
+WGInput/0/Xbox One Game Controller            the PHYSICAL pad
+XInput/0/Gamepad, XInput/1/Gamepad            both pads
+DInput/0/Keyboard Mouse
+```
+
+So the allowlist is **per backend**. Windows.Gaming.Input, XInput and DInput are untouched, and the
+physical pad remains reachable through them. "SDL-based emulator" is the wrong unit of analysis;
+what matters is which backend the emulator's binding actually names.
+
+This does not cause double input in Dolphin, because Dolphin binds one device per pad and the
+shipped config chooses it. It does mean the allowlist cannot *prevent* a user selecting the physical
+pad, and it is the concrete reason HidHide — which filters at the HID layer, beneath every
+backend — remains the only backend-agnostic answer.
+
+The two `XInput/n/Gamepad` entries are also a visual confirmation of the arrival-order slot finding:
+the physical pad holds slot 0 and the virtual pad slot 1.
+
+### The layer makes Dolphin's device name predictable for the first time
+
+`controller-followups.md` records Dolphin as the one emulator where device-agnostic bindings do not
+exist: its `DeviceQualifier` compares source, index *and* name, there is no fallback, and the name
+varies per controller model, so no shippable constant exists. Three separate attempts to predict a
+user's device identity failed.
+
+With the layer active that inverts. Every user presents the same virtual pad, so the identity is a
+constant we control. Dolphin itself wrote the authoritative string on exit:
+
+```
+Device = SDL/0/Xbox 360 Controller
+```
+
+and left every binding byte-identical to the shipped ones (`Button S`, `Shoulder R`, `Pad N`,
+`Left Y+`, …), confirming the virtual pad is indistinguishable from a real Xbox pad at the binding
+level. Only the device line ever needed to change.
+
+**The value is runtime-dependent, which is the catch.** `SDL/0/Xbox 360 Controller` is correct only
+while a layer session is running; with the layer off the correct value is the user's own pad name.
+A statically shipped line cannot be right in both states.
+
+Multiplayer forces the issue: player two needs `SDL/1/Xbox 360 Controller`, and which physical pad
+maps to which SDL index is decided by the layer's creation order at launch. Static config can only
+ever describe player one, so guaranteed player order on Dolphin requires writing the device line at
+launch — a narrow, deliberate exception to the retired config writer rather than un-suspending it.
+
+### `WriteInputLayerDeviceBindings` is that exception, and its narrowness is the point
+
+It is deliberately **not** part of `ApplyControllerMappings`, which stays suspended. Four conditions
+bound it, and all four matter:
+
+1. It runs only while `InputLayer.IsSessionActive` — with the layer off, nothing is written and the
+   shipped config governs exactly as before.
+2. It writes only `controller_section.device_key`. Every binding, calibration and static value is
+   left alone, because Dolphin's rewrite proved the shipped bindings are already correct against the
+   virtual pad. Only device identity was ever wrong.
+3. It requires `format == "ini"` and an existing file. A config the emulator has not yet created is
+   left for the emulator to create.
+4. `{sdl_index}` resolves to the **player index**, which is only meaningful because the SDL allowlist
+   makes our virtual pads the sole SDL devices. Without the allowlist the index is unpredictable and
+   this writer would be actively harmful.
+
+It does overwrite an existing `Device` line, which `controller-followups.md` records as deliberately
+disabled after the writer stamped bad values over good ones. The distinction is that the layer
+*owns* device identity for the duration of a session: it created the device, it knows the name, and
+it assigned the index. That claim is false whenever the layer is off, which is condition 1.
+
+Ports beyond the active player count are set to `device_disconnected`. A user who had deliberately
+bound a spare port to a keyboard for local play would lose it, which is the known cost of the layer
+asserting port ownership.
+
+### Non-Xbox controllers normalize through the layer, which retires the biggest open item
+
+`controller-followups.md` names non-Xbox controllers as "the single biggest open item", with **11 of
+18 systems** at risk because their shipped configs hardcode raw XInput joystick indices (ares
+`/0/3/0`, mGBA `keyA = 1`, melonDS `A = 1`, Azahar `button:1`, snes9x `(J1)Button 0`). Its proposed
+remedy was a mapping pass per controller type per emulator, per-controller-type variants in
+`default_config` as a new concept, and controller-family detection in the frontend.
+
+**None of that is needed while the layer is on.** Verified with two non-Xbox pads:
+
+- **Switch Pro Controller** — works. Nintendo's face buttons are physically transposed against Xbox,
+  and SDL maps the bottom button to south, so the layer emits it as Xbox A. That is the positional
+  convention the project already chose, now enforced in one place instead of hardcoded per config.
+- **8BitDo N64 variant** — works, including the C-button cluster, which SDL exposes as right-stick
+  axes and the layer passes through as a real right stick. N64 emulators already expect C on the
+  right stick, so an unusual physical layout arrives correct without any per-device handling.
+
+The mechanism is that SDL's gamepad database normalizes each pad to a canonical layout before Godot
+sees it, and the layer then re-emits that as an Xbox 360 pad. The emulator's raw joystick indices
+stay valid because the device it is reading genuinely *is* an Xbox pad.
+
+Two limits on the claim:
+
+1. **It only holds while the layer is on.** With it off, the original risk table stands unchanged,
+   so the shipped static configs must not be "simplified" on the strength of this.
+2. **It inherits SDL's view.** A pad SDL has no gamepad mapping for arrives as a generic joystick
+   with arbitrary button ordering, and the layer cannot fix what it is handed. The fix there is an
+   `SDL_GAMECONTROLLERCONFIG` entry, not layer code.
+
+### An 8BitDo in DInput mode does not collide with the allowlist, but XInput mode is untested
+
+Connected in DInput/HID mode the pad enumerates as `VID_2DC8&PID_3019` — its own 8BitDo identity,
+nothing like `045E/028E` — so the SDL allowlist filters it correctly and no collision occurs.
+
+The collision case could not be tested with this pad — the retro-shaped 8BitDo models offer
+Switch/DInput/macOS modes with no X-input mode at all.
+
+Measurement since then narrows the risk considerably. Windows exposes XInput-capable pads through a
+**generic** `045E/02FF` interface, and that is what SDL reports for them:
+
+| Device | SDL-visible product |
+|---|---|
+| Hyperkin, a licensed third-party Xbox pad running XInput | `02FF` |
+| Xbox Series X pad (USB composite `0B12`) | `02FF` |
+| our ViGEm virtual pad | `028E` |
+
+The Hyperkin is precisely the feared case — a third-party pad on XInput — and its child device is
+literally `USB\VID_045E&PID_02FF&IG_00`. It does not collide, and neither does the Series X pad.
+
+`028E` is the true hardware ID of a **wired Xbox 360 controller**, so the collision applies to
+devices whose real USB identity is a 360 pad: a genuine wired 360 controller, or a third-party pad
+impersonating one at the USB level rather than going through the generic XInput interface. That is a
+smaller population than "any pad in X-input mode", which is what this note originally claimed.
+
+It remains a real hole with no in-band fix — the allowlist has only VID/PID to go on and cannot
+distinguish two devices that report the same one. HidHide, filtering by device instance path, can.
+
+A **wired Xbox 360 controller** was then measured and confirms the hole at the device level:
+
+```
+XnaComposite  Xbox 360 Controller for Windows   USB\VID_045E&PID_028E\08D5629
+HIDClass      HID-compliant game controller     HID\VID_045E&PID_028E&IG_00
+```
+
+Both the device *and* its HID child are `045E:028E` — no generic `02FF` indirection, because
+`xusb22` binds directly to a device that genuinely is a 360 pad, exactly as it does for ViGEm's
+emulated one. The physical pad and our virtual pad are therefore indistinguishable to any VID/PID
+filter. Confirmation at the emulator level (counting SDL entries in Dolphin's device list) was not
+run, but the device identity leaves little room for doubt.
+
+This is also why virtual-pad identification uses the arrival snapshot rather than the GUID. With a
+real 360 pad connected, a GUID check is genuinely ambiguous, and the cross-check suggested elsewhere
+in these notes would fail on exactly this hardware.
+
+The same pad also exposes a **keyboard interface** (`MI_01`, `HID Keyboard Device`). A pad that emits
+keystrokes reaches the frontend through a path the joypad gate does not model — `ShouldFrontendIgnoreInput`
+suppresses events once they arrive, but a keyboard is a separate device the input layer neither
+reads nor hides, so it cannot be relayed to the emulator either.
+
+### PlayStation pads are the outstanding test, and for a different reason than expected
+
+No DualShock 4 or DualSense has been tested. `controller-followups.md` predicted these would break
+outright, since their raw HID order is `0=Square 1=Cross 2=Circle 3=Triangle` against Xbox's
+south/east/west/north. On the evidence from the Switch Pro and 8BitDo pads, that prediction should be
+moot with the layer on: SDL normalizes before Godot sees the device, so the layer emits a correct
+Xbox pad regardless of the source ordering.
+
+The real question for a PlayStation pad is a **different** one. SDL drives DS4 and DualSense through
+its HIDAPI driver (`SDL_JOYSTICK_HIDAPI_PS`), which is a separate enumeration path from the one
+`SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT` was observed filtering. So the plausible failure is not a
+scrambled reader but a pad that reads perfectly *and still reaches the emulator*, leaking past the
+allowlist and producing double input.
+
+When one is available, the test is therefore not "do the face buttons work" but "does the emulator's
+device list show one device or two". `SDL_HIDAPI_IGNORE_DEVICES` is the lever if it shows two.

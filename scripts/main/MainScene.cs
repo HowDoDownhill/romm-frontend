@@ -584,6 +584,21 @@ public partial class MainScene : Control
         }
     }
 
+    private bool ShouldFrontendIgnoreInput()
+    {
+        if (appInstance.emulatorManager != null && appInstance.emulatorManager.IsEmulatorRunning)
+        {
+            return true;
+        }
+
+        if (appInstance.inputLayer != null && appInstance.inputLayer.IsSessionActive)
+        {
+            return true;
+        }
+
+        return GetWindow() != null && !GetWindow().HasFocus();
+    }
+
     public override void _Input(InputEvent @event)
     {
         if (SectionHandler.IsTransitioning)
@@ -663,31 +678,9 @@ public partial class MainScene : Control
             return;
         }
 
-        if (appInstance.emulatorManager != null && appInstance.emulatorManager.IsEmulatorRunning)
+        if (ShouldFrontendIgnoreInput())
         {
             GetViewport().SetInputAsHandled();
-            bool isComboPressed = true;
-            int hotkeyCount = appInstance.configManager.EmulatorCloseHotkeyCount;
-            if (hotkeyCount > 0)
-            {
-                for (int i = 1; i <= hotkeyCount; i++)
-                {
-                    if (!Input.IsActionPressed($"CloseKey{i}"))
-                    {
-                        isComboPressed = false;
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                isComboPressed = false;
-            }
-
-            if(isComboPressed)
-            {
-                appInstance.emulatorManager.CloseEmulator();
-            }
             return;
         }
 
@@ -952,6 +945,7 @@ public partial class MainScene : Control
         GameListHandler?.ProcessPendingDetailsRefresh();
         GameListHandler?.ProcessPendingScreenshotLoads();
         GameListHandler?.ProcessPendingImageLoads();
+        InputHandler?.UpdateEmulatorCloseHold(delta);
 
         ulong currentTime = Time.GetTicksMsec();
 

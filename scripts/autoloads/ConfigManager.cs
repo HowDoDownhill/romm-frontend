@@ -175,7 +175,21 @@ public partial class ConfigManager : Node
         file.StoreString(Json.Stringify(document, "    "));
     }
 
+    public const int DefaultEmulatorCloseHotkeyCount = 1;
+    public const float DefaultEmulatorCloseHoldSeconds = 2.0f;
+
+    public static Godot.Collections.Array BuildDefaultEmulatorCloseHotkeys()
+    {
+        return new Godot.Collections.Array { (int)JoyButton.Back };
+    }
+
+    public const string ControllerMappingConsentUnasked = "unasked";
+    public const string ControllerMappingConsentAccepted = "accepted";
+    public const string ControllerMappingConsentDeclined = "declined";
+
     public int EmulatorCloseHotkeyCount { get; private set; }
+    public float EmulatorCloseHoldSeconds { get; private set; }
+    public string ControllerMappingConsent { get; private set; }
     public Godot.Collections.Array EmulatorCloseHotkeys { get; private set; }
 
     public System.Collections.Generic.Dictionary<string, string> PreferredEmulators { get; private set; } = new System.Collections.Generic.Dictionary<string, string>();
@@ -334,9 +348,11 @@ public partial class ConfigManager : Node
         AppTheme = (string)configurationFile.GetValue("UI", "AppTheme", "Default");
         AppBackground = (string)configurationFile.GetValue("UI", "AppBackground", "Flow");
 
-        EmulatorCloseHotkeyCount = (int)configurationFile.GetValue("Input", "EmulatorCloseHotkeyCount", 4);
-        var defaultHotkeyButtons = new Godot.Collections.Array { (int)JoyButton.LeftShoulder, (int)JoyButton.RightShoulder, (int)JoyButton.Back, (int)JoyButton.Start };
+        EmulatorCloseHotkeyCount = (int)configurationFile.GetValue("Input", "EmulatorCloseHotkeyCount", DefaultEmulatorCloseHotkeyCount);
+        var defaultHotkeyButtons = BuildDefaultEmulatorCloseHotkeys();
         EmulatorCloseHotkeys = (Godot.Collections.Array)configurationFile.GetValue("Input", "EmulatorCloseHotkeys", defaultHotkeyButtons);
+        EmulatorCloseHoldSeconds = (float)configurationFile.GetValue("Input", "EmulatorCloseHoldSeconds", DefaultEmulatorCloseHoldSeconds);
+        ControllerMappingConsent = (string)configurationFile.GetValue("Input", "ControllerMappingConsent", ControllerMappingConsentUnasked);
 
         if (configurationFile.HasSection("PreferredEmulators"))
         {
@@ -393,8 +409,10 @@ public partial class ConfigManager : Node
         AppTheme = "Default";
         AppBackground = "Flow";
 
-        EmulatorCloseHotkeyCount = 4;
-        EmulatorCloseHotkeys = new Godot.Collections.Array { (int)JoyButton.LeftShoulder, (int)JoyButton.RightShoulder, (int)JoyButton.Back, (int)JoyButton.Start };
+        EmulatorCloseHotkeyCount = DefaultEmulatorCloseHotkeyCount;
+        EmulatorCloseHotkeys = BuildDefaultEmulatorCloseHotkeys();
+        EmulatorCloseHoldSeconds = DefaultEmulatorCloseHoldSeconds;
+        ControllerMappingConsent = ControllerMappingConsentUnasked;
 
         WriteAllConfigurationValues();
         configurationFile.Save(configurationFilePath);
@@ -427,6 +445,8 @@ public partial class ConfigManager : Node
         configurationFile.SetValue("UI", "AppBackground", AppBackground);
         configurationFile.SetValue("Input", "EmulatorCloseHotkeyCount", EmulatorCloseHotkeyCount);
         configurationFile.SetValue("Input", "EmulatorCloseHotkeys", EmulatorCloseHotkeys);
+        configurationFile.SetValue("Input", "EmulatorCloseHoldSeconds", EmulatorCloseHoldSeconds);
+        configurationFile.SetValue("Input", "ControllerMappingConsent", ControllerMappingConsent ?? ControllerMappingConsentUnasked);
 
         if (PreferredEmulators != null)
         {
@@ -515,6 +535,18 @@ public partial class ConfigManager : Node
     {
         EmulatorCloseHotkeyCount = hotkeyCount;
         EmulatorCloseHotkeys = hotkeyButtons;
+        SaveConfig();
+    }
+
+    public void SaveEmulatorCloseHoldSeconds(float holdSeconds)
+    {
+        EmulatorCloseHoldSeconds = holdSeconds;
+        SaveConfig();
+    }
+
+    public void SaveControllerMappingConsent(string consent)
+    {
+        ControllerMappingConsent = consent;
         SaveConfig();
     }
 

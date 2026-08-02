@@ -35,6 +35,7 @@ NetplayManager="*res://scripts/autoloads/NetplayManager.cs"
 NetplayLobby="*res://scripts/autoloads/NetplayLobby.cs"
 NetplayDiscovery="*res://scripts/autoloads/NetplayDiscovery.cs"
 NetplayPortMapper="*res://scripts/autoloads/NetplayPortMapper.cs"
+InputLayer="*res://scripts/autoloads/InputLayer.cs"
 ControllerIcons="*uid://cbgqhfjlifwga"
 
 [display]
