@@ -216,7 +216,7 @@ public class MainSceneInputHandler
         if (isListeningForControllerAssignment)
         {
             int nextPlayerNumber = assignedControllerDeviceIds.Count + 1;
-            mainScene.assignControllersButton.Text = $"Press a button on Player {nextPlayerNumber}'s controller...";
+            mainScene.assignControllersButton.Text = $"Press a Button on Player {nextPlayerNumber}'s Controller...";
             return;
         }
 
@@ -224,7 +224,7 @@ public class MainSceneInputHandler
 
         mainScene.assignControllersButton.Text = assignedOrder == null || assignedOrder.Count == 0
             ? "Assign Controllers"
-            : $"Assign Controllers [{assignedOrder.Count} in order]";
+            : $"Assign Controllers [{assignedOrder.Count} in Order]";
     }
 
     public void UpdateEmulatorCloseHotkeysBtnText()
@@ -240,7 +240,7 @@ public class MainSceneInputHandler
                     keyNames.Add(((JoyButton)currentKeys[i].AsInt32()).ToString());
                 }
             }
-            mainScene.emulatorCloseHotkeysBtn.Text = $"Record Hotkeys [hold {string.Join(" + ", keyNames)} for {appInstance.configManager.EmulatorCloseHoldSeconds:0.#}s]";
+            mainScene.emulatorCloseHotkeysBtn.Text = $"Record Hotkeys [Hold {string.Join(" + ", keyNames)} for {appInstance.configManager.EmulatorCloseHoldSeconds:0.#}s]";
         }
     }
 

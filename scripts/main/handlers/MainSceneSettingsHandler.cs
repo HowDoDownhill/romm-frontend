@@ -301,7 +301,7 @@ public class MainSceneSettingsHandler
 
         HBoxContainer discreteGpuFieldBox = new HBoxContainer();
         Label discreteGpuLabel = new Label();
-        discreteGpuLabel.Text = "Prefer discrete GPU";
+        discreteGpuLabel.Text = "Prefer Discrete GPU";
         discreteGpuLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         discreteGpuFieldBox.AddChild(discreteGpuLabel);
 
@@ -354,7 +354,7 @@ public class MainSceneSettingsHandler
         HBoxContainer fieldBox = new HBoxContainer();
 
         Label label = new Label();
-        label.Text = "Hide games without box art";
+        label.Text = "Hide Games Without Box Art";
         label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         fieldBox.AddChild(label);
 
@@ -382,7 +382,7 @@ public class MainSceneSettingsHandler
 
         HBoxContainer fieldBox2 = new HBoxContainer();
         Label label2 = new Label();
-        label2.Text = "Show all systems";
+        label2.Text = "Show All Systems";
         label2.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         fieldBox2.AddChild(label2);
 
@@ -810,16 +810,21 @@ public class MainSceneSettingsHandler
     {
         if (appInstance.inputLayer == null)
         {
-            return "unavailable";
+            return "Unavailable";
         }
 
         if (appInstance.configManager.ControllerMappingConsent != ConfigManager.ControllerMappingConsentAccepted)
         {
-            return "emulators use their own controller settings";
+            return "Emulators Use Their Own Controller Settings";
         }
 
         return appInstance.inputLayer.IsVirtualPadBackendAvailable
-            ? "emulators will see one Xbox 360 pad per player"
-            : appInstance.inputLayer.VirtualPadBackendUnavailableReason;
+            ? "Emulators Will See One Xbox 360 Pad Per Player"
+            : CapitaliseFirstLetter(appInstance.inputLayer.VirtualPadBackendUnavailableReason);
+    }
+
+    private static string CapitaliseFirstLetter(string sentence)
+    {
+        return string.IsNullOrEmpty(sentence) ? sentence : char.ToUpperInvariant(sentence[0]) + sentence.Substring(1);
     }
 }
