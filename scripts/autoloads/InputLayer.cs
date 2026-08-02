@@ -185,7 +185,6 @@ public partial class InputLayer : Node
     {
         if (!deviceHider.IsAvailable)
         {
-            GD.Print($"[InputLayer] {deviceHider.UnavailableReason}.");
             return;
         }
 
