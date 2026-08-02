@@ -923,6 +923,12 @@ public class ControllerSection
     [JsonPropertyName("device_disconnected")]
     public string DeviceDisconnected { get; set; }
 
+    [JsonPropertyName("device_binding_pattern")]
+    public string DeviceBindingPattern { get; set; }
+
+    [JsonPropertyName("device_binding_template")]
+    public string DeviceBindingTemplate { get; set; }
+
     [JsonPropertyName("type_key")]
     public string TypeKey { get; set; }
 
@@ -2559,8 +2565,9 @@ public partial class EmulatorManager : Node
 
         bool writesDeviceBinding = !string.IsNullOrEmpty(controllerSection.DeviceKey) && !string.IsNullOrEmpty(controllerSection.DeviceTemplate);
         bool writesPortOccupancy = writesSections && !string.IsNullOrEmpty(controllerSection.TypeKey);
+        bool retargetsBindings = writesSections && !string.IsNullOrEmpty(controllerSection.DeviceBindingPattern);
 
-        if (!writesDeviceBinding && !writesPortOccupancy)
+        if (!writesDeviceBinding && !writesPortOccupancy && !retargetsBindings)
         {
             return;
         }
@@ -2584,6 +2591,11 @@ public partial class EmulatorManager : Node
                     iniUpdater.UpdateValue(configFilePath, sectionName, controllerSection.TypeKey, portType, portType);
                     GD.Print($"[InputLayer] {sectionName}/{controllerSection.TypeKey} = {portType}");
                 }
+            }
+
+            if (writesSections && playerIsPresent)
+            {
+                RewriteSectionDeviceBindings(controllerSection, configFilePath, sectionName, playerIndex, inputLayer);
             }
 
             if (!writesDeviceBinding)
@@ -2624,9 +2636,33 @@ public partial class EmulatorManager : Node
         }
 
         return deviceTemplate
+            .Replace("{sdl_index_after_hidden}", (inputLayer.PhysicalPadsEnumeratedAheadOfOurs + playerIndex).ToString())
             .Replace("{sdl_index}", playerIndex.ToString())
             .Replace("{xinput_index}", xinputSlot.ToString())
             .Replace("{controller_name}", inputLayer.VirtualPadSdlDeviceName);
+    }
+
+    private void RewriteSectionDeviceBindings(ControllerSection controllerSection, string configFilePath, string sectionName, int playerIndex, InputLayer inputLayer)
+    {
+        if (string.IsNullOrEmpty(controllerSection.DeviceBindingPattern) || string.IsNullOrEmpty(controllerSection.DeviceBindingTemplate))
+        {
+            return;
+        }
+
+        string deviceReplacement = ResolveDeviceBindingMacros(controllerSection.DeviceBindingTemplate, playerIndex, inputLayer);
+
+        if (string.IsNullOrEmpty(deviceReplacement))
+        {
+            return;
+        }
+
+        int rewrittenBindingCount = new SectionDeviceIndexRewriter().RewriteSection(
+            configFilePath, sectionName, controllerSection.DeviceBindingPattern, deviceReplacement);
+
+        if (rewrittenBindingCount > 0)
+        {
+            GD.Print($"[InputLayer] retargeted {rewrittenBindingCount} binding(s) in [{sectionName}] to {deviceReplacement}");
+        }
     }
 
     private void ApplyControllerMappings(EmulatorMeta emulatorMetadata, string emulatorInstallDirectory, GameSystem currentGameSystem)

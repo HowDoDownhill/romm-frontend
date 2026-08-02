@@ -158,7 +158,9 @@
           "LargeMotorScale": "1.000000",
           "SmallMotorScale": "1.000000",
           "PressureModifier": "0.5"
-        }
+        },
+        "device_binding_pattern": "SDL-\\d+/",
+        "device_binding_template": "SDL-{sdl_index_after_hidden}/"
       }
     ]
   }

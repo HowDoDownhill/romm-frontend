@@ -57,6 +57,7 @@ public partial class InputLayer : Node
     public string VirtualPadBackendUnavailableReason => virtualPadBackend.UnavailableReason;
     public string VirtualPadSdlDeviceName => virtualPadBackend.SdlDeviceName;
     public int ActivePlayerCount => sessionPhysicalDeviceIds.Count;
+    public int PhysicalPadsEnumeratedAheadOfOurs { get; private set; }
 
     public bool IsOwnVirtualDevice(int godotDeviceId)
     {
@@ -148,6 +149,7 @@ public partial class InputLayer : Node
 
         BuildSessionMappings(systemSlug, emulatorMetadata, physicalPads, playerCount);
         RecordVirtualPadXInputSlots(xinputSlotsBeforeCreatingPads);
+        PhysicalPadsEnumeratedAheadOfOurs = physicalPads.Count;
 
         IsSessionActive = true;
         LastSessionFailureReason = "";

@@ -2496,3 +2496,51 @@ A side effect worth knowing: DuckStation ships `[Pad2] Type = None`, which is wh
 on PS2 but not PS1 — an open item in `controller-followups.md`. The layer now sets it to
 `AnalogController` when a second player is assigned. That enables the port but does **not** create
 bindings for it, since DuckStation ships none, so player two there is not yet complete.
+
+### Group B is pinned by retargeting the device in place, not by rewriting bindings
+
+PCSX2, DuckStation, Azahar, ares and snes9x embed the device index in every binding value rather than
+naming a device once. Rewriting those bindings from `controller_config.mappings` would mean
+re-deriving every button through `ResolvePlatformMacros` — the suspended writer, with all of its
+history.
+
+Instead the layer retargets only the device portion, in place. `device_binding_pattern` matches the
+device reference and `device_binding_template` supplies the replacement, applied within one section:
+
+```json
+"device_binding_pattern": "SDL-\\d+/",
+"device_binding_template": "SDL-{sdl_index_after_hidden}/"
+```
+
+Everything else on the line is untouched, so a user's own remapping survives and only the device it
+points at changes. Verified against a live `PCSX2.ini`: 27 bindings retargeted when the index
+differs, **zero** when it already matches, and the 15 matches in `[Hotkeys]` left alone because the
+rewrite is scoped to the player's section.
+
+### Three index macros, because three emulators mean three different things by "index"
+
+Measured, not assumed, and they genuinely disagree:
+
+| Macro | Resolves to | Needed by |
+|---|---|---|
+| `{sdl_index}` | player index | Dolphin, which numbers only devices it opened |
+| `{sdl_index_after_hidden}` | physical pad count + player index | PCSX2, which numbers by joystick index so ignored pads still consume slots |
+| `{xinput_index}` | measured XInput slot | RetroArch, which reads XInput directly |
+
+A single macro with a mode flag was rejected: the meaning is a property of how that emulator
+enumerates, so naming each meaning explicitly makes a wrong choice visible in the metadata rather
+than hidden behind a boolean.
+
+`{sdl_index_after_hidden}` rests on **one** observation — PCSX2 showing `SDL-1` with one physical pad
+attached. Two pads should put player one at `SDL-2`; until that is checked the macro is a hypothesis
+with a name.
+
+### Known gap: hotkey sections are not retargeted
+
+PCSX2 ships `[Hotkeys]` entries such as `ShutdownVM = SDL-0/Back & SDL-0/Start`. That section is not
+per-player, so the port loop never visits it and its device reference stays at `SDL-0` — which under
+the layer may address nothing.
+
+It cannot simply be added as another `controller_section`: the loop would visit it once per port and
+the last player's index would win. Retargeting it correctly means binding it to player one
+specifically, which is a separate concept from a port section and is not yet modelled.

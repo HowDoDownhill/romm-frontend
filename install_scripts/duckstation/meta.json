@@ -130,7 +130,9 @@
           "RRight": "SDL-{sdl_index}/+RightX",
           "LargeMotor": "SDL-{sdl_index}/LargeMotor",
           "SmallMotor": "SDL-{sdl_index}/SmallMotor"
-        }
+        },
+        "device_binding_pattern": "SDL-\\d+/",
+        "device_binding_template": "SDL-{sdl_index_after_hidden}/"
       }
     ]
   }
