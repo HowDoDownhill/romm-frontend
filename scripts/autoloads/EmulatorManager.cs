@@ -929,6 +929,9 @@ public class ControllerSection
     [JsonPropertyName("device_binding_template")]
     public string DeviceBindingTemplate { get; set; }
 
+    [JsonPropertyName("binding_key_prefix_template")]
+    public string BindingKeyPrefixTemplate { get; set; }
+
     [JsonPropertyName("type_key")]
     public string TypeKey { get; set; }
 
@@ -2595,7 +2598,11 @@ public partial class EmulatorManager : Node
 
             if (writesSections && playerIsPresent)
             {
-                RewriteSectionDeviceBindings(controllerSection, configFilePath, sectionName, playerIndex, inputLayer);
+                string bindingKeyPrefix = string.IsNullOrEmpty(controllerSection.BindingKeyPrefixTemplate)
+                    ? null
+                    : controllerSection.BindingKeyPrefixTemplate.Replace("{port}", portNumber);
+
+                RewriteSectionDeviceBindings(controllerSection, configFilePath, sectionName, playerIndex, inputLayer, bindingKeyPrefix);
             }
 
             if (!writesDeviceBinding)
@@ -2643,7 +2650,7 @@ public partial class EmulatorManager : Node
             .Replace("{controller_name}", inputLayer.VirtualPadSdlDeviceName);
     }
 
-    private void RewriteSectionDeviceBindings(ControllerSection controllerSection, string configFilePath, string sectionName, int playerIndex, InputLayer inputLayer)
+    private void RewriteSectionDeviceBindings(ControllerSection controllerSection, string configFilePath, string sectionName, int playerIndex, InputLayer inputLayer, string bindingKeyPrefix)
     {
         if (string.IsNullOrEmpty(controllerSection.DeviceBindingPattern) || string.IsNullOrEmpty(controllerSection.DeviceBindingTemplate))
         {
@@ -2658,7 +2665,7 @@ public partial class EmulatorManager : Node
         }
 
         int rewrittenBindingCount = new SectionDeviceIndexRewriter().RewriteSection(
-            configFilePath, sectionName, controllerSection.DeviceBindingPattern, deviceReplacement);
+            configFilePath, sectionName, controllerSection.DeviceBindingPattern, deviceReplacement, bindingKeyPrefix);
 
         if (rewrittenBindingCount > 0)
         {

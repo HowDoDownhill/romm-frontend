@@ -2544,3 +2544,39 @@ the layer may address nothing.
 It cannot simply be added as another `controller_section`: the loop would visit it once per port and
 the last player's index would win. Retargeting it correctly means binding it to player one
 specifically, which is a separate concept from a port section and is not yet modelled.
+
+### snes9x indexes joysticks from zero, not one
+
+`controller-followups.md` records `(J1)` as the first joystick and calls the one-indexing "a genuine
+trap, since every other emulator here indexes from 0". **That is wrong**, and it sent this work down
+the wrong path once.
+
+Measured by mapping two virtual pads by hand and reading what snes9x wrote:
+
+```
+Joypad1 = (J0)POV Up      first virtual pad
+Joypad2 = (J1)POV Up      second virtual pad
+```
+
+So snes9x numbers from zero *and* counts only the devices it can see — the allowlist filters the
+physical pads out of its enumeration entirely. It belongs to Dolphin's family, not PCSX2's, and
+takes plain `{sdl_index}`.
+
+Two consequences. The `{sdl_index_after_hidden_plus_one}` macro written for it was wrong twice over
+and briefly wrote `(J3)`, addressing a joystick that does not exist. And **the shipped
+`default_config/snes9x.conf` binds Joypad1 to `(J1)`**, which addresses the *second* joystick — so
+with a single controller and the layer off it should never have worked. That is a pre-existing bug
+this work uncovered rather than caused.
+
+### One section can hold every player, so scoping by section is not always enough
+
+snes9x keeps all players in `[Controls\Win]`, distinguished only by a `Joypad1:` / `Joypad2:` key
+prefix. Retargeting scoped to a section would rewrite every player's bindings to the same device,
+which is the duplicate-port bug PCSX2 already demonstrated.
+
+`binding_key_prefix_template` scopes the rewrite to one player's keys within a shared section. Where
+a section is per-player, as in PCSX2's `[Pad1]`, it is simply omitted.
+
+snes9x's player-two mapping templates were derived from bindings snes9x itself wrote after a manual
+mapping pass, rather than hand-typed, so the button vocabulary comes from the emulator rather than
+from a guess about it.

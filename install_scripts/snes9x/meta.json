@@ -41,15 +41,34 @@
     "config/snes9x/snes9x.conf"
   ],
   "controller_config": {
-    "max_controllers": 1,
+    "max_controllers": 2,
     "config_file_relative_path": "snes9x.conf",
     "format": "ini",
     "controller_sections": [
       {
         "section_template": "Controls\\Win",
         "port_start": 1,
+        "binding_key_prefix_template": "Joypad{port}:",
         "device_binding_pattern": "\\(J\\d+\\)",
-        "device_binding_template": "(J{sdl_index_after_hidden_plus_one})"
+        "device_binding_template": "(J{sdl_index})",
+        "mappings": {
+          "Joypad{port}:Up": "(J{sdl_index})POV Up",
+          "Joypad{port}:Down": "(J{sdl_index})POV Down",
+          "Joypad{port}:Left": "(J{sdl_index})POV Left",
+          "Joypad{port}:Right": "(J{sdl_index})POV Right",
+          "Joypad{port}:A": "(J{sdl_index})Button 1",
+          "Joypad{port}:B": "(J{sdl_index})Button 0",
+          "Joypad{port}:Y": "(J{sdl_index})Button 2",
+          "Joypad{port}:X": "(J{sdl_index})Button 3",
+          "Joypad{port}:L": "(J{sdl_index})Button 4",
+          "Joypad{port}:R": "(J{sdl_index})Button 5",
+          "Joypad{port}:Start": "(J{sdl_index})Button 7",
+          "Joypad{port}:Select": "(J{sdl_index})Button 6",
+          "Joypad{port}:Left+Up": "(J{sdl_index})POV Up Left",
+          "Joypad{port}:Right+Up": "(J{sdl_index})POV Up Right",
+          "Joypad{port}:Right+Down": "(J{sdl_index})POV Dn Right",
+          "Joypad{port}:Left+Down": "(J{sdl_index})POV Dn Left"
+        }
       }
     ]
   }

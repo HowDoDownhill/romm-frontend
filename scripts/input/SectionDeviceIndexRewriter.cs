@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 
 public class SectionDeviceIndexRewriter
 {
-    public int RewriteSection(string configurationFilePath, string targetSection, string devicePattern, string deviceReplacement)
+    public int RewriteSection(string configurationFilePath, string targetSection, string devicePattern, string deviceReplacement, string requiredKeyPrefix = null)
     {
         if (!File.Exists(configurationFilePath) || string.IsNullOrEmpty(devicePattern))
         {
@@ -40,7 +40,9 @@ public class SectionDeviceIndexRewriter
                 continue;
             }
 
-            if (!isInsideTargetSection || !deviceExpression.IsMatch(currentLine))
+            bool describesRequiredKey = string.IsNullOrEmpty(requiredKeyPrefix) || trimmedLine.StartsWith(requiredKeyPrefix);
+
+            if (!isInsideTargetSection || !describesRequiredKey || !deviceExpression.IsMatch(currentLine))
             {
                 rewrittenLines.Add(currentLine);
                 continue;
