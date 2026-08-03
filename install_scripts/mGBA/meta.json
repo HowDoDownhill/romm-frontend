@@ -110,5 +110,13 @@
         "On": "1"
       }
     }
-  ]
+  ],
+  "controller_config": {
+    "max_controllers": 1,
+    "config_file_relative_path": "config.ini",
+    "format": "ini",
+    "remove_section_patterns": [
+      "^g[ba]{1,2}\\.input-profile\\."
+    ]
+  }
 }

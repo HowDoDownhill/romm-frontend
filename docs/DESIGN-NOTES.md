@@ -2692,3 +2692,31 @@ Filtering governs which devices are *usable*; numbering is a separate decision e
 The reliable procedure for a new emulator: let the layer write whatever it writes, map a pad by hand
 in the emulator, then read the config back. The emulator states its own answer, and it has been
 different from the predicted one often enough that predicting is not worth the round trip.
+
+### mGBA writes per-controller profiles that shadow the shipped bindings
+
+mGBA has no device selector — its bindings live globally in `[gba.input.SDLB]`. But once it has seen a
+specific pad it writes a `[<platform>.input-profile.<name>]` or `[<platform>.input-profile.<guid>]`
+section, and those **override** the global ones. With the layer running it produced two for our
+virtual pad:
+
+```
+[gba.input-profile.Xbox 360 Controller]              buttons bound
+[gba.input-profile.0300b9695e0400008e02000000007200] tilt and gyro only, no buttons
+```
+
+The second is our pad seen through a different backend — product `8e02` is ViGEm, but the driver byte
+is `72` (`'r'`, RawInput) rather than the `78` (`'x'`, XInput) of the SDL GUIDs. mGBA treated that as a
+separate device and gave it a buttonless profile, which swallowed all input.
+
+These sections cannot be written correctly: the GUID changes every session, so writing one leaves a
+stale section next launch and accumulates a new one each time. `controller-followups.md` already says
+never to ship them, for the same reason.
+
+So they are **removed** at launch instead, via `remove_section_patterns`, letting the shipped global
+`SDLB` bindings govern — which is the state mGBA was verified working in. This is the first case where
+the layer deletes configuration rather than writing it.
+
+The pattern is deliberately anchored to `input-profile`, so `[gba.input.SDLB]`, `[gb.input.SDLB]` and
+the keyboard section `[gba.input.QT_K]` are untouched. A user who has hand-tuned a per-controller
+profile loses it, which is the accepted cost of the layer owning device identity during a session.

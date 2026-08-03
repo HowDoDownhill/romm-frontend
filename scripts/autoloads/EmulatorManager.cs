@@ -896,6 +896,9 @@ public class ControllerConfig
     [JsonPropertyName("controller_sections")]
     public List<ControllerSection> ControllerSections { get; set; }
 
+    [JsonPropertyName("remove_section_patterns")]
+    public List<string> RemoveSectionPatterns { get; set; }
+
     [JsonPropertyName("assignment_key_path")]
     public string AssignmentKeyPath { get; set; }
 
@@ -2538,7 +2541,7 @@ public partial class EmulatorManager : Node
 
         var controllerConfig = emulatorMetadata?.ControllerConfig;
 
-        if (controllerConfig?.ControllerSections == null || !SupportsDeviceBindingWrites(controllerConfig.Format))
+        if (controllerConfig == null || !SupportsDeviceBindingWrites(controllerConfig.Format))
         {
             return;
         }
@@ -2558,9 +2561,31 @@ public partial class EmulatorManager : Node
             return;
         }
 
-        foreach (ControllerSection controllerSection in controllerConfig.ControllerSections)
+        RemoveStaleControllerProfiles(controllerConfig, configFilePath);
+
+        foreach (ControllerSection controllerSection in controllerConfig.ControllerSections ?? new List<ControllerSection>())
         {
             WriteDeviceBindingsForSection(controllerSection, controllerConfig, configFilePath, inputLayer);
+        }
+    }
+
+    private void RemoveStaleControllerProfiles(ControllerConfig controllerConfig, string configFilePath)
+    {
+        if (controllerConfig.RemoveSectionPatterns == null)
+        {
+            return;
+        }
+
+        var sectionRemover = new IniSectionRemover();
+
+        foreach (string sectionNamePattern in controllerConfig.RemoveSectionPatterns)
+        {
+            int removedSectionCount = sectionRemover.RemoveMatchingSections(configFilePath, sectionNamePattern);
+
+            if (removedSectionCount > 0)
+            {
+                GD.Print($"[InputLayer] removed {removedSectionCount} per-controller profile section(s) matching '{sectionNamePattern}'");
+            }
         }
     }
 
