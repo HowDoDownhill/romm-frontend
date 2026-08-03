@@ -2720,3 +2720,43 @@ the layer deletes configuration rather than writing it.
 The pattern is deliberately anchored to `input-profile`, so `[gba.input.SDLB]`, `[gb.input.SDLB]` and
 the keyboard section `[gba.input.QT_K]` are untouched. A user who has hand-tuned a per-controller
 profile loses it, which is the accepted cost of the layer owning device identity during a session.
+
+### Flycast is unfiltered, so its ports must be assigned for the physical pads too
+
+Flycast's Controls screen listed **four** devices with two controllers attached — both physical pads
+and both virtual ones. So it enumerates through the joystick layer and the SDL allowlist does not
+reach it, the same as RetroArch. Its binary does contain
+`SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT`, so the hint is compiled in; it simply is not the layer
+Flycast enumerates through.
+
+It maps SDL joystick index to maple port with the index in the **key**:
+
+```
+maple_sdl_joystick_0 = 0
+```
+
+Pointing our pads at ports A and B is not sufficient, because the shipped
+`maple_sdl_joystick_0 = 0` still maps the user's physical pad to port A and player one ends up
+sharing or losing the port — the symptom being a player-one pad arriving as Dreamcast port B.
+
+Both groups are therefore assigned. Our pads take ports A and B, and the physical pads are pushed to
+the remaining ports:
+
+```
+maple_sdl_joystick_2 = 0     virtual pad 1  -> port A
+maple_sdl_joystick_3 = 1     virtual pad 2  -> port B
+maple_sdl_joystick_0 = 2     physical pad 1 -> port C
+maple_sdl_joystick_1 = 3     physical pad 2 -> port D
+```
+
+Moving the physical pads rather than disabling them is deliberate: no documented value for "no port"
+was found, and guessing one risks a config Flycast rejects. The cost is that a four-player Dreamcast
+game would see the physical pads on ports C and D, which is wrong but harmless next to player one
+being on the wrong port.
+
+This works because the second section's index macro counts players, and the player count never
+exceeds the number of physical pads, so the two sections cannot collide on an index.
+
+Flycast also did **not** persist a port change made in its own UI — `emu.cfg` still held only the
+shipped entry afterwards. Hand-fixing the ports is therefore not a workaround available to users, and
+writing them at launch is the only reliable route.

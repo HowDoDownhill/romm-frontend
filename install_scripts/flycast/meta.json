@@ -101,5 +101,24 @@
       "launch_arg_true": "-config config:rend.UseMipmaps=yes",
       "launch_arg_false": "-config config:rend.UseMipmaps=no"
     }
-  ]
+  ],
+  "controller_config": {
+    "max_controllers": 2,
+    "config_file_relative_path": "emu.cfg",
+    "format": "ini",
+    "controller_sections": [
+      {
+        "section_template": "input",
+        "port_start": 0,
+        "device_key": "maple_sdl_joystick_{sdl_index_after_hidden}",
+        "device_template": "{port}"
+      },
+      {
+        "section_template": "input",
+        "port_start": 2,
+        "device_key": "maple_sdl_joystick_{sdl_index}",
+        "device_template": "{port}"
+      }
+    ]
+  }
 }

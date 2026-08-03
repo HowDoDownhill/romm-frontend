@@ -2648,7 +2648,7 @@ public partial class EmulatorManager : Node
             }
 
             string deviceValue = playerIsPresent
-                ? ResolveDeviceBindingMacros(controllerSection.DeviceTemplate, playerIndex, inputLayer)
+                ? ResolveDeviceBindingMacros(controllerSection.DeviceTemplate, playerIndex, inputLayer).Replace("{port}", portNumber)
                 : controllerSection.DeviceDisconnected;
 
             if (string.IsNullOrEmpty(deviceValue))
@@ -2656,7 +2656,7 @@ public partial class EmulatorManager : Node
                 continue;
             }
 
-            string deviceKey = controllerSection.DeviceKey.Replace("{port}", portNumber);
+            string deviceKey = ResolveDeviceBindingMacros(controllerSection.DeviceKey, playerIndex, inputLayer).Replace("{port}", portNumber);
 
             if (writesSections)
             {
