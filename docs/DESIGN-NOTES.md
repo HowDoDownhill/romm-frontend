@@ -2678,6 +2678,7 @@ were guessed wrong first, so treat the reasoning as a hint and the measurement a
 |---|---|---|
 | Dolphin | `{sdl_index}` | numbers only devices it opened, so player index |
 | snes9x | `{sdl_index}` | same, and zero-based despite the note claiming otherwise |
+| melonDS | `{sdl_index}` | measured `JoystickID = 0` with two physical pads attached |
 | ares | `{controller_guid}` + literal `0` | identifies by GUID; the index is relative to it |
 | PCSX2 | `{sdl_index_after_hidden}` | numbers by joystick index, so ignored pads still consume slots |
 | DuckStation | `{sdl_index_after_hidden}` | shares PCSX2's input layer |
