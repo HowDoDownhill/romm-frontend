@@ -2668,3 +2668,26 @@ reasoning about the wait itself, which was never at fault.
 
 `LaunchEmulatorWithoutGame` is `async void` for this reason: it has no caller to await it, but it now
 has to await enumeration before writing config.
+
+### Which index an emulator wants, measured rather than reasoned
+
+Every one of these was established by mapping a pad by hand and reading what the emulator wrote. Three
+were guessed wrong first, so treat the reasoning as a hint and the measurement as the answer.
+
+| Emulator | Macro | What it means |
+|---|---|---|
+| Dolphin | `{sdl_index}` | numbers only devices it opened, so player index |
+| snes9x | `{sdl_index}` | same, and zero-based despite the note claiming otherwise |
+| ares | `{controller_guid}` + literal `0` | identifies by GUID; the index is relative to it |
+| PCSX2 | `{sdl_index_after_hidden}` | numbers by joystick index, so ignored pads still consume slots |
+| DuckStation | `{sdl_index_after_hidden}` | shares PCSX2's input layer |
+| Azahar | `{sdl_index_after_hidden}` | measured `port:2` with two physical pads attached |
+| RetroArch | `{xinput_index}` | reads XInput directly, so the measured slot |
+
+There is no way to derive this from whether the allowlist filters the emulator. PCSX2 **is** filtered —
+its device list shows only our pads — yet still numbers as though the hidden ones were present.
+Filtering governs which devices are *usable*; numbering is a separate decision each emulator makes.
+
+The reliable procedure for a new emulator: let the layer write whatever it writes, map a pad by hand
+in the emulator, then read the config back. The emulator states its own answer, and it has been
+different from the predicted one often enough that predicting is not worth the round trip.
