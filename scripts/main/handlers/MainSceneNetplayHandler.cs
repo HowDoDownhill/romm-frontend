@@ -64,6 +64,32 @@ public class MainSceneNetplayHandler
         ApplyLobbyVisibility();
     }
 
+    public void Detach()
+    {
+        if (appInstance.netplayLobby != null)
+        {
+            appInstance.netplayLobby.MembersChanged -= RefreshLobbyPanel;
+            appInstance.netplayLobby.MembersChanged -= ReportPreparednessIfInLobby;
+            appInstance.netplayLobby.MembersChanged -= AutoStartHostedGameIfRequested;
+            appInstance.netplayLobby.GameSelectionChanged -= OnGameSelectionChanged;
+            appInstance.netplayLobby.HostBrowsingGameChanged -= OnHostBrowsingGameChanged;
+            appInstance.netplayLobby.StartRequested -= OnStartRequested;
+            appInstance.netplayLobby.LobbyClosed -= OnLobbyClosed;
+            appInstance.netplayLobby.RequiredRomHashChanged -= OnRequiredRomHashChanged;
+        }
+
+        if (appInstance.downloadManager != null)
+        {
+            appInstance.downloadManager.DownloadCompleted -= OnAnyDownloadCompleted;
+        }
+
+        if (appInstance.emulatorManager != null)
+        {
+            appInstance.emulatorManager.EmulatorInstallationCompleted -= OnEmulatorInstallationCompleted;
+            appInstance.emulatorManager.EmulatorLaunchStateChanged -= OnEmulatorLaunchStateChanged;
+        }
+    }
+
     private const string HostSessionArgument = "--netplay-host";
     private const string JoinSessionArgumentPrefix = "--netplay-join=";
     private const string AutoReadyArgument = "--netplay-auto-ready";

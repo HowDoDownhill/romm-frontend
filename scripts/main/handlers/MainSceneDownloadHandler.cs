@@ -65,19 +65,15 @@ public class MainSceneDownloadHandler
             appInstance.rommApi.GetAuthHeaders(),
             (path) => HandleRomDownloadCompletion(path, game),
             game.Id.ToString(),
-            game.FileSizeBytes);
+            game.FileSizeBytes,
+            true);
 
         mainScene.GameListHandler.UpdateDetailsPanelButtons(game);
     }
 
     private void HandleRomDownloadCompletion(string tempZipPath, Game game)
     {
-        string fileName = tempZipPath.GetFile();
-
-        if (mainScene.downloadProgressUI != null)
-        {
-            mainScene.downloadProgressUI.SetDownloadStatus(fileName, "Extracting...");
-        }
+        appInstance.downloadManager.ReportDownloadStage(tempZipPath.GetFile(), "Extracting...");
 
         GD.Print($"Download complete. Starting extraction for: {tempZipPath}");
 
@@ -99,13 +95,13 @@ public class MainSceneDownloadHandler
 
         System.Threading.Tasks.Task.Run(() =>
         {
-            ExtractDownloadedRom(sevenZipPath, globalTempZip, globalFinalDir, isLinux);
+            bool extractionSucceeded = ExtractDownloadedRom(sevenZipPath, globalTempZip, globalFinalDir, isLinux);
 
-            Callable.From(() => HandleExtractionFinished(tempZipPath, game)).CallDeferred();
+            Callable.From(() => HandleExtractionFinished(tempZipPath, game, extractionSucceeded)).CallDeferred();
         });
     }
 
-    private void ExtractDownloadedRom(string sevenZipPath, string globalTempZip, string globalFinalDir, bool isLinux)
+    private bool ExtractDownloadedRom(string sevenZipPath, string globalTempZip, string globalFinalDir, bool isLinux)
     {
         try
         {
@@ -121,7 +117,7 @@ public class MainSceneDownloadHandler
             if (exitCode != 0)
             {
                 GD.PrintErr($"Failed to extract zip file. 7zip exit code: {exitCode}");
-                return;
+                return false;
             }
 
             GD.Print($"Successfully extracted {globalTempZip} to {globalFinalDir}");
@@ -130,10 +126,13 @@ public class MainSceneDownloadHandler
             {
                 RunProcessToCompletion("chmod", new string[] { "-R", "a+rwx", globalFinalDir });
             }
+
+            return true;
         }
         catch (System.Exception extractionException)
         {
             GD.PrintErr($"Error extracting zip file: {extractionException.Message}");
+            return false;
         }
     }
 
@@ -158,13 +157,15 @@ public class MainSceneDownloadHandler
         return process.ExitCode;
     }
 
-    private void HandleExtractionFinished(string tempZipPath, Game game)
+    private void HandleExtractionFinished(string tempZipPath, Game game, bool extractionSucceeded)
     {
         if (Godot.FileAccess.FileExists(tempZipPath))
         {
             DirAccess.RemoveAbsolute(tempZipPath);
             GD.Print($"Deleted temporary file: {tempZipPath}");
         }
+
+        appInstance.downloadManager.CloseDeferredDownload(tempZipPath.GetFile(), extractionSucceeded);
 
         mainScene.GameListHandler.UpdateDetailsPanelButtons(game);
         mainScene.GameListHandler.RefreshGameList();

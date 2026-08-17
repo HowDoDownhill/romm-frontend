@@ -29,6 +29,19 @@ public partial class MainSceneGameListHandler
         appInstance.assetManager.AssetDownloaded += OnAssetDownloaded;
     }
 
+    public void Detach()
+    {
+        if (appInstance.downloadManager != null)
+        {
+            appInstance.downloadManager.DownloadProgressUpdated -= OnDownloadProgressUpdated;
+        }
+
+        if (appInstance.assetManager != null)
+        {
+            appInstance.assetManager.AssetDownloaded -= OnAssetDownloaded;
+        }
+    }
+
     private bool marqueeRefreshPending;
     private bool coverRefreshPending;
     private bool screenshotsRefreshPending;

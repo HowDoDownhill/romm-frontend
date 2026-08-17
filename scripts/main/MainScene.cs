@@ -230,6 +230,29 @@ public partial class MainScene : Control
         OfferControllerLayerOnceTheInterfaceHasSettled();
     }
 
+    public override void _ExitTree()
+    {
+        if (appInstance == null)
+        {
+            return;
+        }
+
+        if (appInstance.downloadManager != null && DownloadHandler != null)
+        {
+            appInstance.downloadManager.DownloadCompleted -= DownloadHandler.OnDownloadCompleted;
+        }
+
+        if (appInstance.emulatorManager != null)
+        {
+            appInstance.emulatorManager.EmulatorInstallationCompleted -= OnEmulatorInstallationCompleted;
+            appInstance.emulatorManager.EmulatorLaunchStateChanged -= OnEmulatorLaunchStateChanged;
+        }
+
+        GameListHandler?.Detach();
+        NetplayHandler?.Detach();
+        UpdaterHandler?.Detach();
+    }
+
     private async void OfferControllerLayerOnceTheInterfaceHasSettled()
     {
         await ToSignal(GetTree().CreateTimer(ControllerLayerOfferDelaySeconds), "timeout");

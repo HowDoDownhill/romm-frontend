@@ -85,11 +85,24 @@ public partial class DownloadProgressUI : Panel
         
         appInstance.downloadManager.DownloadProgressUpdated += OnDownloadProgressUpdated;
         appInstance.downloadManager.DownloadCompleted += OnDownloadCompleted;
+        appInstance.downloadManager.DownloadStageChanged += OnDownloadStageChanged;
 
         if (cancelDownloadButton != null)
         {
             cancelDownloadButton.Pressed += OnCancelDownloadButtonPressed;
         }
+    }
+
+    public override void _ExitTree()
+    {
+        if (appInstance?.downloadManager == null)
+        {
+            return;
+        }
+
+        appInstance.downloadManager.DownloadProgressUpdated -= OnDownloadProgressUpdated;
+        appInstance.downloadManager.DownloadCompleted -= OnDownloadCompleted;
+        appInstance.downloadManager.DownloadStageChanged -= OnDownloadStageChanged;
     }
 
     private void OnDownloadProgressUpdated(string fileName, long current, long total, string gameId)
@@ -141,11 +154,11 @@ public partial class DownloadProgressUI : Panel
         }
     }
 
-    public void SetDownloadStatus(string fileName, string status)
+    private void OnDownloadStageChanged(string fileName, string stageDescription)
     {
         if (downloadEntries.TryGetValue(fileName, out var entry))
         {
-            entry.SetStatus(status);
+            entry.SetStage(stageDescription);
         }
     }
 

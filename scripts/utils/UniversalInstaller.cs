@@ -25,6 +25,29 @@ public static class UniversalInstaller
 
     public static async Task<bool> Install(AppInstance appInstance, string emulatorName, EmulatorMeta emulatorMetadata, string currentOperatingSystem, ReleaseOption selectedRelease = null)
     {
+        var installTransfer = appInstance?.downloadManager?.BeginExternalTransfer(emulatorMetadata?.Name ?? emulatorName);
+
+        try
+        {
+            bool installSucceeded = await RunInstall(appInstance, emulatorName, emulatorMetadata, currentOperatingSystem, selectedRelease, installTransfer);
+            appInstance?.downloadManager?.CompleteExternalTransfer(installTransfer, installSucceeded);
+            return installSucceeded;
+        }
+
+        catch (Exception)
+        {
+            appInstance?.downloadManager?.CompleteExternalTransfer(installTransfer, false);
+            throw;
+        }
+    }
+
+    private static void ReportStage(AppInstance appInstance, DownloadManager.ExternalTransfer installTransfer, string stageDescription)
+    {
+        appInstance?.downloadManager?.ReportExternalTransferStage(installTransfer, stageDescription);
+    }
+
+    private static async Task<bool> RunInstall(AppInstance appInstance, string emulatorName, EmulatorMeta emulatorMetadata, string currentOperatingSystem, ReleaseOption selectedRelease, DownloadManager.ExternalTransfer installTransfer)
+    {
         if (emulatorMetadata.InstallRecipe == null || !emulatorMetadata.InstallRecipe.ContainsKey(currentOperatingSystem))
         {
             GD.PrintErr($"No install recipe found for {emulatorName} on {currentOperatingSystem}.");
@@ -36,6 +59,8 @@ public static class UniversalInstaller
 
         if (selectedRelease == null)
         {
+            ReportStage(appInstance, installTransfer, "Finding the latest release...");
+
             var availableReleases = await ListReleases(installRecipe);
             selectedRelease = availableReleases.FirstOrDefault();
         }
@@ -48,7 +73,9 @@ public static class UniversalInstaller
 
         string temporaryArchiveFilePath = Path.Combine(appInstance.configManager.DownloadsPath, $"{emulatorName}download.archive");
 
-        bool downloadSucceeded = await DownloadFileAsync(appInstance, selectedRelease.DownloadUrl, temporaryArchiveFilePath, emulatorName);
+        ReportStage(appInstance, installTransfer, null);
+
+        bool downloadSucceeded = await DownloadIntoTransferAsync(appInstance, selectedRelease.DownloadUrl, temporaryArchiveFilePath, installTransfer);
 
         if (!downloadSucceeded)
         {
@@ -57,6 +84,8 @@ public static class UniversalInstaller
 
         if (installRecipe.Extract)
         {
+            ReportStage(appInstance, installTransfer, "Extracting...");
+
             string extractionDestinationPath = string.IsNullOrEmpty(installRecipe.ExtractFolderRegex)
                 ? emulatorTargetDirectory
                 : appInstance.configManager.EmulatorsPath;
@@ -138,10 +167,12 @@ public static class UniversalInstaller
             EnsureExecutableBit(ResolveInstalledExecutablePath(emulatorMetadata, currentOperatingSystem, emulatorTargetDirectory));
         }
 
-        if (!await DownloadExtraFiles(appInstance, emulatorName, installRecipe, emulatorTargetDirectory, selectedRelease.VersionLabel))
+        if (!await DownloadExtraFiles(appInstance, emulatorName, installRecipe, emulatorTargetDirectory, selectedRelease.VersionLabel, installTransfer))
         {
             return false;
         }
+
+        ReportStage(appInstance, installTransfer, "Finishing the install...");
 
         CopyDefaultConfigurations(appInstance, emulatorName, emulatorTargetDirectory);
         SaveStore.LinkEmulatorSaveDirectories(appInstance, emulatorName, emulatorMetadata, currentOperatingSystem, null);
@@ -201,11 +232,16 @@ public static class UniversalInstaller
         string temporaryArchiveFilePath = Path.Combine(appInstance.configManager.DownloadsPath, $"{emulatorName}core.archive");
         GD.Print($"Downloading the {coreName} core for {emulatorName}...");
 
-        if (!await DownloadFileAsync(appInstance, coreDownloadUrl, temporaryArchiveFilePath, $"{emulatorName} {coreName} core"))
+        var coreTransfer = appInstance?.downloadManager?.BeginExternalTransfer($"{emulatorName} {coreName} core");
+
+        if (!await DownloadIntoTransferAsync(appInstance, coreDownloadUrl, temporaryArchiveFilePath, coreTransfer))
         {
             GD.PrintErr($"Failed to download the {coreName} core from {coreDownloadUrl}.");
+            appInstance?.downloadManager?.CompleteExternalTransfer(coreTransfer, false);
             return false;
         }
+
+        ReportStage(appInstance, coreTransfer, "Extracting...");
 
         bool extractionSucceeded = await ExtractArchiveAsync(appInstance, temporaryArchiveFilePath, coreDirectoryPath);
         try { File.Delete(temporaryArchiveFilePath); } catch { }
@@ -213,8 +249,11 @@ public static class UniversalInstaller
         if (!extractionSucceeded || !File.Exists(coreFilePath))
         {
             GD.PrintErr($"The {coreName} core did not extract to {coreFilePath}.");
+            appInstance?.downloadManager?.CompleteExternalTransfer(coreTransfer, false);
             return false;
         }
+
+        appInstance?.downloadManager?.CompleteExternalTransfer(coreTransfer, true);
 
         GD.Print($"Installed the {coreName} core for {emulatorName}.");
         return true;
@@ -271,7 +310,7 @@ public static class UniversalInstaller
         }
     }
 
-    private static async Task<bool> DownloadExtraFiles(AppInstance appInstance, string emulatorName, InstallRecipe installRecipe, string emulatorTargetDirectory, string versionLabel)
+    private static async Task<bool> DownloadExtraFiles(AppInstance appInstance, string emulatorName, InstallRecipe installRecipe, string emulatorTargetDirectory, string versionLabel, DownloadManager.ExternalTransfer installTransfer)
     {
         if (installRecipe.ExtraDownloads == null || installRecipe.ExtraDownloads.Count == 0)
         {
@@ -298,7 +337,9 @@ public static class UniversalInstaller
             string downloadedFileName = resolvedDownloadUrl.Split('/').LastOrDefault();
             string temporaryFilePath = Path.Combine(appInstance.configManager.DownloadsPath, $"{emulatorName}extra{extraDownloadIndex}.archive");
 
-            if (!await DownloadFileAsync(appInstance, resolvedDownloadUrl, temporaryFilePath, $"{emulatorName} {downloadedFileName}"))
+            ReportStage(appInstance, installTransfer, null);
+
+            if (!await DownloadIntoTransferAsync(appInstance, resolvedDownloadUrl, temporaryFilePath, installTransfer))
             {
                 GD.PrintErr($"Failed to download {resolvedDownloadUrl} for {emulatorName}.");
                 return false;
@@ -306,6 +347,8 @@ public static class UniversalInstaller
 
             if (extraDownload.Extract)
             {
+                ReportStage(appInstance, installTransfer, $"Extracting {downloadedFileName}...");
+
                 bool extractionSucceeded = await ExtractExtraDownload(appInstance, temporaryFilePath, destinationDirectory, extraDownload.ExtractFolderRegex);
                 File.Delete(temporaryFilePath);
 
@@ -597,6 +640,15 @@ public static class UniversalInstaller
     public static async Task<bool> DownloadFileAsync(AppInstance appInstance, string downloadUrl, string destinationFilePath, string displayName)
     {
         var externalTransfer = appInstance?.downloadManager?.BeginExternalTransfer(displayName);
+        bool downloadSucceeded = await DownloadIntoTransferAsync(appInstance, downloadUrl, destinationFilePath, externalTransfer);
+        appInstance?.downloadManager?.CompleteExternalTransfer(externalTransfer, downloadSucceeded);
+
+        return downloadSucceeded;
+    }
+
+    private static async Task<bool> DownloadIntoTransferAsync(AppInstance appInstance, string downloadUrl, string destinationFilePath, DownloadManager.ExternalTransfer externalTransfer)
+    {
+        appInstance?.downloadManager?.ReportExternalTransferProgress(externalTransfer, 0, 0);
 
         try
         {
@@ -626,14 +678,12 @@ public static class UniversalInstaller
                 }
             }
 
-            appInstance?.downloadManager?.CompleteExternalTransfer(externalTransfer, true);
             return true;
         }
 
         catch (Exception exception)
         {
             GD.PrintErr($"Download error: {exception.Message}");
-            appInstance?.downloadManager?.CompleteExternalTransfer(externalTransfer, false);
             return false;
         }
     }

@@ -343,6 +343,14 @@ Successfully extracted ... to roms/nes
 `Needs game` after `Download complete` is the recompute reading a file that is not there yet. Before the
 fix that was the terminal state.
 
+**Update — the ordering that caused this no longer holds for ROMs.** A ROM download is now started with
+`callerClosesEntry: true`, so `DownloadCompleted` is emitted by `HandleExtractionFinished` rather than by
+`HandleDownloadFinished`: on the success path the signal now arrives *after* the file exists (see "A
+download entry lives as long as the operation"). The `OnLocalRomLibraryChanged` notification stays — it
+is the narrower, more honest trigger, and nothing should start depending again on `DownloadCompleted`
+firing early. A failed download still emits immediately, which is exactly the case the `DownloadCompleted`
+subscription was kept for.
+
 ### The published ROM hash is absent from any cache written before the hashing work
 `RequiredRomHash` comes only from `game.Files[0].Md5Hash`, which is populated from the API's `md5_hash`.
 That field was added to `RomFile` alongside netplay, so a `games.cache` written before then contains no
@@ -1563,6 +1571,52 @@ letterboxed by exactly the space they occupy.
 
 ---
 
+## Signals and scene lifetime
+
+### An autoload signal outlives the scene, and one dead subscriber silences every later one
+
+`DownloadManager`, `EmulatorManager`, `AssetManager`, `NetplayLobby` and `AppUpdater` are autoloads and
+live for the whole process. The scene does not: `CacheManager` sends the app back through
+`loading_screen.tscn` to `main_scene.tscn`, so every game-list refresh frees the main scene and builds
+a new one. Each `+=` the old scene made is still in the autoload's invocation list, and the delegate
+holds the freed object alive.
+
+Godot's C# dispatch calls **one multicast delegate** — the generated
+`RaiseGodotClassSignalCallbacks` does `backing_X?.Invoke(...)`. A .NET multicast invoke is not
+fault-isolated: the first handler that throws unwinds the whole call and every subscriber after it in
+the list never runs. The bridge catches the exception at the boundary and logs it, so the app keeps
+running and nothing announces that the rest of the handlers were skipped.
+
+That is what emptied the downloads page. A stale `DownloadProgressUI` belonging to a previous scene
+threw on `downloadsVBox.AddChild`, and because it had subscribed first, the *live*
+`DownloadProgressUI` was never reached:
+
+```
+ERROR: System.ObjectDisposedException: Cannot access a disposed object.
+Object name: 'Godot.VBoxContainer'.
+   at Godot.Node.AddChild(...)
+   at DownloadProgressUI.OnDownloadProgressUpdated(...) DownloadProgressUI.cs:line 112
+   at DownloadManager.RaiseGodotClassSignalCallbacks(...)
+```
+
+One session's log held 9,275 copies of it — one per emitting frame — plus the same failure in
+`MainScene.OnEmulatorInstallationCompleted` and three `MainSceneGameListHandler` methods. The symptom
+is deliberately misleading: the transfer itself runs to completion and logs healthy progress the whole
+time, so the download looks fine while the page that should show it stays blank. Reading the source
+proves nothing either, because the live object's wiring is correct — the bug is an *extra* subscriber
+that no longer exists on screen. The tell is only in the log.
+
+So every subscription a scene makes to an autoload signal is undone when the scene leaves the tree:
+`DownloadProgressUI._ExitTree`, `MainScene._ExitTree`, and a `Detach()` on each handler that subscribes
+in its own constructor or `Initialise()`. The handlers are plain C# objects with no tree callback of
+their own, which is why `MainScene` has to call them. Subscriptions to nodes *inside* the same scene
+(`lobbyActionButton.Pressed`, `cancelDownloadButton.Pressed`) need none of this — they are freed
+together.
+
+Keep the `+=` and `-=` counts equal per file; that grep is the whole invariant.
+
+---
+
 ## Downloads
 
 ### Downloads deliberately bypass Godot's `HttpRequest`
@@ -1613,7 +1667,8 @@ tolerable when an install was a single archive; it stopped being tolerable when 
 
 `DownloadManager.BeginExternalTransfer` / `ReportExternalTransferProgress` / `CompleteExternalTransfer`
 let a transfer the manager does not own publish through the *existing* `DownloadProgressUpdated` and
-`DownloadCompleted` signals, so `DownloadProgressUI` needed no changes. They are held in a
+`DownloadCompleted` signals, so `DownloadProgressUI` needed no changes at the time — phase reporting was
+added later, and is covered below. They are held in a
 `ConcurrentDictionary` rather than the plain `List` used for game downloads, because the installer
 resumes on a task thread after its awaits and would otherwise mutate that list while `_Process`
 iterates it. Reads still happen only in `_Process`, so the threading rule above is unchanged.
@@ -1624,6 +1679,60 @@ into an indeterminate bar, so no extra guard is needed at the call site.
 Every transfer the user starts or waits on now reports: ROMs and firmware through `DownloadManager`
 directly, the emulator archive and cores bundle through `UniversalInstaller`, save sync through
 `RomMAPI`, and the app update through `AppUpdater`.
+
+### A download entry lives as long as the operation, not as long as the transfer
+
+`DownloadProgressUI` frees an entry when it sees `DownloadCompleted`, and `HandleDownloadFinished`
+emitted that the instant the last byte landed. `MainSceneDownloadHandler` set the entry's status to
+`Extracting...` one line earlier, so the label was overwritten by a `QueueFree` in the same frame. The
+page never showed extraction at all — a multi-gigabyte ROM spent its longest phase with nothing on
+screen, which reads as a download that finished and then did nothing.
+
+A caller that keeps working after the bytes arrive now declares that up front —
+`DownloadFile(..., callerClosesEntry: true)` — and closes the entry itself with
+`CloseDeferredDownload(fileName, succeeded)` once the work is really done, publishing phase text with
+`ReportDownloadStage` in between. The manager holds that file's game id in `gameIdsAwaitingCallerClose`
+for the duration, so `IsDownloadingGame` keeps reporting true through extraction and the action button
+stays `Downloading...` until the ROM exists, instead of flicking back to `Download` mid-extract.
+
+A *failed* transfer never defers — there is no second phase to wait for, so it emits `DownloadCompleted`
+immediately and the entry clears.
+
+### The stage text has to outrank the byte counter, not race it
+
+Progress and stage land on the same entry, and `_Process` re-emits progress every frame. A status label
+written once by the extraction step is overwritten on the very next frame by
+`Downloading... 4.1 GB / 4.1 GB`. `DownloadEntryUI` therefore holds the stage as *state*: while one is
+set, `UpdateProgress` returns without touching the label and the bar stays indeterminate; clearing it
+(an empty string) hands the entry back to the byte counter. That is what lets one entry alternate
+download → extract → download extras → extract without the phases fighting each other.
+
+External transfers carry the stage on the transfer object and publish it from `_Process` only when it
+changes. The thread rule is unchanged: the installer runs on a task thread and only ever writes the
+field.
+
+### An install is one entry, not one entry per file it fetches
+
+`UniversalInstaller.Install` opened a fresh external transfer per download, so installing RetroArch
+produced an entry for the archive that vanished, then a separate entry for the cores bundle, with both
+extractions invisible in between. It now opens **one** transfer named after the emulator for the whole
+install and reports stages through it, so an install or an update is a single entry from
+`Finding the latest release...` through `Extracting...` to `Finishing the install...`.
+`EnsureCoreInstalled` does the same for an on-demand core. Emulator updates need no separate handling
+because `OnUpdateEmulatorPressed` runs the same `InstallEmulator` path.
+
+`DownloadFileAsync` keeps its public shape for callers that genuinely are one file
+(`VirtualPadDriverInstaller`); the shared body moved to `DownloadIntoTransferAsync`, which reports into
+a transfer someone else owns and zeroes its byte counts first, so a second phase does not begin pinned
+at the previous phase's total.
+
+### Entry names are only filenames some of the time
+
+The entry label ran every name through `String.GetBaseName()`, which strips whatever follows the last
+dot. That is right for the ROM temp file (`Sonic (USA).chd.zip` → `Sonic (USA).chd`) and wrong for every
+display name that is not a filename — the app updater's `Update 1.0.14` rendered as `Update 1.0`.
+`DownloadProgressDisplay.DescribeEntryName` strips only the suffixes the downloader itself appends,
+`.zip` and `.archive`, and leaves everything else intact.
 
 ### Box art is the one download deliberately kept off the page
 `RomMAPI.DownloadAssetAsync` serves both save sync and `AssetManager`'s cover art, and reports

@@ -13,6 +13,9 @@ public partial class DownloadManager : Node
     [Signal]
     public delegate void DownloadCompletedEventHandler(string fileName, bool wasSuccessful);
 
+    [Signal]
+    public delegate void DownloadStageChangedEventHandler(string fileName, string stageDescription);
+
     private const int TransferBufferSizeBytes = 1024 * 1024;
     private const double DiagnosticsLogIntervalSeconds = 2.0;
 
@@ -41,15 +44,20 @@ public partial class DownloadManager : Node
         public string failureReason;
         public double secondsSinceDiagnosticsLog;
         public long bytesAtLastDiagnosticsLog;
+        public bool callerClosesEntry;
     }
 
     private List<ActiveDownloadEntry> activeDownloadEntries = new List<ActiveDownloadEntry>();
+
+    private readonly Dictionary<string, string> gameIdsAwaitingCallerClose = new Dictionary<string, string>();
 
     public class ExternalTransfer
     {
         public string displayName;
         public long bytesTransferred;
         public long totalBytes;
+        public string stageDescription;
+        public string publishedStageDescription;
         public bool hasFinished;
         public bool wasSuccessful;
     }
@@ -72,6 +80,16 @@ public partial class DownloadManager : Node
 
         Interlocked.Exchange(ref externalTransfer.bytesTransferred, bytesTransferred);
         Interlocked.Exchange(ref externalTransfer.totalBytes, totalBytes);
+    }
+
+    public void ReportExternalTransferStage(ExternalTransfer externalTransfer, string stageDescription)
+    {
+        if (externalTransfer == null)
+        {
+            return;
+        }
+
+        Volatile.Write(ref externalTransfer.stageDescription, stageDescription);
     }
 
     public void CompleteExternalTransfer(ExternalTransfer externalTransfer, bool wasSuccessful)
@@ -100,10 +118,26 @@ public partial class DownloadManager : Node
             }
 
             EmitSignal(SignalName.DownloadProgressUpdated, externalTransfer.displayName, bytesTransferred, totalBytes, "");
+
+            PublishExternalTransferStageIfChanged(externalTransfer);
         }
     }
 
-    public void DownloadFile(string downloadUrl, string destinationFilePath, string[] requestHeaders, System.Action<string> onDownloadComplete, string gameId = null, long expectedTotalBytes = 0)
+    private void PublishExternalTransferStageIfChanged(ExternalTransfer externalTransfer)
+    {
+        string stageDescription = Volatile.Read(ref externalTransfer.stageDescription);
+
+        if (stageDescription == externalTransfer.publishedStageDescription)
+        {
+            return;
+        }
+
+        externalTransfer.publishedStageDescription = stageDescription;
+
+        EmitSignal(SignalName.DownloadStageChanged, externalTransfer.displayName, stageDescription ?? "");
+    }
+
+    public void DownloadFile(string downloadUrl, string destinationFilePath, string[] requestHeaders, System.Action<string> onDownloadComplete, string gameId = null, long expectedTotalBytes = 0, bool callerClosesEntry = false)
     {
         var downloadEntry = new ActiveDownloadEntry
         {
@@ -113,7 +147,8 @@ public partial class DownloadManager : Node
             gameId = gameId,
             cancellationSource = new CancellationTokenSource(),
             startedAtMilliseconds = Time.GetTicksMsec(),
-            totalBytes = expectedTotalBytes
+            totalBytes = expectedTotalBytes,
+            callerClosesEntry = callerClosesEntry
         };
 
         activeDownloadEntries.Add(downloadEntry);
@@ -279,18 +314,41 @@ public partial class DownloadManager : Node
 
         double elapsedSeconds = (Time.GetTicksMsec() - downloadEntry.startedAtMilliseconds) / 1000.0;
 
-        if (downloadEntry.wasSuccessful)
-        {
-            GD.Print($"[Download] finished file={downloadEntry.fileName} downloaded={bytesDownloaded} total={totalBytes} elapsed={elapsedSeconds:F1}s");
-            downloadEntry.completionCallback?.Invoke(downloadEntry.destinationPath);
-        }
-        else
+        if (!downloadEntry.wasSuccessful)
         {
             GD.PrintErr($"Download failed: {downloadEntry.fileName} ({downloadEntry.failureReason}) after {elapsedSeconds:F1}s");
             DeleteIncompleteFile(ProjectSettings.GlobalizePath(downloadEntry.destinationPath));
+            EmitSignal(SignalName.DownloadCompleted, downloadEntry.fileName, false);
+            return;
         }
 
-        EmitSignal(SignalName.DownloadCompleted, downloadEntry.fileName, downloadEntry.wasSuccessful);
+        GD.Print($"[Download] finished file={downloadEntry.fileName} downloaded={bytesDownloaded} total={totalBytes} elapsed={elapsedSeconds:F1}s");
+
+        if (downloadEntry.callerClosesEntry)
+        {
+            gameIdsAwaitingCallerClose[downloadEntry.fileName] = downloadEntry.gameId;
+            downloadEntry.completionCallback?.Invoke(downloadEntry.destinationPath);
+            return;
+        }
+
+        downloadEntry.completionCallback?.Invoke(downloadEntry.destinationPath);
+
+        EmitSignal(SignalName.DownloadCompleted, downloadEntry.fileName, true);
+    }
+
+    public void ReportDownloadStage(string fileName, string stageDescription)
+    {
+        EmitSignal(SignalName.DownloadStageChanged, fileName, stageDescription ?? "");
+    }
+
+    public void CloseDeferredDownload(string fileName, bool wasSuccessful)
+    {
+        if (!gameIdsAwaitingCallerClose.Remove(fileName))
+        {
+            return;
+        }
+
+        EmitSignal(SignalName.DownloadCompleted, fileName, wasSuccessful);
     }
 
     public bool IsDownloading(string fileName)
@@ -305,7 +363,8 @@ public partial class DownloadManager : Node
             return false;
         }
 
-        return activeDownloadEntries.Any(entry => entry.gameId == gameId);
+        return activeDownloadEntries.Any(entry => entry.gameId == gameId)
+            || gameIdsAwaitingCallerClose.ContainsValue(gameId);
     }
 
     public void CancelDownload(string fileName)

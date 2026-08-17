@@ -37,6 +37,26 @@ public static class DownloadProgressDisplay
         return $"Downloading... {FormatBytes(currentBytes)} / {FormatBytes(totalBytes)}";
     }
 
+    private static readonly string[] TemporaryDownloadSuffixes = { ".zip", ".archive" };
+
+    public static string DescribeEntryName(string downloadName)
+    {
+        if (string.IsNullOrEmpty(downloadName))
+        {
+            return downloadName;
+        }
+
+        foreach (string temporarySuffix in TemporaryDownloadSuffixes)
+        {
+            if (downloadName.EndsWith(temporarySuffix, System.StringComparison.OrdinalIgnoreCase))
+            {
+                return downloadName.Substring(0, downloadName.Length - temporarySuffix.Length);
+            }
+        }
+
+        return downloadName;
+    }
+
     public static string FormatBytes(long byteCount)
     {
         if (byteCount < 0)
