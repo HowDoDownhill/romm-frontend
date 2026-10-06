@@ -919,6 +919,34 @@ its bundled tree, RetroArch's own defaults are already correct; overriding them 
 versioned folder name in a second place. Only `savefile_directory` and `savestate_directory` are
 redirected, so saves land in the central save store like every other emulator.
 
+### RetroArch on Linux renders through Vulkan, because GL halves the frame rate under PRIME offload
+Reported as "very low FPS" in Game Boy and GBA on the hybrid laptop (Intel Tiger Lake iGPU driving a
+3840×2400 panel at 60 Hz with 150% fractional scaling, RTX 3060 Laptop, nvidia-open 615.71, GNOME
+Shell 50). Measured with `--max-frames=1200` on the same ROM, startup included:
+
+| Driver | NVIDIA (offload) | Intel |
+|---|---|---|
+| `gl` (RetroArch's default) | 28.9 fps | 58.6 fps |
+| `gl`, vsync off | 35.5 fps | 58.5 fps |
+| `gl`, XWayland/GLX instead of Wayland/EGL | 29.4 fps | – |
+| `gl`, 640×576 window | 46.5 fps | – |
+| `vulkan` | **56.9 fps** | 57.5 fps |
+
+During the GL runs the NVIDIA GPU sat in P5 at 440-670 MHz and 23-52% utilisation: it was waiting,
+not working. The cost is NVIDIA's GL presentation when the frame has to cross to the iGPU that owns
+the display, and it scales with output size. Vulkan's WSI handles the same handoff at full speed. So
+the discrete GPU stays the right choice; GL is the wrong API for it here.
+
+The driver is a `settings_fields` dropdown (Vulkan / OpenGL, default Vulkan) limited to Linux with
+`operating_systems` and written at every launch with `apply_on_launch`. A shipped-default-only change
+would have reached new installs alone, because `retroarch.cfg` is in `preserve_on_reinstall`, and
+forcing it with no setting would leave a machine without working Vulkan stranded. OpenGL remains one
+click away. Cores that need a specific hardware context still get it through RetroArch's own
+`driver_switch_enable`, which defaults to on.
+
+Windows is unchanged: nothing was measured there, and Windows hybrid graphics presents through a
+different path.
+
 ### PCSX2's Linux AppImage keeps its config in a nested `PCSX2/` directory
 `-portable` on Windows makes PCSX2 read `inis/PCSX2.ini` next to the executable. The Linux AppImage
 cannot do that — its "app directory" is a read-only mount — so it creates a `PCSX2/` data directory

@@ -654,9 +654,11 @@ public class MainSceneSettingsHandler
 
         var userSettings = appInstance.emulatorManager.LoadEmulatorSettings(slug);
 
+        string currentOperatingSystem = OS.GetName().ToLower();
+
         foreach (var field in meta.SettingsFields)
         {
-            if (string.IsNullOrEmpty(field.Id)) continue;
+            if (string.IsNullOrEmpty(field.Id) || !field.AppliesTo(currentOperatingSystem)) continue;
 
             bool hasValue = userSettings.TryGetValue(field.Id, out System.Text.Json.JsonElement element);
 

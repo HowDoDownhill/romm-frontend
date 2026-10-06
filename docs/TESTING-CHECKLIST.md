@@ -121,6 +121,9 @@ This is the section with the worst platform divergence. Do not skip it on either
 
 - [ ] Every settings section opens, renders its fields, and persists changes to `config.cfg`.
 - [ ] Per-emulator settings fields write `user_settings.json` and change the launch arguments.
+- [ ] Linux, RetroArch: the log shows `Applied retroarch setting video_driver = vulkan` at launch,
+      a GB/GBA game holds full speed on a hybrid laptop, and switching Video Driver to OpenGL
+      takes effect on the next launch. The setting does not appear on Windows.
 - [ ] Preferred emulator and preferred core per system persist and take effect.
 - [ ] BIOS/firmware selection per system persists.
 - [ ] Panel open/close, section transitions, and the panel stack behave with both mouse and controller.

@@ -746,6 +746,14 @@ public class EmulatorSettingField
     [JsonPropertyName("default_value_string")]
     public string DefaultValueString { get; set; }
 
+    [JsonPropertyName("apply_on_launch")]
+    public bool ApplyOnLaunch { get; set; }
+
+    [JsonPropertyName("operating_systems")]
+    public List<string> OperatingSystems { get; set; }
+
+    public bool AppliesTo(string operatingSystem) => OperatingSystems == null || OperatingSystems.Count == 0 || OperatingSystems.Contains(operatingSystem);
+
     public string ResolveConfigFileRelativePath(string operatingSystem) => ResolveOsScopedValue(ConfigFileRelativePath, operatingSystem);
 
     public string ResolveConfigSection(string operatingSystem) => ResolveOsScopedValue(ConfigSection, operatingSystem);
@@ -1393,7 +1401,7 @@ public partial class EmulatorManager : Node
             string configSection = targetSettingField?.ResolveConfigSection(currentOperatingSystem);
             string configKey = targetSettingField?.ResolveConfigKey(currentOperatingSystem);
 
-            if (targetSettingField != null && !string.IsNullOrEmpty(configFileRelativePath) && !string.IsNullOrEmpty(configSection) && !string.IsNullOrEmpty(configKey))
+            if (targetSettingField != null && !string.IsNullOrEmpty(configFileRelativePath) && !string.IsNullOrEmpty(configKey))
             {
                 if (emulatorMetadata.EmulatorDirName != null && emulatorMetadata.EmulatorDirName.ContainsKey(currentOperatingSystem))
                 {
@@ -1430,27 +1438,91 @@ public partial class EmulatorManager : Node
                         }
                     }
 
-                    var updaters = new IConfigurationUpdater[]
-                    {
-                        new JsonConfigurationUpdater(),
-
-                        new BmlConfigurationUpdater(),
-
-                        new QtConfigurationUpdater(),
-
-                        new IniConfigurationUpdater()
-                    };
-
-                    foreach (var updater in updaters)
-                    {
-                        if (updater.CanHandle(configurationFilePath))
-                        {
-                            updater.UpdateValue(configurationFilePath, configSection, configKey, stringValue, settingValue);
-                            break;
-                        }
-                    }
+                    WriteSettingToConfigFile(configurationFilePath, configSection, configKey, stringValue, settingValue);
                 }
             }
+        }
+    }
+
+    private static void WriteSettingToConfigFile(string configurationFilePath, string configSection, string configKey, string stringValue, object rawValue)
+    {
+        if (string.IsNullOrEmpty(configSection))
+        {
+            new FlatConfigurationUpdater().UpdateValue(configurationFilePath, configKey, stringValue);
+            return;
+        }
+
+        var updaters = new IConfigurationUpdater[]
+        {
+            new JsonConfigurationUpdater(),
+
+            new BmlConfigurationUpdater(),
+
+            new QtConfigurationUpdater(),
+
+            new IniConfigurationUpdater()
+        };
+
+        foreach (var updater in updaters)
+        {
+            if (updater.CanHandle(configurationFilePath))
+            {
+                updater.UpdateValue(configurationFilePath, configSection, configKey, stringValue, rawValue);
+                break;
+            }
+        }
+    }
+
+    private void ApplyLaunchTimeSettings(string emulatorName, EmulatorMeta emulatorMetadata, string emulatorInstallDirectory, string operatingSystem)
+    {
+        if (emulatorMetadata.SettingsFields == null)
+        {
+            return;
+        }
+
+        var savedUserSettings = LoadEmulatorSettings(emulatorName);
+
+        foreach (var settingField in emulatorMetadata.SettingsFields)
+        {
+            if (!settingField.ApplyOnLaunch || string.IsNullOrEmpty(settingField.Id) || !settingField.AppliesTo(operatingSystem))
+            {
+                continue;
+            }
+
+            string configFileRelativePath = settingField.ResolveConfigFileRelativePath(operatingSystem);
+            string configKey = settingField.ResolveConfigKey(operatingSystem);
+
+            if (string.IsNullOrEmpty(configFileRelativePath) || string.IsNullOrEmpty(configKey))
+            {
+                continue;
+            }
+
+            bool hasUserOverride = savedUserSettings.TryGetValue(settingField.Id, out JsonElement savedValue);
+            string stringValue;
+
+            if (settingField.Type == "boolean")
+            {
+                bool booleanValue = hasUserOverride && (savedValue.ValueKind == JsonValueKind.True || savedValue.ValueKind == JsonValueKind.False)
+                    ? savedValue.ValueKind == JsonValueKind.True
+                    : settingField.DefaultValueBool;
+                stringValue = booleanValue ? "true" : "false";
+            }
+
+            else
+            {
+                stringValue = hasUserOverride && savedValue.ValueKind == JsonValueKind.String
+                    ? savedValue.GetString()
+                    : settingField.DefaultValueString;
+            }
+
+            if (string.IsNullOrEmpty(stringValue))
+            {
+                continue;
+            }
+
+            string configurationFilePath = Path.Combine(emulatorInstallDirectory, configFileRelativePath);
+            WriteSettingToConfigFile(configurationFilePath, settingField.ResolveConfigSection(operatingSystem), configKey, stringValue, stringValue);
+            GD.Print($"Applied {emulatorName} setting {settingField.Id} = {stringValue} to {configFileRelativePath}.");
         }
     }
 
@@ -1925,10 +1997,11 @@ public partial class EmulatorManager : Node
 
         var savedUserSettings = LoadEmulatorSettings(emulatorName);
         var settingsArgumentParts = new List<string>();
+        string currentOperatingSystem = OS.GetName().ToLower();
 
         foreach (var settingField in emulatorMetadata.SettingsFields)
         {
-            if (string.IsNullOrEmpty(settingField.Id))
+            if (string.IsNullOrEmpty(settingField.Id) || !settingField.AppliesTo(currentOperatingSystem))
             {
                 continue;
             }
@@ -2201,6 +2274,7 @@ public partial class EmulatorManager : Node
             }
 
             GameSystem currentGameSystem = appInstance.dataBus.systems.FirstOrDefault(s => s.Id == game.PlatformId);
+            ApplyLaunchTimeSettings(mappedEmulatorName, emulatorMetadata, emulatorInstallDirectory, currentOperatingSystem);
             ApplyControllerMappings(emulatorMetadata, emulatorInstallDirectory, currentGameSystem);
             appInstance.inputLayer?.BeginSession(game.System?.Slug, emulatorMetadata);
 
@@ -2410,6 +2484,7 @@ public partial class EmulatorManager : Node
             }
 
             launchArguments = AppendDynamicSettingsToArguments(launchArguments, emulatorName, emulatorMetadata);
+            ApplyLaunchTimeSettings(emulatorName, emulatorMetadata, emulatorInstallDirectory, currentOperatingSystem);
             appInstance.inputLayer?.BeginSession(currentGameSystem?.Slug, emulatorMetadata);
 
             if (appInstance.inputLayer != null)

@@ -80,6 +80,20 @@
       "default_value_bool": true,
       "launch_arg_true": "-f",
       "launch_arg_false": ""
+    },
+    {
+      "id": "video_driver",
+      "label": "Video Driver",
+      "type": "dropdown",
+      "operating_systems": ["linux"],
+      "apply_on_launch": true,
+      "default_value_string": "vulkan",
+      "options": {
+        "Vulkan": "vulkan",
+        "OpenGL": "gl"
+      },
+      "config_file_relative_path": "retroarch.cfg",
+      "config_key": "video_driver"
     }
   ],
   "core_launch_arg": "-L \"{core_path}\"",
