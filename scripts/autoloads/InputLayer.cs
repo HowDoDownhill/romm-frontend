@@ -1,0 +1,392 @@
+using Godot;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+public enum InputLayerConsent
+{
+    Unasked,
+    Accepted,
+    Declined
+}
+
+public partial class InputLayer : Node
+{
+    public const int MaximumPlayers = 4;
+
+    private AppInstance appInstance;
+    private ControllerManager controllerManager;
+
+    private IPhysicalPadReader physicalPadReader;
+    private IVirtualPadBackend virtualPadBackend;
+    private IDeviceHider deviceHider;
+
+    private readonly List<int> sessionPhysicalDeviceIds = new List<int>();
+    private readonly List<PadMappingTable> sessionMappingTables = new List<PadMappingTable>();
+    private readonly List<PadState> sessionPhysicalStates = new List<PadState>();
+    private readonly List<PadState> sessionVirtualStates = new List<PadState>();
+
+    private const int VirtualPadEnumerationPollMilliseconds = 50;
+    private const int VirtualPadEnumerationTimeoutMilliseconds = 3000;
+
+    private HashSet<int> joypadsPresentBeforeSession = new HashSet<int>();
+    private readonly HashSet<int> ownVirtualDeviceIds = new HashSet<int>();
+    private readonly List<int> ownVirtualDeviceIdsInPlayerOrder = new List<int>();
+
+    public bool IsSessionActive { get; private set; }
+    public string LastSessionFailureReason { get; private set; } = "";
+
+    public override void _Ready()
+    {
+        appInstance = GetNode<AppInstance>("/root/AppInstance");
+        appInstance.inputLayer = this;
+        controllerManager = GetNode<ControllerManager>("/root/ControllerManager");
+
+        physicalPadReader = new GodotPhysicalPadReader();
+        virtualPadBackend = new ViGEmPadBackend();
+        deviceHider = new NullDeviceHider();
+
+        Input.JoyConnectionChanged += OnJoyConnectionChanged;
+        SetProcess(false);
+
+        ClearStaleHidingRulesFromAPreviousRun();
+    }
+
+    private void ClearStaleHidingRulesFromAPreviousRun()
+    {
+        deviceHider.UnhideAll();
+    }
+
+    public bool IsVirtualPadBackendAvailable => virtualPadBackend.IsAvailable;
+    public string VirtualPadBackendUnavailableReason => virtualPadBackend.UnavailableReason;
+    public string VirtualPadSdlDeviceName => virtualPadBackend.SdlDeviceName;
+    public int ActivePlayerCount => sessionPhysicalDeviceIds.Count;
+    public int PhysicalPadsEnumeratedAheadOfOurs { get; private set; }
+
+    public bool IsOwnVirtualDevice(int godotDeviceId)
+    {
+        return ownVirtualDeviceIds.Contains(godotDeviceId);
+    }
+
+    public IReadOnlyList<int> SessionPhysicalDeviceIds => sessionPhysicalDeviceIds;
+
+    public int ResolvePlayerOneDeviceId()
+    {
+        if (sessionPhysicalDeviceIds.Count > 0)
+        {
+            return sessionPhysicalDeviceIds[0];
+        }
+
+        List<ConnectedController> availablePads = GetAssignablePhysicalPads();
+        return availablePads.Count > 0 ? availablePads[0].GodotDeviceId : -1;
+    }
+
+    private readonly List<int> playerAssignmentDeviceIds = new List<int>();
+
+    public IReadOnlyList<int> PlayerAssignmentDeviceIds => playerAssignmentDeviceIds;
+
+    public void SetPlayerAssignment(IEnumerable<int> orderedDeviceIds)
+    {
+        playerAssignmentDeviceIds.Clear();
+        playerAssignmentDeviceIds.AddRange(orderedDeviceIds);
+        GD.Print($"[InputLayer] player order set to devices [{string.Join(", ", playerAssignmentDeviceIds)}].");
+    }
+
+    public void ClearPlayerAssignment()
+    {
+        if (playerAssignmentDeviceIds.Count == 0)
+        {
+            return;
+        }
+
+        playerAssignmentDeviceIds.Clear();
+        GD.Print("[InputLayer] player order cleared; falling back to connection order.");
+    }
+
+    private List<ConnectedController> GetAssignablePhysicalPads()
+    {
+        var availablePads = controllerManager
+            .GetConnectedControllers()
+            .Where(candidate => !IsOwnVirtualDevice(candidate.GodotDeviceId))
+            .ToList();
+
+        return availablePads.OrderBy(ResolveAssignedPlayerPosition).ToList();
+    }
+
+    private int ResolveAssignedPlayerPosition(ConnectedController pad)
+    {
+        int assignedPosition = playerAssignmentDeviceIds.IndexOf(pad.GodotDeviceId);
+        return assignedPosition >= 0 ? assignedPosition : playerAssignmentDeviceIds.Count + pad.ConnectionOrder;
+    }
+
+    public bool BeginSession(string systemSlug, EmulatorMeta emulatorMetadata)
+    {
+        EndSession();
+
+        if (!ShouldRunLayerForSession())
+        {
+            return false;
+        }
+
+        List<ConnectedController> physicalPads = GetAssignablePhysicalPads();
+
+        if (physicalPads.Count == 0)
+        {
+            LastSessionFailureReason = "no physical controller is connected";
+            GD.Print($"[InputLayer] not starting a session: {LastSessionFailureReason}.");
+            return false;
+        }
+
+        int playerCount = Math.Min(physicalPads.Count, ResolveMaximumPlayers(emulatorMetadata));
+
+        joypadsPresentBeforeSession = Input.GetConnectedJoypads().Select(deviceId => (int)deviceId).ToHashSet();
+        HidePhysicalPadsBeforeCreatingVirtualOnes(physicalPads);
+
+        List<int> xinputSlotsBeforeCreatingPads = XInputSlots.ReadConnectedSlots();
+
+        if (!virtualPadBackend.TryCreatePads(playerCount))
+        {
+            LastSessionFailureReason = virtualPadBackend.UnavailableReason;
+            GD.PrintErr($"[InputLayer] not starting a session: {LastSessionFailureReason}.");
+            return false;
+        }
+
+        BuildSessionMappings(systemSlug, emulatorMetadata, physicalPads, playerCount);
+        RecordVirtualPadXInputSlots(xinputSlotsBeforeCreatingPads);
+        PhysicalPadsEnumeratedAheadOfOurs = physicalPads.Count;
+
+        IsSessionActive = true;
+        LastSessionFailureReason = "";
+        SetProcess(true);
+
+        GD.Print($"[InputLayer] session started for '{systemSlug}' with {playerCount} virtual pad(s).");
+        return true;
+    }
+
+    private readonly List<int> virtualPadXInputSlots = new List<int>();
+
+    private void RecordVirtualPadXInputSlots(List<int> slotsBeforeCreatingPads)
+    {
+        virtualPadXInputSlots.Clear();
+
+        foreach (int slotIndex in XInputSlots.ReadConnectedSlots())
+        {
+            if (!slotsBeforeCreatingPads.Contains(slotIndex))
+            {
+                virtualPadXInputSlots.Add(slotIndex);
+            }
+        }
+
+        GD.Print(virtualPadXInputSlots.Count > 0
+            ? $"[InputLayer] virtual pads occupy XInput slot(s) [{string.Join(", ", virtualPadXInputSlots)}]."
+            : "[InputLayer] no new XInput slots appeared; emulators reading XInput may not see the virtual pads.");
+    }
+
+    public string ResolveVirtualPadGuid(int playerIndex)
+    {
+        return playerIndex >= 0 && playerIndex < ownVirtualDeviceIdsInPlayerOrder.Count
+            ? Input.GetJoyGuid(ownVirtualDeviceIdsInPlayerOrder[playerIndex])
+            : "";
+    }
+
+    public async Task WaitForVirtualPadsToEnumerate()
+    {
+        if (!IsSessionActive)
+        {
+            return;
+        }
+
+        int elapsedMilliseconds = 0;
+        GD.Print($"[InputLayer] waiting for virtual pads to enumerate: {ownVirtualDeviceIdsInPlayerOrder.Count} of {ActivePlayerCount} seen.");
+
+        while (ownVirtualDeviceIdsInPlayerOrder.Count < ActivePlayerCount && elapsedMilliseconds < VirtualPadEnumerationTimeoutMilliseconds)
+        {
+            await ToSignal(GetTree().CreateTimer(VirtualPadEnumerationPollMilliseconds / 1000.0f), SceneTreeTimer.SignalName.Timeout);
+            elapsedMilliseconds += VirtualPadEnumerationPollMilliseconds;
+        }
+
+        GD.Print($"[InputLayer] enumeration wait finished after {elapsedMilliseconds} ms with {ownVirtualDeviceIdsInPlayerOrder.Count} pad(s).");
+
+        if (ownVirtualDeviceIdsInPlayerOrder.Count < ActivePlayerCount)
+        {
+            GD.PrintErr($"[InputLayer] only {ownVirtualDeviceIdsInPlayerOrder.Count} of {ActivePlayerCount} virtual pad(s) enumerated; emulator config may name the wrong device.");
+        }
+    }
+
+    public int ResolveVirtualPadXInputSlot(int playerIndex)
+    {
+        return playerIndex >= 0 && playerIndex < virtualPadXInputSlots.Count ? virtualPadXInputSlots[playerIndex] : -1;
+    }
+
+    private void HidePhysicalPadsBeforeCreatingVirtualOnes(List<ConnectedController> physicalPads)
+    {
+        if (!deviceHider.IsAvailable)
+        {
+            return;
+        }
+
+        deviceHider.HidePhysicalPads(physicalPads);
+    }
+
+    private bool ShouldRunLayerForSession()
+    {
+        if (ResolveConsent() != InputLayerConsent.Accepted)
+        {
+            LastSessionFailureReason = "automatic controller mapping has not been enabled";
+            return false;
+        }
+
+        if (!virtualPadBackend.IsAvailable)
+        {
+            LastSessionFailureReason = virtualPadBackend.UnavailableReason;
+            GD.Print($"[InputLayer] not starting a session: {LastSessionFailureReason}.");
+            return false;
+        }
+
+        return true;
+    }
+
+    private int ResolveMaximumPlayers(EmulatorMeta emulatorMetadata)
+    {
+        int metadataMaximum = emulatorMetadata?.ControllerConfig?.MaxControllers ?? 0;
+        return metadataMaximum > 0 ? Math.Min(metadataMaximum, MaximumPlayers) : MaximumPlayers;
+    }
+
+    private void BuildSessionMappings(string systemSlug, EmulatorMeta emulatorMetadata, List<ConnectedController> physicalPads, int playerCount)
+    {
+        for (int playerIndex = 0; playerIndex < playerCount; playerIndex++)
+        {
+            sessionPhysicalDeviceIds.Add(physicalPads[playerIndex].GodotDeviceId);
+            sessionMappingTables.Add(BuildMappingTableForPlayer(systemSlug, emulatorMetadata, playerIndex));
+            sessionPhysicalStates.Add(new PadState());
+            sessionVirtualStates.Add(new PadState());
+        }
+    }
+
+    private PadMappingTable BuildMappingTableForPlayer(string systemSlug, EmulatorMeta emulatorMetadata, int playerIndex)
+    {
+        if (emulatorMetadata?.ControllerConfig == null)
+        {
+            return PadMappingTable.BuildIdentity();
+        }
+
+        Dictionary<string, string> playerMappings = ResolvePlayerMappings(systemSlug, playerIndex);
+        return PadMappingTable.Build(emulatorMetadata.ControllerConfig, playerMappings);
+    }
+
+    private Dictionary<string, string> ResolvePlayerMappings(string systemSlug, int playerIndex)
+    {
+        var platformMappings = appInstance?.configManager?.PlatformInputMappings;
+
+        if (platformMappings == null
+            || string.IsNullOrEmpty(systemSlug)
+            || !platformMappings.TryGetValue(systemSlug, out var mappingsByPlayer)
+            || !mappingsByPlayer.TryGetValue(playerIndex, out var playerMappings))
+        {
+            return null;
+        }
+
+        return playerMappings;
+    }
+
+    public void EndSession()
+    {
+        if (!IsSessionActive && sessionPhysicalDeviceIds.Count == 0)
+        {
+            return;
+        }
+
+        SetProcess(false);
+        IsSessionActive = false;
+
+        virtualPadBackend.DestroyPads();
+        deviceHider.UnhideAll();
+
+        sessionPhysicalDeviceIds.Clear();
+        virtualPadXInputSlots.Clear();
+        sessionMappingTables.Clear();
+        sessionPhysicalStates.Clear();
+        sessionVirtualStates.Clear();
+        ownVirtualDeviceIds.Clear();
+        ownVirtualDeviceIdsInPlayerOrder.Clear();
+        joypadsPresentBeforeSession.Clear();
+
+        GD.Print("[InputLayer] session ended.");
+    }
+
+    public override void _Process(double delta)
+    {
+        if (!IsSessionActive)
+        {
+            return;
+        }
+
+        for (int playerIndex = 0; playerIndex < sessionPhysicalDeviceIds.Count; playerIndex++)
+        {
+            PadState physicalState = sessionPhysicalStates[playerIndex];
+            PadState virtualState = sessionVirtualStates[playerIndex];
+
+            physicalPadReader.ReadInto(sessionPhysicalDeviceIds[playerIndex], physicalState);
+            sessionMappingTables[playerIndex].Apply(physicalState, virtualState);
+            virtualPadBackend.Submit(playerIndex, virtualState);
+        }
+    }
+
+    private void OnJoyConnectionChanged(long deviceId, bool connected)
+    {
+        int joypadId = (int)deviceId;
+
+        if (!connected)
+        {
+            ownVirtualDeviceIds.Remove(joypadId);
+
+            if (playerAssignmentDeviceIds.Contains(joypadId))
+            {
+                ClearPlayerAssignment();
+            }
+
+            return;
+        }
+
+        if (virtualPadBackend.CreatedPadCount > 0 && !joypadsPresentBeforeSession.Contains(joypadId) && ownVirtualDeviceIds.Add(joypadId))
+        {
+            ownVirtualDeviceIdsInPlayerOrder.Add(joypadId);
+            GD.Print($"[InputLayer] our virtual pad appeared as Godot device {joypadId} \"{Input.GetJoyName(joypadId)}\"; excluding it from input.");
+        }
+    }
+
+    public Dictionary<string, string> BuildLaunchEnvironment(EmulatorMeta emulatorMetadata)
+    {
+        if (!IsSessionActive || ResolveInputLayerMode(emulatorMetadata) == "none")
+        {
+            return new Dictionary<string, string>();
+        }
+
+        return SdlDeviceAllowlist.BuildEnvironment();
+    }
+
+    private static string ResolveInputLayerMode(EmulatorMeta emulatorMetadata)
+    {
+        return string.IsNullOrEmpty(emulatorMetadata?.InputLayer) ? "virtual_pad" : emulatorMetadata.InputLayer;
+    }
+
+    public InputLayerConsent ResolveConsent()
+    {
+        string storedConsent = appInstance?.configManager?.ControllerMappingConsent;
+
+        switch (storedConsent)
+        {
+            case "accepted": return InputLayerConsent.Accepted;
+            case "declined": return InputLayerConsent.Declined;
+            default: return InputLayerConsent.Unasked;
+        }
+    }
+
+    public override void _ExitTree()
+    {
+        Input.JoyConnectionChanged -= OnJoyConnectionChanged;
+        EndSession();
+        (virtualPadBackend as ViGEmPadBackend)?.Dispose();
+    }
+}

@@ -11,6 +11,10 @@ using System.Text.Json.Serialization;
 [JsonSerializable(typeof(List<RomFile>))]
 [JsonSerializable(typeof(GameSystem))]
 [JsonSerializable(typeof(List<GameSystem>))]
+[JsonSerializable(typeof(Collection))]
+[JsonSerializable(typeof(CollectionRomsPayload))]
+[JsonSerializable(typeof(NetplayAdvertisement))]
+[JsonSerializable(typeof(List<Collection>))]
 [JsonSerializable(typeof(Firmware))]
 [JsonSerializable(typeof(List<Firmware>))]
 [JsonSerializable(typeof(Dictionary<string, string>))]
@@ -25,6 +29,8 @@ using System.Text.Json.Serialization;
 [JsonSerializable(typeof(SyncNegotiatePayload))]
 [JsonSerializable(typeof(SyncCompletePayload))]
 [JsonSerializable(typeof(GithubReleaseInfo))]
+[JsonSerializable(typeof(RomHashEntry))]
+[JsonSerializable(typeof(Dictionary<string, RomHashEntry>))]
 public partial class RommJsonContext : JsonSerializerContext
 {
 }

@@ -11,6 +11,7 @@ public partial class DownloadEntryUI : MarginContainer
     [Export] private PanelContainer backgroundPanel;
     
     private StyleBoxFlat backgroundStyle;
+    private string stageDescription;
 
     public string FileName { get; private set; }
     public string GameId { get; private set; }
@@ -77,17 +78,35 @@ public partial class DownloadEntryUI : MarginContainer
 
         if (nameLabel != null)
         {
-            nameLabel.Text = fileName.GetBaseName();
+            nameLabel.Text = DownloadProgressDisplay.DescribeEntryName(fileName);
         }
     }
 
     public void UpdateProgress(long current, long total)
     {
+        if (!string.IsNullOrEmpty(stageDescription))
+        {
+            return;
+        }
+
         DownloadProgressDisplay.ApplyTo(progressBar, current, total);
         SetStatus(DownloadProgressDisplay.DescribeProgress(current, total));
     }
 
-    public void SetStatus(string status)
+    public void SetStage(string stage)
+    {
+        stageDescription = stage;
+
+        if (string.IsNullOrEmpty(stageDescription))
+        {
+            return;
+        }
+
+        DownloadProgressDisplay.ApplyTo(progressBar, 0, 0);
+        SetStatus(stageDescription);
+    }
+
+    private void SetStatus(string status)
     {
         if (statusLabel != null)
         {

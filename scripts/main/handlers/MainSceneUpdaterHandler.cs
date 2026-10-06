@@ -28,6 +28,18 @@ public class MainSceneUpdaterHandler
         }
     }
 
+    public void Detach()
+    {
+        if (appUpdater == null)
+        {
+            return;
+        }
+
+        appUpdater.UpdateAvailable -= OnUpdateAvailable;
+        appUpdater.UpdateDownloadProgress -= OnUpdateDownloadProgress;
+        appUpdater.UpdateDownloadCompleted -= OnUpdateDownloadCompleted;
+    }
+
     private void OnUpdateAvailable(string version, string releaseNotes)
     {
         pendingUpdateVersion = version;

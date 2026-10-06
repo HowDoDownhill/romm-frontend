@@ -20,7 +20,7 @@ data_*/
 mono_crash.*.json
 .idea/
 *.sln.DotSettings.user
-*.csproj.old
+*.csproj.old*
 test_*.png
 test_*.png.import
 
@@ -61,7 +61,10 @@ config.cfg
 themes.json
 games.cache
 systems.cache
+romhashes.cache
 assets/screenshots/
+
+tools/linux-test/config.json
 
 .claude/
 
@@ -70,3 +73,7 @@ assets/screenshots/
 .windsurfrules
 CLAUDE.md
 AGENTS.md
+
+# Local scratch: API dumps and the script that fetches them carry server data and tokens
+fetch.ps1
+scratch_*.json

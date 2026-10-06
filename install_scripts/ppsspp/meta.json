@@ -46,6 +46,32 @@
       "default_value_bool": true,
       "launch_arg_true": "--fullscreen",
       "launch_arg_false": "--windowed"
+    },
+    {
+      "id": "adhoc_wlan",
+      "label": "Ad-hoc WLAN",
+      "type": "hidden",
+      "default_value_string": "True",
+      "config_file_relative_path": {
+        "windows": "memstick/PSP/SYSTEM/ppsspp.ini",
+        "linux": "memstick/ppsspp/PSP/SYSTEM/ppsspp.ini",
+        "macos": "memstick/PSP/SYSTEM/ppsspp.ini"
+      },
+      "config_section": "Network",
+      "config_key": "EnableWlan"
+    },
+    {
+      "id": "adhoc_server",
+      "label": "Ad-hoc Server",
+      "type": "hidden",
+      "default_value_string": "True",
+      "config_file_relative_path": {
+        "windows": "memstick/PSP/SYSTEM/ppsspp.ini",
+        "linux": "memstick/ppsspp/PSP/SYSTEM/ppsspp.ini",
+        "macos": "memstick/PSP/SYSTEM/ppsspp.ini"
+      },
+      "config_section": "Network",
+      "config_key": "EnableAdhocServer"
     }
   ]
 }

@@ -298,6 +298,26 @@ public class MainSceneSettingsHandler
         var backgroundEntry = settingsListEntryScene.Instantiate<SettingsListEntry>();
         backgroundEntry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(backgroundFieldBox);
         vbox.AddChild(backgroundEntry);
+
+        HBoxContainer discreteGpuFieldBox = new HBoxContainer();
+        Label discreteGpuLabel = new Label();
+        discreteGpuLabel.Text = "Prefer Discrete GPU";
+        discreteGpuLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        discreteGpuFieldBox.AddChild(discreteGpuLabel);
+
+        CheckButton discreteGpuCheckbox = new CheckButton();
+        discreteGpuCheckbox.ButtonPressed = appInstance.configManager.PreferDiscreteGpu;
+
+        discreteGpuCheckbox.Toggled += (bool toggledOn) =>
+        {
+            appInstance.configManager.SavePreferDiscreteGpu(toggledOn);
+            DiscreteGpuPreference.RegisterWindowsGpuPreference(OS.GetExecutablePath(), toggledOn);
+        };
+
+        discreteGpuFieldBox.AddChild(discreteGpuCheckbox);
+        var discreteGpuEntry = settingsListEntryScene.Instantiate<SettingsListEntry>();
+        discreteGpuEntry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(discreteGpuFieldBox);
+        vbox.AddChild(discreteGpuEntry);
     }
 
     private void GenerateGameListSettingsForm()
@@ -334,7 +354,7 @@ public class MainSceneSettingsHandler
         HBoxContainer fieldBox = new HBoxContainer();
 
         Label label = new Label();
-        label.Text = "Hide games without box art";
+        label.Text = "Hide Games Without Box Art";
         label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         fieldBox.AddChild(label);
 
@@ -362,7 +382,7 @@ public class MainSceneSettingsHandler
 
         HBoxContainer fieldBox2 = new HBoxContainer();
         Label label2 = new Label();
-        label2.Text = "Show all systems";
+        label2.Text = "Show All Systems";
         label2.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
         fieldBox2.AddChild(label2);
 
@@ -422,6 +442,33 @@ public class MainSceneSettingsHandler
         scrollContainer.AddChild(vbox);
         mainScene.sectionOptionsContainer.AddChild(formContainer);
 
+        HBoxContainer automaticMappingBox = new HBoxContainer();
+        Label automaticMappingLabel = new Label();
+        automaticMappingLabel.Text = "Automatic Controller Mapping";
+        automaticMappingLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        automaticMappingBox.AddChild(automaticMappingLabel);
+
+        Label automaticMappingStatus = new Label();
+        automaticMappingStatus.Text = DescribeInputLayerAvailability();
+        automaticMappingStatus.AddThemeColorOverride("font_color", new Color(0.6f, 0.6f, 0.6f));
+        automaticMappingBox.AddChild(automaticMappingStatus);
+
+        CheckButton automaticMappingCheckbox = new CheckButton();
+        automaticMappingCheckbox.ButtonPressed = appInstance.configManager.ControllerMappingConsent == ConfigManager.ControllerMappingConsentAccepted;
+
+        automaticMappingCheckbox.Toggled += (bool toggledOn) =>
+        {
+            appInstance.configManager.SaveControllerMappingConsent(toggledOn
+                ? ConfigManager.ControllerMappingConsentAccepted
+                : ConfigManager.ControllerMappingConsentDeclined);
+            automaticMappingStatus.Text = DescribeInputLayerAvailability();
+        };
+
+        automaticMappingBox.AddChild(automaticMappingCheckbox);
+        var automaticMappingEntry = settingsListEntryScene.Instantiate<SettingsListEntry>();
+        automaticMappingEntry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(automaticMappingBox);
+        vbox.AddChild(automaticMappingEntry);
+
         HBoxContainer countBox = new HBoxContainer();
         Label countLabel = new Label();
         countLabel.Text = "Number of Emulator Close Hotkeys";
@@ -437,6 +484,29 @@ public class MainSceneSettingsHandler
         var entry1 = settingsListEntryScene.Instantiate<SettingsListEntry>();
         entry1.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(countBox);
         vbox.AddChild(entry1);
+
+        HBoxContainer holdBox = new HBoxContainer();
+        Label holdLabel = new Label();
+        holdLabel.Text = "Seconds to Hold Before Closing";
+        holdLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        holdBox.AddChild(holdLabel);
+
+        SpinBox holdSpin = new SpinBox();
+        holdSpin.MinValue = 0.5;
+        holdSpin.MaxValue = 10.0;
+        holdSpin.Step = 0.5;
+        holdSpin.Value = appInstance.configManager.EmulatorCloseHoldSeconds;
+        holdBox.AddChild(holdSpin);
+
+        holdSpin.ValueChanged += (double holdSeconds) =>
+        {
+            appInstance.configManager.SaveEmulatorCloseHoldSeconds((float)holdSeconds);
+            mainScene.InputHandler.UpdateEmulatorCloseHotkeysBtnText();
+        };
+
+        var holdEntry = settingsListEntryScene.Instantiate<SettingsListEntry>();
+        holdEntry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(holdBox);
+        vbox.AddChild(holdEntry);
 
         mainScene.emulatorCloseHotkeysBtn = new Button();
         mainScene.InputHandler.UpdateEmulatorCloseHotkeysBtnText();
@@ -734,5 +804,27 @@ public class MainSceneSettingsHandler
         {
             activePanel.Visible = true;
         }
+    }
+
+    private string DescribeInputLayerAvailability()
+    {
+        if (appInstance.inputLayer == null)
+        {
+            return "Unavailable";
+        }
+
+        if (appInstance.configManager.ControllerMappingConsent != ConfigManager.ControllerMappingConsentAccepted)
+        {
+            return "Emulators Use Their Own Controller Settings";
+        }
+
+        return appInstance.inputLayer.IsVirtualPadBackendAvailable
+            ? "Emulators Will See One Xbox 360 Pad Per Player"
+            : CapitaliseFirstLetter(appInstance.inputLayer.VirtualPadBackendUnavailableReason);
+    }
+
+    private static string CapitaliseFirstLetter(string sentence)
+    {
+        return string.IsNullOrEmpty(sentence) ? sentence : char.ToUpperInvariant(sentence[0]) + sentence.Substring(1);
     }
 }

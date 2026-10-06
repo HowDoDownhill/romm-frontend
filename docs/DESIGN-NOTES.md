@@ -24,6 +24,25 @@ a dedicated updater — notably ares' `settings.bml`, which is indentation-based
 corrupted by INI-style writes. The extension exclusion list keeps this correct regardless of
 ordering, but the ordering is still load-bearing and there are two lists that must agree.
 
+### A cached firmware path must be re-validated, not just null-checked
+`GameSystem.PrefferedFirmware` is an absolute path, and `GameSystem` is serialized into
+`systems.cache` next to the executable. The scan that fills it in only ran when the field was
+**empty**, so a stored path was kept forever even once it pointed nowhere.
+
+That breaks in two ways. Move the app to another drive or folder and firmware silently resolves to
+the old location. Worse, carry the cache to another platform: a Windows value like
+`E:/Projects/romm-frontend/bios/nes/disksys.rom` is **not rooted on Linux** — `:` has no meaning
+there — so `Path.GetFullPath` resolves it against the working directory and yields
+`<app dir>/E:/Projects/romm-frontend/bios/nes/disksys.rom`. Measured under WSL. A literal `E:`
+directory then appears beside the executable and accumulates a duplicate of the whole tree; one
+release build had grown a 316 MB copy of `bios` that way.
+
+`IsUsableFirmwarePath` requires the path to be non-empty, rooted **and** to exist, and both the
+consumer (`ResolveFirmwarePath`) and the producer (the firmware scan on the loading screen) go
+through it, so a stale value is re-derived instead of followed. This mirrors how
+`ResolveRelocatablePath` already treats stored directory overrides: honour them only if they still
+exist, otherwise fall back to the derived default.
+
 ### Executable resolution falls back to regex
 Emulator executables resolve by literal `executable_name` first, then by a per-OS
 `executable_regex`. The fallback exists for version-stamped release filenames (AppImages in
@@ -53,16 +72,39 @@ One emulator can serve several platforms from a single meta (ares). Auto-detecti
 is ambiguous for shared formats like `.bin`/`.cue` (Genesis vs. disc systems), so `system_flags` maps
 a system slug to the launch fragment substituted for `{system}` — e.g. `--system "Mega Drive"`.
 
-### Cores install on demand, not at emulator install time
-RetroArch declares 19 cores across 14 systems; downloading all of them to play one game wastes about
-30 MB. `EnsureCoreInstalled` runs at launch, after the save link and sync, and fetches only the core
-the selected system actually needs. Switching core in settings therefore needs no reinstall — the new
-one is fetched the next time that system launches.
+### Cores ship with the install, because only the bundle is versioned
+Cores are installed with RetroArch as one `RetroArch_cores.7z` from the same `{version}` the install
+recipe resolved, not fetched per core at launch. This replaces an earlier on-demand scheme that pulled
+each core individually from `buildbot.libretro.com/nightly/.../latest/`.
+
+The reason is netplay parity. RetroArch refuses a netplay connection unless both peers run the same
+RetroArch version *and* the same core version, and `latest/` is unpinnable — two users installing days
+apart get different core builds with no way to ask for a specific one. Probed on the buildbot: there is
+no per-core stable download and no dated per-core archive. `stable/<version>/<os>/x86_64/cores/`,
+`.../latest/` and a bare `.../<core>_libretro.dll.zip` all 404. The only versioned artifact is the
+whole-bundle `RetroArch_cores.7z`.
+
+Extracting one core from the remote archive is not an option either: the bundle reports `Solid = +`
+with `Blocks = 1`, so a single file cannot be decompressed without the entire archive. The cost is
+therefore fixed at one 227 MB download per RetroArch install, against roughly 30 MB before, and
+on-demand buys nothing once it has been paid. All 44 declared cores across 41 systems were verified
+present in the stable bundle, so no system needs a fallback core.
+
+`{version}` is substituted into `extra_downloads` URLs from the resolved `ReleaseOption.VersionLabel`,
+which is the bare version for `web_scrape` recipes, so cores can never drift from the RetroArch build
+they shipped with. `extract_folder_regex` on an extra download lifts the contents of the archive's
+wrapper directory into the destination — the bundle nests everything under `RetroArch-Win64/cores/`,
+so without it the cores land one level too deep.
 
 `core_directory` plus a per-OS `core_file_name` are the single source of truth for a core's on-disk
 path; `core_launch_arg` is a plain string using `{core_path}`, so the `.dll`/`.so` split lives in one
 field rather than being duplicated into every system's launch fragment. `cores` is in
-`preserve_on_reinstall` so an upgrade does not discard cores it would only re-download.
+`preserve_on_reinstall` so an upgrade does not discard them.
+
+`core_download_url` and the per-core path in `EnsureCoreInstalled` are deliberately left in place for
+any future emulator that has a versioned per-core source. RetroArch no longer declares the field, so a
+core missing from a RetroArch install is reported as needing a reinstall rather than silently pulling
+an unpinned nightly.
 
 ### Installing while the emulator runs corrupts the install
 `UninstallEmulator` refused to run while an emulator was open but `InstallEmulator` did not, so
@@ -72,11 +114,21 @@ directory and a working executable. `InstallEmulator` now carries the same `IsEm
 
 ### Default emulator per system favours RetroArch for pre-gen-6 and cartridge systems
 `GetMappedEmulator` returns index `[0]`, so ordering in `BuildDefaultEmulatorMap` is the default.
-RetroArch is first for generations 1-5 and for all cartridge systems (`nes`, `snes`, `n64`, `genesis`,
+RetroArch is first for generations 1-5 and for most cartridge systems (`nes`, `snes`, `genesis`,
 `sms`, `sega32`, `segacd`, `psx`, `gb`, `gbc`, `gba`, `nds`) because those are the systems RomM's
 EmulatorJS browser player supports, so a save written by RetroArch is also playable in the web UI.
 Gen-6-and-later disc systems keep their native emulator; 3DS is a cartridge system but has no usable
 libretro core, so azahar stays.
+
+`n64` is the exception to the cartridge rule and defaults to gopher64. Neither `mupen64plus_next`
+nor `parallel_n64` supports RetroArch netplay (measured — see `docs/NETPLAY-DESIGN.md`), while
+gopher64 has P2P netplay with TURN fallback built in. Browser-player save compatibility is not worth
+giving up multiplayer on the console whose library is most worth playing together.
+
+For the same reason `psx` keeps RetroArch but its default core is `mednafen_psx_hw`, not
+`swanstation`: swanstation cannot netplay at all, and beetle is the only PS1 path that can. psx is
+the one system where the netplay-capable choice and the browser-save-compatible choice coincide, so
+it stays on RetroArch rather than moving to DuckStation, which has no netplay whatsoever.
 
 `MergeMissingDefaultMappings` appends and never reorders, so this changes fresh installs only. That is
 deliberate: reordering an existing user's map would switch their emulator, and since saves are not
@@ -105,6 +157,716 @@ argument (Azahar): those put `{settings}` before `{rom_path}` so appended settin
 ROM out of final position. When removing the placeholder, drop exactly one adjacent space — never
 collapse other whitespace, since a ROM path may contain consecutive spaces.
 
+### The device id must be persisted, or every sync registers a new device
+`GetOrCreateDeviceAsync` is called by `SaveSyncManager` twice per game session — once before launch
+and once after exit — and it unconditionally `POST`ed `/api/devices`, discarding the returned id.
+Nothing was ever reused, so each sync created a row. Measured against a live server: **403 devices,
+all named `romm-frontend`**, with `last_seen` spread across weeks.
+
+`allow_existing` did not save it, most likely because the payload carried nothing RomM could match an
+existing row on — no `hostname`, no `mac_address`. The id is now stored in `config.cfg` under
+`[RomM] DeviceId` and revalidated with `GET /api/devices/{id}` before reuse, so a server-side
+deletion re-registers rather than failing forever. `hostname` is also sent now, giving RomM a chance
+to dedupe on its own.
+
+This matters beyond tidiness: `device_id` is what save sync attributes uploads to, so hundreds of
+one-shot devices make the server's own sync history meaningless, and any future presence built on the
+device registry would be unusable.
+
+### A netplay session must not outlive the emulator
+`NetplayManager` holds the session as autoload state, and `{netplay}` resolves from it on every
+launch. If a session were left active after the emulator closed, the *next* ordinary launch would
+silently carry `--host` or `--connect` and sit waiting for a peer that never arrives — a failure with
+no visible cause.
+
+`EndSession` is therefore called from the same `EmulatorManager._Process` branch that already detects
+process exit and triggers save sync, not from the UI. Cancelling from the menu also ends it, but the
+process-exit path is the one that must never be missed, because it covers the emulator being closed
+by the hotkey, by its own quit, or by crashing.
+
+### Hosting is gated on the game being launchable, not just supported
+The host button asks `ResolveGameAction(game).Kind == LaunchGame` rather than testing the emulator
+and download state itself. That reuses the single state machine the play button already derives from,
+so the menu can never offer to host a game that the play button would refuse to start — and a game
+that still needs downloading says so instead of failing at launch.
+
+### The netplay view is a third start-menu view, and Back cancels rather than closes
+`ShowNetplayView` follows `ShowBiosView`: the menu list hides and a sibling container shows. Two
+things had to change beyond adding nodes. `HandleInput` picked its focus-cycling list with a boolean
+`IsBiosViewOpen ? biosView : optionsList`, which would have cycled the hidden menu while the netplay
+view was up; and Back closed the whole panel, which would have left a session armed with no visible
+way to cancel it. Back now emits `NetplayCancelRequested`, which ends the session and returns to the
+menu.
+
+### `{netplay}` is a denylist, unlike `sync_include`
+`netplay.unsupported_systems` names the systems that *cannot* netplay, so an unlisted system is
+allowed to try. That is the opposite of `sync_include`, which is an allowlist, and the difference is
+deliberate.
+
+The failure modes are not symmetric. A save-sync allowlist that misses an extension silently stops a
+real save from being uploaded, and nobody notices until the save is needed. A netplay denylist that
+misses a bad core costs nothing: RetroArch refuses the connection outright with
+`Core does not support netplay`, which is loud, immediate and harmless. Guessing wrong is safe in one
+direction and destructive in the other, so the schemas point opposite ways on purpose.
+
+Only 13 of RetroArch's 41 systems were measured. The unmeasured ones are allowed to attempt netplay
+because the worst case is a clear refusal.
+
+`{netplay}` sits before `{rom_path}` in the launch template for the same reason `{settings}` does —
+some emulators require the ROM path last — and is removed with the same single-adjacent-space rule
+when no session is active.
+
+### Join codes encode an address, not a session
+A join code is the host's IPv4 address and port packed into 6 bytes and rendered as 10 characters of
+Crockford base32. The alphabet omits `I`, `L`, `O` and `U`, and parsing folds `I`/`L` to `1` and `O`
+to `0`, because these are typed on a gamepad's on-screen keyboard where those glyphs are easy to
+confuse. Hyphens and whitespace are ignored so a code can be written in groups.
+
+The code carries no session identity, so it cannot survive the host changing address. That is
+acceptable while codes are LAN-scoped; a relay-backed session id (RetroArch's `--mitm-session`) is
+the eventual replacement and is deliberately a different field rather than an overload of this one.
+`BuildJoinCode` returns null for anything that is not IPv4, rather than inventing an encoding that
+would then need supporting.
+
+### The host has no Ready button, so its readiness is its preparedness
+`AllMembersReady` asks every member — including the host — for `IsReady`, but the host's action
+button is Start, not Ready, so nothing ever set the host's `isLocallyReady`. The host therefore
+reported itself unready forever, `AllMembersReady` could never be true, and Start stayed disabled
+reading `Waiting For Players` no matter how many clients readied up.
+
+Readiness is now reported as `isPrepared && (isLocallyReady || IsHosting)`. Pressing Start *is* the
+host's readiness declaration, so deriving it from preparedness rather than adding a Ready toggle
+keeps one button on the host and avoids a state where the host is ready but has not started.
+
+### A rom cannot be selected until the system transition has finished
+`TransitionToSystem` is `async void`: it awaits a 0.2 s fade-out *before* calling
+`DoSelectSystemByIndex`, which is what actually rebuilds `currentlyShownGames`. Switching system and
+then immediately calling `SelectGameById` therefore searched the **previous** system's list and
+silently found nothing, while the carousel header — updated synchronously by
+`SetSelectionSilently` — had already moved. A client following the host's pick showed the new
+system's name above the old system's games.
+
+`SelectGameOnceSystemSettles` records the wanted rom id instead, and `OnSystemSelected` consumes it
+through `ResolveInitialGameIndex` in place of its usual `OnGameSelected(0)`. The selection happens
+once, on the list that actually contains the game, rather than being retried against a list that is
+not there yet.
+
+### The host's browsing is broadcast separately from its pick, and is debounced
+Clients mirror the host's carousel so everyone is looking at the same game before it is committed.
+That is a different message from `ReceiveGameSelection`: browsing moves the client's carousel and
+nothing else, while a committed selection also resets readiness, publishes the host's emulator and
+version, and drives the download prompt.
+
+Broadcasting on every highlight was rejected once already because it puts a network message behind
+every frame of scrolling. `PushHostBrowsingGame` therefore coalesces: it records the newest rom id
+and schedules one broadcast `BrowsingBroadcastSettleSeconds` later, so a scroll through fifty games
+sends one packet rather than fifty. `BroadcastBrowsingGame` also returns early when the host is
+alone in the lobby.
+
+The client's handler ignores the message when it is itself hosting, which is what stops
+`OnGameSelected` → broadcast → `OnGameSelected` from looping back.
+
+### The port mapping belongs to the lobby, not to the emulator session
+`EmulatorManager`'s exit branch released the UPnP mappings along with ending the netplay session. That
+is right when the lobby is closing too, and wrong while the lobby is still open: the *second* game in a
+lobby then had no port forwarding at all, so an internet peer could reach the lobby but not the
+emulator. Measured over a phone tether — the second session connected to the right address and simply
+was not forwarded, which presents as "netplay launched but the players are not connected".
+
+`ReleasePorts` on emulator exit is now conditional on the lobby being gone. The lobby's own paths —
+leaving, cancelling, tree exit — still release, which is where that responsibility belonged.
+
+### The advertised host address must come from the routing table, not the first private address
+`ResolveLocalHostAddress` walked `IP.GetLocalAddresses()` and returned the first RFC1918 address it
+found. On a machine with WSL or Hyper-V installed that is a **virtual adapter**: it advertised
+`172.31.16.1`, an address no peer can reach. It also poisons the LAN join code, which encodes the same
+value.
+
+It now asks the OS which local address would be used to reach the internet, by connecting a UDP socket
+to a public address and reading the local endpoint back. UDP connect sends no packets — it only
+resolves the route — so this costs nothing and cannot fail on a firewall. The old scan remains as a
+fallback for a machine with no route out.
+
+Clients were insulated from this by the earlier "connect to the address you reached the lobby on" rule,
+which is the second time that rule has covered for a bad advertised address.
+
+### Readiness is cleared when a session ends
+Nothing reset the ready flags when an emulator exited, so a lobby returning from a game showed everyone
+still Ready. The host could then start the next game before anyone had confirmed they wanted it or
+finished downloading it. Ending a session now clears readiness on the host and locally on each client.
+
+### The readiness signature suppresses the message, never the panel refresh
+Reporting readiness is idempotent so that recomputing on `MembersChanged` cannot loop, and the first
+version of that returned early on an unchanged signature — skipping `RefreshLobbyPanel` along with the
+RPC. The guard exists to stop redundant *network messages*; a local repaint is free and there is never
+a reason to skip it. The refresh now always runs and only the RPC is gated.
+
+Preparedness transitions are logged when the signature changes, which is naturally low-volume — one
+line per real state change — and is what confirms whether a stuck panel is a missed refresh or a
+preparedness ladder returning the wrong answer.
+
+This guard was initially blamed for a lobby that did not notice a *download* finishing. It was not the
+cause — see below.
+
+### A finished download is not a finished ROM; preparedness must wait for extraction
+`DownloadManager.HandleDownloadFinished` invokes the completion callback, which starts extraction on a
+background thread, and then emits `DownloadCompleted` synchronously — so the signal always arrives
+*before* the ROM exists at `roms/<slug>/<file>`. Preparedness is derived from `CheckIfGameIsDownloaded`,
+which tests exactly that path, so recomputing on `DownloadCompleted` reads the file as still missing.
+
+The lobby therefore settled on `Needs game` the moment a download completed, and nothing recomputed
+again once extraction landed. This is why the symptom survived making `RefreshLobbyPanel` unconditional:
+the repaint was running, it was just painting a correct answer to a question asked too early.
+
+The same ordering silently skipped the ROM hash check. `VerifyLocalRomAgainstHost` returns early when
+the file does not exist, so a freshly downloaded ROM was never hashed against the host's and
+`isLocalRomMatchingHost` kept its optimistic default — the match check failed open rather than running.
+
+`HandleExtractionFinished` now notifies netplay via `OnLocalRomLibraryChanged`, which is the first
+moment the file is real. The `DownloadCompleted` subscription is kept because a *failed* download never
+reaches extraction and still has to repaint.
+
+Emulator installs do not have this problem: `InstallEmulator` awaits the installer to completion before
+emitting, so that signal already fires when the state it describes is true.
+
+Confirmed on the two-machine rig. A client joining with `--netplay-auto-download` logs the whole ladder,
+and the middle line is the bug itself:
+
+```
+[Netplay] preparedness now "Downloading..."
+Download complete. Starting extraction for: ...
+[Netplay] preparedness now "Needs game"
+Successfully extracted ... to roms/nes
+[Netplay] preparedness now "Ready"
+```
+
+`Needs game` after `Download complete` is the recompute reading a file that is not there yet. Before the
+fix that was the terminal state.
+
+**Update — the ordering that caused this no longer holds for ROMs.** A ROM download is now started with
+`callerClosesEntry: true`, so `DownloadCompleted` is emitted by `HandleExtractionFinished` rather than by
+`HandleDownloadFinished`: on the success path the signal now arrives *after* the file exists (see "A
+download entry lives as long as the operation"). The `OnLocalRomLibraryChanged` notification stays — it
+is the narrower, more honest trigger, and nothing should start depending again on `DownloadCompleted`
+firing early. A failed download still emits immediately, which is exactly the case the `DownloadCompleted`
+subscription was kept for.
+
+### The published ROM hash is absent from any cache written before the hashing work
+`RequiredRomHash` comes only from `game.Files[0].Md5Hash`, which is populated from the API's `md5_hash`.
+That field was added to `RomFile` alongside netplay, so a `games.cache` written before then contains no
+hash at all — not even a null. `VerifyLocalRomAgainstHost` returns early on an empty expected hash, so
+on a stale cache the whole ROM-matching feature is inert and every client silently passes.
+
+It fails open rather than blocking play, which is why it is easy to miss. A cache rebuild is what turns
+it back on; there is no error to notice in the meantime.
+
+### The host publishes a hash it computed, not one the server reported
+Depending on the server's `md5_hash` made the check hostage to cache freshness, and it was the wrong
+question anyway. Netplay needs both sides running *identical bytes*; "matches the host" is the real
+requirement and "matches the server's canonical dump" only approximates it. The host therefore hashes
+its own file and publishes that.
+
+Hashing is too slow to do inline — `CommitHostGameSelection` would block on a multi-GB image — so the
+selection goes out immediately and the hash follows on `ReceiveRomHash`. Clients treat an empty
+`RequiredRomHash` as *not yet verified*: `OnRequiredRomHashChanged` resets verification and re-runs it,
+which drops a client back out of Ready until it has actually compared. That closes the window where
+everyone looks ready before anyone has checked.
+
+While the host hashes it sets `isVerifyingLocalRom`, so it reports `Checking game file` through the
+existing `LobbyMember.Status` and `LocalPlayerHasGame` returns false — a hashing host cannot press
+Start. No new status field was needed; the host simply never used to participate in the one that
+already existed.
+
+`romhashes.cache` sits beside `games.cache` and is keyed by path with a size and mtime stamp. The stamp
+is what makes a re-download or a swapped dump invalidate cleanly rather than trusting a stale entry.
+All three callers — the download-time warm, the host publish and the client verify — funnel through
+`ResolveRomHashAsync`, which collapses concurrent requests for the same path so a file is never hashed
+twice at once.
+
+Verified on the two machines: identical ROMs produce `Checking game file` then `Ready`, and a client
+whose ROM has four bytes appended reports the real computed hash against the host's and settles on
+`Game file does not match`, refusing to ready up.
+
+### A client must not have its game list filtered out from under the host's choice
+`showOnlyInstalledGames` hides anything not downloaded, which is right when browsing your own library
+and wrong in a lobby: the host picks from *their* library, and the whole point of a client's lobby is
+to see that game and download it. With the filter on, the host's pick was simply absent from
+`currentlyShownGames`, so `SelectGameById` found nothing and the client's carousel sat still while the
+host browsed.
+
+The filter is therefore suppressed while following a lobby — a non-hosting member of a lobby — and left
+alone for the host, who is choosing from what they have. It composes with
+`FilterSystemsForNetplayHost`, which narrows *systems* for both roles.
+
+### Closing a lobby has to restore the browse source, not just hide the panel
+`LeaveLobby` re-ran `GetCache` so the carousel returned to the full system list, but `OnLobbyClosed` —
+the path taken when the *host* quits or the connection drops — only hid the panel. A client left after
+the host quit therefore stayed narrowed to netplay-capable systems and could not see any other
+platform until something else forced a rebuild.
+
+`OnLobbyClosed` now performs the same teardown as leaving deliberately: refresh the browse source,
+return focus to the game list, release ports, and clear the cached lobby address, readiness signature
+and browsing flag. The two paths differ in *why* the lobby ended, not in what has to be undone.
+
+### Readiness never starts a session; only the host pressing Start does
+Readiness says "I am able to play this", not "go". The host decides when a session begins, and nothing
+else may decide for it — otherwise a player finishing a download is enough to drag everyone into a
+game.
+
+That was never true of the product, but it *was* true of the test flags: `--netplay-auto-ready`
+originally readied clients **and** started the game on the host, so selecting a game appeared to launch
+it instantly. The two behaviours are now separate arguments — `--netplay-auto-ready` readies up and
+stops there, `--netplay-auto-start` is the host-only flag that presses Start. Only the second one can
+begin a session, and neither exists unless explicitly passed.
+
+Auto-start is also one-shot per selection, reset when the selection changes. Without that, clearing
+readiness at the end of a session immediately re-readies everyone and relaunches the same game forever.
+
+### `lobbyCopyCodeButton` was never bound, so the button did nothing at all
+The node existed in `main_scene.tscn` and the `[Export]` existed in `MainScene`, but the field was
+absent from `node_paths` and had no assignment line — exactly the failure mode this document and
+`CLAUDE.md` warn about. The field was null, so the button was invisible to focus navigation *and* its
+`Pressed` signal was never connected: it had never copied anything.
+
+Verifying by eye is what let it through. The check that catches it is mechanical — parse the scene for
+declared `node_paths`, assignment lines and real node paths, parse the C# for `[Export]` fields, and
+diff all four sets. Doing that surfaced a second one immediately: `lobbySelectGameButton` has a C#
+export and **no node in the scene at all**, so the Select/Change Game button has never existed and
+browsing is reachable only via Back.
+
+### A netplay client must not upload its save, because the progress is the host's
+Lockstep netplay has exactly one game state and it is the host's file — RetroArch syncs it to each
+client on connect. So whatever a client's emulator writes when it exits is the *host's* progress
+sitting in the client's save directory under the client's name.
+
+`SyncAfterExit` ran on every emulator exit with no netplay distinction, which meant joining a session
+overwrote the joiner's own cloud save for that game with the host's progress. Silently, and for a game
+they may have had their own long-running save of. The upload is now skipped when
+`NetplayManager.Role` is `Join`. The role is still set at that point — `EndSession` is called further
+down the same branch — which is the only reason this can be decided there at all.
+
+Only the upload is suppressed. `SyncBeforeLaunch` still runs for a client, because it costs nothing
+and keeps the pre-session state coherent.
+
+The client's *local* file turns out to be safe without any help from us. Measured with both machines
+holding the same Emerald save and the host saving in-game mid-session: the host's `.srm` changed and
+uploaded, while the client's was **not written at all** — same hash, same mtime as before the session
+— even though lockstep means the client's in-memory SRAM was identical to the host's at the moment of
+saving. RetroArch does not persist SRAM while it is a netplay client. The `.netplay` directory it
+creates under the save directory stayed empty too.
+
+So no backup-and-restore is needed, and the upload gate is defence in depth rather than the only thing
+standing between a joined session and someone's overwritten save. That distinction matters for phase
+4: this is a RetroArch behaviour, not a guarantee, and Flycast, PPSSPP and gopher64 have not been
+measured. The gate protects the cloud save whatever they do locally.
+
+### Readiness depends on who else is in the lobby, so it has to be recomputed when they change
+Once the version target became "the newest anyone has" rather than the host's, readiness stopped
+being a purely local property: a peer joining with a newer build can invalidate everyone else's. The
+first cut recomputed only on download, install and game-selection events, so a host that readied
+while alone stayed ready when a newer client arrived, and started the game it was no longer eligible
+for.
+
+Recomputing on `MembersChanged` fixes that but closes a loop — reporting readiness broadcasts the
+roster, which raises `MembersChanged`, which reports readiness. Reporting is therefore idempotent: the
+computed values are hashed into a signature and an unchanged signature sends nothing. The loop
+terminates on the first repeat.
+
+Handler order on that signal matters too, and it is subtle. `AutoStartHostedGameIfRequested` was
+subscribed before `ReportPreparednessIfInLobby`, so it saw the *stale* roster — the host still marked
+ready from before the client joined — and started the game before the recompute could clear the flag.
+Preparedness is now reported first. Auto-start also asks `LocalPlayerHasGame` directly rather than
+trusting the roster, because a host should never start a session it is not itself eligible for,
+whatever order the signals arrive in.
+
+A peer's own installed version has to seed the target as well, not just the versions in the roster.
+A client learns its own version through the roster only *after* it reports, so a client on the newest
+build would compare itself against the host's older one, decide it needed to change, and never report
+at all — a deadlock where nobody is ready because nobody has spoken.
+
+### The host waits until the emulator is actually listening, rather than guessing
+Clients used to sleep `HostStartupGraceSeconds` — five seconds — after the start message and then
+connect blind. `--connect` against a host that is not yet listening fails outright with no retry, so
+a core that took longer than the guess lost the session, and every session paid the five seconds
+whether it needed them or not.
+
+The host now polls `GetActiveTcpListeners` for its netplay port and only sends `ReleaseMembersToStart`
+once something is listening; clients connect immediately on receipt. RetroArch binds that port when
+netplay initialises, which is after the core and content have loaded — exactly the delay the guess
+was covering.
+
+Reading the OS listener table is deliberate over connecting to the port to test it. A probe
+connection would arrive at RetroArch as a peer that immediately disappears, which is at best noise in
+the very handshake this is trying to protect. Binding the port to see if it is taken is not reliable
+either: address-reuse semantics differ across platforms, so a successful bind does not prove nobody
+is listening. The listener table is passive and means exactly what it says.
+
+There is still a timeout, and it releases the other players anyway when it expires — a session that
+might work beats one that certainly will not.
+
+#### The session port must be re-resolved per launch, not read from the previous session
+`EndSession` sets `Port` to zero when an emulator exits, and `BeginHosting` is what applies the
+fallback. `StartHostedGame` read `Port` *before* calling `BeginHosting`, so the first game in a lobby
+worked — the lobby's own `BeginHosting` had already set it — and **every game after it launched with
+port 0**.
+
+The damage was almost invisible, which is why it survived: the client's `BeginJoining` applies the
+same fallback independently, so it still connected to the right port. What broke was the host's
+listening check, which waited for something to listen on port 0 and burned the entire 60-second
+timeout before releasing the other players. Measured as `nothing started listening on 0` followed by a
+client that launched a minute-plus late, into a session the host had by then finished with.
+
+The port is now resolved through `ResolveDefaultPort` on every launch, matching how the lobby resolved
+the port it asked UPnP to map, and the listening poll refuses a non-positive port outright rather than
+waiting out the timeout on a value that can never match.
+
+Worth noting how this escaped: every automated test launched exactly **one** game per lobby. The bug
+only exists from the second launch onward, so a scripted run could never see it.
+
+### ROM parity is checked against the file on disk, not against the metadata
+Comparing the host's ROM metadata with the client's would prove nothing: both resolve the same
+`rom_id` against the same RomM server, so the hashes are equal by construction. The failure this
+guards against is a **local file** that does not match what RomM says it should be — a partial
+download, a hand-replaced file, a different regional dump — which RetroArch reports as a cryptic
+connection failure.
+
+The host publishes RomM's `md5_hash` with the game selection, and each peer hashes its own file and
+compares. MD5 rather than the CRC32 RetroArch itself logs, because .NET has MD5 built in and CRC32
+would need a package for no benefit — the check is "is this the file RomM describes", and any hash
+answers that.
+
+Hashing runs off the main thread and is cached per file path, so it happens once per selection rather
+than once per panel refresh. A mismatch blocks readiness and turns the action button into
+`Redownload <game>`, so the fix is one press. A hash that cannot be computed counts as a match: the
+frontend's own failure to read a file must not be what stops a session starting.
+
+### A client connects to the address it reached the lobby on, not the one the host advertises
+`StartHostedGame` publishes the host's UPnP external address when there is one, which is right for a
+peer coming in over the internet and wrong for everyone else. Measured on two machines on one LAN:
+the host launched `--host --port 55435` while the client launched `--connect 50.34.50.204` — its own
+router's public address. That only works if the router supports NAT hairpinning, and consumer
+routers commonly do not, so a purely local session would fail with a connect error that names a
+public address and gives no hint that the LAN address was available.
+
+The host cannot tell which of its addresses a given peer can reach, but the peer already knows: it
+is talking to the lobby right now, over an address that demonstrably arrives. `MainSceneNetplayHandler`
+remembers that address from `JoinLobby` and prefers it, falling back to the advertised one only if
+it has none. This needs no subnet comparison and stays correct for internet peers, whose lobby
+address *is* the external one.
+
+### Internet play needs the lobby port forwarded too, not just the netplay port
+Hosting mapped `hostPort` — the emulator's netplay port — and nothing else, so the log read
+`Mapped ports 55435 via UPnP` and the join code advertised the public address as reachable. But a
+joiner connects the **lobby** first, and `NetplayLobby` listens on its own ENet port (55440), which
+was never forwarded. Over the internet the client's connection was dropped at the host's NAT, so the
+lobby opened with an empty roster and sat there until ENet gave up — the failure looked like an
+empty lobby rather than a blocked port. On a LAN nothing forwards anything, which is why this only
+appeared once a code was used across the internet.
+
+Both ports are mapped now, and *both* must succeed before the code advertises the public address:
+`MapPorts` returns true if **any** port mapped, so checking its return value alone would still call
+a host reachable when only the emulator's port got through. `IsPortMapped` is asked about each one.
+When either fails the code carries the LAN address and the note names both ports to forward by hand.
+
+A client cannot tell "connected, nobody here yet" from "never connected" either, since both are an
+empty roster, so a non-hosting lobby with no members reports `Connecting to the host...` rather than
+the waiting-for-a-game text.
+
+### Closing the emulator is three different things on Linux
+`CloseEmulator` was written for Windows and silently did nothing on Linux. Measured: the host quit,
+the client logged that it had been told to close, and RetroArch stayed on screen.
+
+Three separate faults:
+
+- `Process.CloseMainWindow` only works on Windows. On Unix .NET has no window handle to send to, so
+  it returns false and nothing happens.
+- `Process.Kill()` without `entireProcessTree` kills only the tracked process. RetroArch on Linux is
+  an AppImage, so the tracked pid is the AppImage runtime and the emulator is its child — killing the
+  parent leaves the emulator running.
+- `WaitForExit(5000)` ran on the main thread, so the whole frontend froze for five seconds while
+  waiting for a process that was never asked to exit.
+
+The request is now per-platform — `CloseMainWindow` on Windows, `SIGTERM` elsewhere — and the wait
+happens off the main thread. `SIGTERM` rather than `Kill` first matters: `Process.Kill` sends
+`SIGKILL` on Unix, which would stop RetroArch before it flushes SRAM, and save sync reads those files
+off disk once the process exits.
+
+#### An AppImage's launcher outlives the emulator, so exit is detected by scanning `/proc`
+The same double-fork breaks *detecting* the exit, not just causing it, and that is the more damaging
+half. Measured: the emulator was quit, and one minute later
+
+```
+27935      1  romm-frontend.x
+28366  27935  AppRun            <- still alive, emulator long gone
+```
+
+`activeEmulatorProcess` is the launcher, so `HasExited` stayed false indefinitely. Everything hanging
+off that check silently never ran: **save sync never fired on exit**, `EndSession` never cleared the
+netplay role — so the next ordinary launch would have carried `--host` or `--connect` — the port
+mapping was never released, and `IsEmulatorRunning` stayed true, which refuses every later launch
+with "an emulator is already starting or running". None of it produced an error; the frontend simply
+believed a game was still running forever.
+
+On Windows `HasExited` is the whole answer and is still used unchanged. On Linux the emulator is
+identified by scanning `/proc` for a process whose `comm` is the executable's file name — truncated
+to the 15 characters the kernel keeps — *and* whose `cmdline` contains the executable path.
+
+A process counts as the emulator when its `cmdline` contains the executable path **and** either its
+`comm` is that expected name, or its `comm` is not a known launcher. Both tests are kept because
+their failure modes are wildly asymmetric, and only the union is safe in both directions:
+
+- **Name match alone** breaks badly when an AppImage's `AppRun` execs a binary under a different
+  name — plausible for PCSX2 or Dolphin, whose real process may not be named after the AppImage. No
+  process would match, the session would be declared over about fifteen seconds in, and save sync
+  would fire *while the game was still being played*.
+- **Excluding launchers alone** breaks gently: an unrecognised launcher keeps the frontend thinking a
+  game is running until that launcher exits. That is the old bug's behaviour, no worse.
+
+So a severe failure now needs both rules to be wrong at once. The launcher list has to include the
+FUSE mount daemons some AppImages leave behind — `dwarfs` processes carrying the AppImage path in
+their own `cmdline`, observed still running ten hours after their emulator closed — or those alone
+would keep the session alive forever.
+
+Verified against RetroArch, whose `comm` is `RetroArch-Linux`, exactly the first 15 characters of
+`RetroArch-Linux-x86_64.AppImage`, with `AppRun` as its launcher. The other AppImage emulators are
+covered by the launcher-exclusion half and are untested.
+
+The scan is throttled to `EmulatorLivenessCheckSeconds` rather than run every frame, and suppressed
+for `EmulatorLivenessGraceSeconds` after launch: an AppImage has to mount itself before the emulator
+exists, and a check that ran in that window would see no match and declare the session over
+immediately. Detecting the exit a second late costs nothing.
+
+The lingering launcher is killed once the exit is detected, or it accumulates one orphan per game.
+
+#### Signalling the process tree does not reach an AppImage's emulator
+Killing by process handle cannot work for these emulators, and measuring the tree shows why:
+
+```
+14145  ppid=13842  AppRun                    <- what the frontend tracks
+14149  ppid=1      RetroArch-Linux-x86_64    <- re-parented to init
+```
+
+`AppRun` double-forks the real emulator, so it is orphaned to init and is **not a descendant** of
+anything the frontend holds. `pkill -P`, `Kill(entireProcessTree: true)` and every other tree walk
+find no children to signal. Worse, `AppRun` ignores `SIGTERM` outright — sending it one changes
+nothing — while the same signal to the real process shuts it down cleanly.
+
+Shutdown is therefore addressed by **executable path** (`pkill -f` on `StartInfo.FileName`), which
+matches the orphan as well as the wrapper, with the tracked pid signalled too so non-AppImage
+emulators still take the ordinary path. The force stage repeats it with `-KILL` before falling back
+to `Kill(true)`, because a lingering `AppRun` keeps `IsEmulatorRunning` true and would leave the
+frontend believing a game is still running.
+
+### Selecting a game by id has to scroll the carousel, not just mark the card
+`OnGameSelected` sets `currentlySelectedGame`, fills the details panel and flips each card's
+`Selected` flag — but the carousel's own position lives in `VerticalCarousel.SelectedIndex`, and
+nothing in that path touches it. Calling `SelectGameById` therefore lit the right card up while the
+list stayed exactly where it was, so a client following the host's pick highlighted a game that was
+somewhere off screen.
+
+Every other caller that moves the selection programmatically already sets `SelectedIndex` and calls
+`UpdateLayout` alongside `OnGameSelected`; `SelectGameById` was the one that did not.
+`ScrollGameListTo` is that pair, and `OnSystemSelected` uses it too so the first card of a new
+system is actually scrolled to rather than assumed to be in view.
+
+### The lobby panel needs explicit d-pad navigation, and must not steal focus on refresh
+Two separate faults made the lobby unnavigable on a controller.
+
+Godot drops focus from a control the moment it is disabled, and `RefreshLobbyPanel` reassigns
+`Disabled` on the action and select-game buttons every time it runs. It runs on every roster
+broadcast, which arrives repeatedly, so the focused button was routinely disabled out from under the
+user and the panel then re-focused its *first* enabled button. Focus snapped back to the top faster
+than it could be moved. The refresh now remembers what was focused and restores it when it is still
+usable, falling back to the first button only when it is not.
+
+Focus navigation between the buttons could not be left to Godot either. `MainScene` sits in front of
+the GUI for directional input, so `HandleLobbyNavigation` cycles the enabled, visible lobby buttons
+directly, in the same place `Select` and `Back` are already routed for the lobby. It is a wrap-around
+cycle over a filtered list rather than a geometric neighbour search, which means a disabled button is
+skipped instead of becoming a dead end.
+
+The cycle order is read from the panel's own child order, not from a list in code. It was a hardcoded
+array first, and it silently disagreed with the scene: the panel laid the buttons out as
+Action → Leave → Copy Code while the array said Action → Copy Code → Leave, so pressing down from the
+action button jumped to the bottom entry and then back up to the middle one. It reads as the d-pad
+running backwards. Walking `lobbyPanel` for `Button` descendants in tree order cannot drift from the
+layout, and it picks up buttons nested inside their `MarginContainer` wrappers without needing to know
+they are there.
+
+The consequence is that `LobbyPanel` is a `VBoxContainer`, so the order of the `MarginContainer` blocks
+in `main_scene.tscn` is the only thing that sets *both* the visual order and the d-pad order — there is
+no second place to keep them in sync, and no code change can reorder them. They now read
+Action → Copy Code → Leave so that leaving the lobby is last rather than sitting between the two
+buttons you actually use.
+
+`lobbySelectGameButton` used to be a fourth entry here. It had a C# `[Export]` but no node and no
+binding in the scene, so it was permanently null: invisible to this walk and its `Pressed` handler never
+connected. Browsing for a game is reached from Back and from the internal call sites instead, so the
+export was removed rather than given a node.
+
+### Flycast's GGPO port is fixed at 19713; `network:LocalPort` does not move it
+`network:LocalPort` looks like the GGPO port and is not — it belongs to the Naomi/BBA networking
+path. Launching the host with `-config network:LocalPort=55435` produced a Flycast bound to UDP
+**19713** regardless, which is GGPO's own default and the only port it listens on. There is no
+`GGPOPort` key anywhere in the binary; the client side is configurable only in that
+`network:server` accepts `address:port` ("Your peer IP address and optional port").
+
+`host_args` therefore sets no port at all and `default_port` is 19713, which is the real number
+rather than a wish. The client is pointed at `{peer_address}:{peer_port}`, and both resolve to
+19713 through the emulator's declared port.
+
+This is why `BuildLaunchFragment` now prefers the emulator's declared `default_port` over the
+session port. The session port is chosen when the *lobby* opens, before anyone has picked a game,
+so it cannot know which emulator will run — it was always the generic 55435 fallback. RetroArch
+declares 55435 too, so nothing changes for it, but the field is no longer decorative.
+
+**The frontend still forwards the session port, not the emulator's.** `TryMapPortsAsync(hostPort,
+lobbyPort)` runs at lobby-open with the same pre-emulator information, so a Flycast session over
+the internet would have 55435 forwarded and 19713 closed. LAN is unaffected. Fixing this means
+mapping the port once the host commits a game, which is the same UPnP-lifetime area that already
+caused the second-launch bugs, so it is deliberately left for its own change.
+
+### Flycast GGPO is symmetric: both peers need the other's address
+`ActAsServer` and `LocalPort` belong to the **Naomi** networking tab — their tooltips are "Create a
+local server for Naomi network games" and "The local UDP port to use". The GGPO tab has no server
+concept at all: it has `Play as Player 1` ("Deselect to play as player 2") and a single `Peer` field
+("Your peer IP address and optional port"). The "leave blank to find a server automatically" tooltip
+that suggests a listening mode belongs to Naomi's `Server`, not to GGPO's `Peer`.
+
+So there is no host that merely listens. Both sides dial each other and the only asymmetry is who is
+player 1. With only the client given an address, both peers sat at `Starting Network` forever.
+
+The host therefore has to learn the client's address. `NetplayLobby` records each member's
+`RemoteAddress` from the ENet connection when its identity arrives, and `StartHostedGame` passes the
+first remote member's address into `BeginHosting`, so `{peer_address}` resolves on both sides. This is
+also why the lobby is limited to two players for Flycast — `max_players` is 2 and GGPO is a pair.
+
+Once that landed the peers genuinely connect, which is what turned an indefinite `Starting Network`
+hang into a fast, explicit failure.
+
+### `Peer verification failed` is Flycast rejecting a mismatched peer, not a network problem
+After the peers connect, GGPO exchanges a verification step, and any mismatch stops both sides with
+`GGPOException in ggpo_idle: Verification mismatch` on the side that detects it and
+`Peer reported verification failure` on the other. It is not a connectivity failure — reaching this
+error is proof the transport works.
+
+Two causes were ruled out by measurement: BIOS (both load real BIOS under the frontend; only a
+hand-rolled launch without `XDG_DATA_HOME` fell back to `reios`) and the render settings the frontend
+appends per machine, which were made identical and changed nothing.
+
+**The emulator builds are not verified to match.** `GetInstalledVersion` reads
+`installed_version.txt` from the emulator directory, and neither machine has one for Flycast, so it
+returns null on both. The lobby's version convergence compares null to null, reports agreement, and
+lets the session start. The Windows build reports `v2.6` dated January 2026 while the Linux AppImage
+was installed in July 2026 — almost certainly different releases, which is exactly what GGPO's
+verification exists to reject.
+
+A missing version file is therefore not a cosmetic gap: for any emulator installed outside the
+frontend, or before version tracking existed, the convergence check silently passes and the mismatch
+surfaces as an unexplained emulator-side error instead.
+
+### A netplay session has to plug in the second controller itself
+Flycast's default maple layout is `device1 = 0` (a controller in port A) and `device2 = 10`, where
+10 is *None*. The emulated Dreamcast therefore has exactly one controller plugged in, so a netplay
+session connects, synchronises and plays — while the second player simply does not exist as far as
+the game is concerned.
+
+`input:device2=0` puts a controller in port B for netplay launches only. It is deliberately not set
+outside netplay, where a phantom second pad can change how a single-player game behaves.
+
+The expansion slots are left alone. Port A carries VMUs (`device1.1 = 1`), port B keeps the existing
+`10`. Adding a VMU to port B would change the emulated machine on one side only unless it were set on
+both, and that is exactly the kind of divergence GGPO rejects.
+
+### Digital inputs always cross GGPO; the analog stick only if you ask
+`network:GGPOAnalogAxes` is a three-way enum — 0 `Disabled`, 1 `Horizontal`, 2 `Full` — and it
+defaults to 0. Buttons and the d-pad travel regardless, so a session with it unset looks *almost*
+right: two players, both responsive, and a completely dead thumbstick.
+
+Netplay launches now force `2` on both sides. It has to be identical on both, because Flycast treats
+a difference as a hard error rather than degrading — `GGPO analog settings are different from peer`.
+Passing it from the launch arguments is what guarantees that, since each machine's own `emu.cfg` is
+free to disagree.
+
+### Netplay peers must share the emulated console's state, not just the ROM
+`Peer verification failed` was traced to `dc_nvmem.bin` and the game's VMU save differing between the
+two machines. `dc_boot.bin` and `dc_flash.bin` matched; the NVRAM did not, because it is per-machine
+state that drifts as each install is used. Copying the host's NVRAM and VMU to the client was what
+finally let a session start.
+
+**The frontend does not enforce this yet.** It already refuses to start when the *ROM* differs, and
+the same reasoning applies to everything else that makes up the emulated machine. For Flycast that is
+`dc_nvmem.bin` plus the per-game VMU files — both already named in `sync_include`, which is why they
+exist on both machines but with per-device contents. Until a client adopts the host's copies, Flycast
+netplay works only when the two installs happen to have converged.
+
+### `installed_version.txt` is what makes version convergence real
+`GetInstalledVersion` reads that file from the emulator directory and returns null when it is absent.
+Neither machine had one for Flycast, so the lobby compared null to null, reported agreement, and let
+the session start. Both builds happened to be v2.6, so nothing broke — but a genuine mismatch would
+have passed the same check and surfaced as an unexplained emulator-side failure.
+
+An emulator installed outside the frontend, or before version tracking existed, has no version file.
+Treat a null version as *unknown*, not as *matching*.
+
+### The emulator's port is mapped when a game is committed, not when the lobby opens
+`TryMapPortsAsync` runs at lobby-open, before anyone has picked a game, so it can only map the lobby
+port and the generic session port. Flycast's GGPO uses 19713, which was therefore never forwarded and
+made internet play impossible while LAN play worked.
+
+Remapping the whole set later is the obvious fix and the wrong one: `TryMapPortsAsync` calls
+`ReleasePorts` and rediscovers the gateway, so it would briefly unmap the lobby port out from under a
+live lobby. `TryMapAdditionalPortAsync` instead reuses the already-discovered `Upnp` device and adds a
+single mapping, and `ReleasePorts` already tears down everything in `mappedPorts` regardless of how it
+got there. The host maps the emulator port once, when it commits a game and the emulator is finally
+known.
+
+### Listening detection has to look at UDP, or it always waits the full timeout
+`ReleaseMembersOnceHostIsListening` holds the other players back until the host's emulator is actually
+accepting connections. It checked `GetActiveTcpListeners` only. RetroArch happens to listen on TCP;
+Flycast's GGPO binds **UDP** 19713 and nothing else, so the check could never succeed and every
+Dreamcast session sat through the entire 60-second timeout before releasing anyone.
+
+Checking `GetActiveUdpListeners` as well takes that from 60 seconds to `listening on 19713 after 1.0s`.
+The symptom was easy to misread as netplay being slow to connect, because the session did eventually
+work — the clients simply started a minute late.
+
+### Flycast's config keys were read out of the binary, not guessed
+`flycast -help` documents only `-config section:key=value`, so the key names had to come from
+somewhere. They are laid out as string literals in the executable: the `network` section is
+followed by `Enable`, `ActAsServer`, `DNS`, `server`, `LocalPort`, `EmulateBBA`, `EnableUPnP`,
+`GGPO`, `GGPODelay`, `Stats`, `GGPOAnalogAxes`, `GGPOChat`.
+
+A second cluster containing `NetworkEnable`, `NetworkServer` and `GGPOEnable` is a **Lua API**
+binding list — it sits next to `maple`, `memory` and `input` — and those names are not config
+keys. Using `network:GGPOEnable` would silently do nothing, because `-config` accepts any
+section:key pair and simply stores unknown ones.
+
+### RetroArch must not do its own NAT traversal, because the frontend already did it
+`NetplayPortMapper` maps the netplay port over UPnP before launching, and RetroArch then asks the
+router to map **the same port again**. The second request is refused — routers do not hand the same
+external port to two mappings — and RetroArch reports `Netplay UPnP Port Mapping Failed` followed by
+`Your room is not connectable from the internet`, which reads as a router problem when it is really
+the frontend and the emulator competing for one mapping.
+
+`netplay_nat_traversal = "false"` in the shipped `retroarch.cfg` stops the duplicate attempt. The
+mapping still exists; the frontend owns it and releases it on cancel, on emulator exit and on tree
+exit, which RetroArch cannot do for a mapping it did not make. `netplay_public_announce` is off for
+a separate reason: sessions here are formed in the lobby, and there is no reason to list a private
+game on RetroArch's public server.
+
+This supersedes the earlier reading of that measurement as a plain router refusal.
+
+### Netplay can be driven from the command line, because a lobby needs two machines
+`--netplay-host` and `--netplay-join=<address>` are read by `ApplyStartupSessionArguments` at the end
+of `MainScene._Ready` and call the same handlers the start-menu buttons do. They exist because a
+lobby cannot be tested from one keyboard: verifying host and client behaviour means driving two
+machines at once, and the Arch test box (see `LINUX-TESTING.md`) has no way to take input remotely.
+
+They take the host address directly rather than a join code, so a test does not depend on the
+clipboard. Both are read from `OS.GetCmdlineUserArgs`, which means they must follow a bare `--` on
+the command line.
+
 ### Save data lives inside the install directory
 Every emulator keeps its saves inside its own install directory (memory cards, save folders), so
 uninstall and reinstall must know which sub-paths to leave alone. Two separate lists exist and the
@@ -120,6 +882,58 @@ as a game save.
 ### Prerelease filtering
 GitHub release recipes prefer stable releases, but some repos (PCSX2) flag every rolling release as
 a prerelease. When prereleases are all that exist, they are used.
+
+### RetroArch on Linux is an AppImage that rewrites its own HOME
+The Linux `RetroArch.7z` from the libretro buildbot contains no `retroarch` binary. It ships
+`RetroArch-Linux-x86_64.AppImage` alongside a `RetroArch-Linux-x86_64.AppImage.home` directory, and
+the AppImage sets `$HOME` to that directory on launch. Every RetroArch-owned path — `cores`,
+`system`, `assets`, `info`, `database` — therefore lives under
+`RetroArch-Linux-x86_64.AppImage.home/.config/retroarch/`, not flat in the install directory the way
+the Windows build lays them out.
+
+`executable_name.linux` and `core_directory.linux` in `install_scripts/retroarch/meta.json` are
+written against that layout. Declaring `executable_name.linux` as `retroarch` (the obvious guess)
+makes `IsEmulatorInstalled` resolve a path that never exists, so a fully successful download and
+extraction still reports as "not installed".
+
+The Linux `default_config` deliberately does **not** override `system_directory`,
+`libretro_directory`, `assets_directory` and friends. Because the AppImage already points `$HOME` at
+its bundled tree, RetroArch's own defaults are already correct; overriding them just hardcodes the
+versioned folder name in a second place. Only `savefile_directory` and `savestate_directory` are
+redirected, so saves land in the central save store like every other emulator.
+
+### PCSX2's Linux AppImage keeps its config in a nested `PCSX2/` directory
+`-portable` on Windows makes PCSX2 read `inis/PCSX2.ini` next to the executable. The Linux AppImage
+cannot do that — its "app directory" is a read-only mount — so it creates a `PCSX2/` data directory
+*next to the AppImage* and uses `PCSX2/inis/PCSX2.ini` instead. Anything written to `inis/` on Linux
+is inert: PCSX2 generates its own config about half a second after install and never reads ours.
+
+This is why `install_scripts/pcsx2/default_config/linux/PCSX2/inis/PCSX2.ini` exists, and why every
+`config_file_relative_path` in the PCSX2 metadata — the four `settings_fields` and
+`controller_config` — is OS-scoped. Without that, the in-app graphics settings and controller
+mappings silently write to a file PCSX2 ignores.
+
+The symptom is the first-run setup wizard appearing forever: `SetupWizardIncomplete = false` is
+being written to the wrong file. PCSX2 is the only emulator that does this. Dolphin (`User/`),
+Azahar (`user/`), PPSSPP (`memstick/`) and Flycast (`data/`) all keep their data where the shipped
+`default_config` already puts it.
+
+`[Folders]` in the Linux config points `Bios` and `MemoryCards` at `../bios` and `../memcards` so
+they resolve back out to the emulator install directory. That keeps `emulator_bios_path` and
+`relative_save_path` identical across platforms — PCSX2 accepts the parent-relative paths and does
+not rewrite them.
+
+### Default configs can be scoped per OS
+`install_scripts/<emulator>/default_config/` is copied wholesale on install, but a `windows/`,
+`linux/` or `macos/` subdirectory inside it is treated as an overlay rather than as content: the
+base directory is copied with those names excluded, then the one matching the running OS is copied
+over the top. This exists because emulators that ship a different directory layout per platform
+(RetroArch) need different path settings in the same config file name.
+
+### `core_directory` is OS-scoped
+`core_directory` accepts either a plain string or an object keyed by OS name, resolved through
+`ResolveOsScopedValue` like `core_file_name` beside it. Existing metadata using a plain string keeps
+working unchanged.
 
 ### Platform mapping merges on upgrade
 The on-disk `EmulatorMap.json` is written once at first run. Platforms added to the defaults in a
@@ -174,6 +988,38 @@ a valid key for that emulator.
 the UI keeps reacting to the controller behind the emulator, which makes configuring an emulator's
 own controller bindings nearly impossible. `activeGame` stays null so the process cleanup runs
 without triggering a save sync.
+
+---
+
+## Discrete GPU preference
+
+On hybrid laptops the compositor (Linux) or the driver (Windows) hands out the integrated GPU by
+default, which is wrong for both the frontend's background shader work and for every emulator.
+`ConfigManager.PreferDiscreteGpu` (`[Graphics] PreferDiscreteGpu`, default true) drives
+`DiscreteGpuPreference`.
+
+The two platforms need completely different mechanisms:
+
+- **Linux** sets PRIME offload environment variables on the child `ProcessStartInfo`. They are
+  applied before `ApplyLaunchEnvironment`, so an emulator's own `launch_env` in `meta.json` can
+  still override them.
+- **Windows** writes `HKCU\Software\Microsoft\DirectX\UserGpuPreferences`, keyed by full executable
+  path with the value `GpuPreference=2;`. This is the same key the Windows Graphics Settings UI
+  writes. It is registered for each emulator as it launches, and for our own executable at startup.
+
+### The registry call is isolated in its own method on purpose
+`Microsoft.Win32.Registry` is Windows-only. A platform check *inside* a method does not stop the JIT
+from having to resolve the type when that method is compiled, so the registry work lives in
+`WriteWindowsGpuPreference`, marked `[SupportedOSPlatform("windows")]` and `NoInlining`, behind an
+`OperatingSystem.IsWindows()` guard in the caller. Inlining it back would risk a type-load failure on
+Linux, where the method is still reached (and returns early) on every emulator launch.
+
+### The setting cannot move the frontend itself on Linux
+PRIME offload variables must exist in the environment *before* the process starts, so the app cannot
+apply them to itself once running. On Linux the setting therefore affects launched emulators only;
+moving the frontend requires the variables in whatever launches it (`.desktop` entry, wrapper
+script, or `tools/linux-test/deploy.ps1 -Gpu discrete` when testing). On Windows the registry key
+covers the frontend too, but only from the next launch onward.
 
 ---
 
@@ -401,6 +1247,31 @@ Emitting `Pressed` manually, and controller "Select" routing directly, both bypa
 disabled-button gate. The disabled state has to be re-checked by hand at those call sites, e.g. while
 an emulator install or download is running.
 
+### A quick-switch fade with nothing to fade back in leaves the list invisible
+`BeginQuickSwitchFade` drops `gameList` and `detailsPanel` to alpha 0 and relies on the
+`TransitionToSystem` that follows to bring them back. Nothing did when the carousel could not
+actually move: `Next`/`Previous` wrapped a single-entry list back to the same index,
+`SelectSystemByIndex` hit its `index == currentGameSystemIndex` early return, and the fade was never
+reversed. The page looked empty because it was invisible, and re-entering the mode fixed it only
+because that path runs a full transition.
+
+Latent for any one-entry list, and collections made it routine — most users have exactly one
+Favorites collection.
+
+Fixed at both ends. `Next`/`Previous` return false when there is nothing to move to, so the caller
+never starts the fade; and every early return in `SelectSystemByIndex` calls
+`CancelQuickSwitchFade`, so a fade can never outlive the transition that was supposed to end it.
+
+### Closing a panel has to hand focus back
+`gameList` keeps its own focus for controller navigation, and nothing restored it when the start menu
+closed — focus stayed on a button that was no longer visible, so the list ignored input until a click
+gave it back. `UpdateMouseFocus` did not rescue it either, since that only runs on mouse motion.
+
+`MainScene` now subscribes to the panel's `Closed` signal rather than restoring focus inside
+`ToggleStartMenu`, so it holds however the panel was dismissed — toggle, Back, or a menu action. It
+is guarded by `IsAnyMenuOpen` so a panel closing beneath another one does not steal focus from
+whatever is still open.
+
 ### Focus-follows-mouse
 For keyboard/mouse users, whichever focusable widget the cursor moves over takes focus; the nearest
 focusable *ancestor* is used, so hovering a settings entry's inner widget still focuses the entry.
@@ -545,6 +1416,25 @@ start syncing.
 
 Omitting `sync_include` means "sync everything" and is the default; an empty list means sync nothing.
 
+### Dot-prefixed save items are the emulator's, never a game's
+A netplay client in RetroArch does not write to the normal save path. It redirects SRAM into
+`<savefile_directory>/.netplay/`, so the joining player's own save is not overwritten by the host's
+state. Measured by joining a local session: the host wrote
+`saves/Pokemon - Emerald Version (USA, Europe).srm`, the client wrote
+`saves/.netplay/Pokemon - Emerald Version (USA, Europe).srm`.
+
+RetroArch declares no `sync_include`, which means "sync everything", so `SyncAfterExit` would have
+treated `.netplay` as one game's save unit and uploaded it to RomM as `.netplay.folder.zip` under
+whatever game was being played — once per session, for every joining player.
+
+`ShouldSyncSaveItem` now rejects any item whose name starts with `.` before the allowlist is
+consulted. This is deliberately a rule in code rather than a `sync_include` entry per recipe.
+`sync_include` is an allowlist, so covering RetroArch that way means enumerating every save extension
+across 41 systems and 44 cores; a single omission silently stops a real save from syncing, which is a
+worse failure than the one being fixed. The saves directory of this install already holds both `.srm`
+and `.sav` for the same game, which is how little the extension set can be trusted. A per-recipe
+allowlist for RetroArch should be built empirically, one system at a time, as each is verified.
+
 ### `sync_save_path` narrows the sync scope without narrowing the link scope
 `relative_save_path` answers two questions at once: what gets linked into the store and preserved
 across reinstall, and what save-sync walks. Those are not always the same directory. azahar is the
@@ -603,6 +1493,68 @@ logged, and the emulator launches with saves in the old location.
 
 ---
 
+## Collections
+
+### Collections are projected into `GameSystem` with negative ids
+A RomM collection becomes a `GameSystem` carrying `IsCollection = true` and a synthetic **negative**
+`Id`, with its games registered in `gameCache` under that id. Real platform ids from RomM are always
+positive, so the two can never collide and `systemId < 0` is a reliable test for "this is a
+projection, not a platform".
+
+Doing it this way means `SystemCarousel.Populate`, the game grid, the card pool and the art pipeline
+all work on collections unchanged — the carousel takes a `List<GameSystem>` and does not care where
+the entries came from.
+
+`Project` clears existing negative-id entries before rebuilding, so it is idempotent and self-heals
+if a stale projection ever reached `games.cache`.
+
+### A collection is a view, never a re-homing
+Games in a collection are the **same `Game` objects** already in `gameCache`, so each one keeps the
+`System` it was given at cache build. `LaunchEmulatorWithGame` reads `game.System.Slug`, not the
+carousel selection, so a game launched from a collection still resolves its real platform's emulator.
+
+This is load-bearing and easy to break. `OnRefreshCurrentSystemGamesPressed` assigns
+`game.System = currentSystem` to every game it fetches; running it while a collection is selected
+would re-home the whole collection onto a synthetic system with no emulator and break launching for
+those games everywhere, not just on that page. It now returns early on a collection, as does
+`OnSelectBiosMenuPressed` — BIOS and preferred-emulator are per-platform concepts with no meaning
+here.
+
+### The start menu's emulator actions follow the game, not the carousel
+`GetCurrentPlatformSystem` resolves the selected game's own `System` first and only falls back to the
+carousel entry. Every emulator action in the start menu — launch, install, update, uninstall — goes
+through it, so the buttons name the emulator that would actually run the highlighted game.
+
+It used to read the carousel system's slug directly. That was already slightly wrong (the menu
+described the system rather than the selection) and became outright broken with collections: a
+collection's slug maps to no emulator, so `GetMappedEmulator` returned empty and every emulator
+button went permanently dead on a collection page.
+
+The fallback returns null rather than the carousel entry when that entry is a collection, so a
+collection with no selected game disables the actions instead of resolving to nonsense.
+`OnLaunchEmulatorPressed` needs the `GameSystem` itself, not just the emulator name, which is why the
+helper returns the system and `GetCurrentEmulator` is layered on top rather than the other way round.
+
+### Collections bypass the emulator filter, and are not cached
+`GetCache` filters out systems with no mapped-and-installed emulator unless `ShowAllSystems` is set.
+A collection has no emulator by definition, so the collections branch returns before that filter
+rather than being exempted inside it.
+
+They are also fetched fresh on every load rather than written to `systems.cache`. Smart collections
+are evaluated server-side from `filter_criteria` and change without the client doing anything, so a
+cached copy would go stale invisibly. The cost is one extra request per launch.
+
+Virtual collections need their own type. `VirtualCollectionSchema.id` is a **string** where the other
+two are integers, so deserialising them into `Collection` would fail on the id alone. `Project` takes
+both lists and normalises them into one internal shape whose `SourceId` is a string, which is safe
+because the synthetic system id is assigned by the projection and never derived from the source id —
+the source id only reaches the slug.
+
+Ordering is favourites, then real collections, then virtual ones grouped by `type`. Virtual
+collections sort last deliberately: they are auto-generated per genre, franchise and publisher, so
+there can be a great many of them and they would otherwise bury the collections a user actually
+curated.
+
 ## Image loading
 
 Images are loaded by sniffing magic bytes (PNG/JPEG/WebP) rather than trusting the file extension, so
@@ -616,6 +1568,52 @@ working the moment entries gained a wrapper node — every item then fell back t
 The reported aspect covers the whole card, not just the cover: the carousel sets the card's width and
 derives height from it, so padding and the caption strip must be included or the cover gets
 letterboxed by exactly the space they occupy.
+
+---
+
+## Signals and scene lifetime
+
+### An autoload signal outlives the scene, and one dead subscriber silences every later one
+
+`DownloadManager`, `EmulatorManager`, `AssetManager`, `NetplayLobby` and `AppUpdater` are autoloads and
+live for the whole process. The scene does not: `CacheManager` sends the app back through
+`loading_screen.tscn` to `main_scene.tscn`, so every game-list refresh frees the main scene and builds
+a new one. Each `+=` the old scene made is still in the autoload's invocation list, and the delegate
+holds the freed object alive.
+
+Godot's C# dispatch calls **one multicast delegate** — the generated
+`RaiseGodotClassSignalCallbacks` does `backing_X?.Invoke(...)`. A .NET multicast invoke is not
+fault-isolated: the first handler that throws unwinds the whole call and every subscriber after it in
+the list never runs. The bridge catches the exception at the boundary and logs it, so the app keeps
+running and nothing announces that the rest of the handlers were skipped.
+
+That is what emptied the downloads page. A stale `DownloadProgressUI` belonging to a previous scene
+threw on `downloadsVBox.AddChild`, and because it had subscribed first, the *live*
+`DownloadProgressUI` was never reached:
+
+```
+ERROR: System.ObjectDisposedException: Cannot access a disposed object.
+Object name: 'Godot.VBoxContainer'.
+   at Godot.Node.AddChild(...)
+   at DownloadProgressUI.OnDownloadProgressUpdated(...) DownloadProgressUI.cs:line 112
+   at DownloadManager.RaiseGodotClassSignalCallbacks(...)
+```
+
+One session's log held 9,275 copies of it — one per emitting frame — plus the same failure in
+`MainScene.OnEmulatorInstallationCompleted` and three `MainSceneGameListHandler` methods. The symptom
+is deliberately misleading: the transfer itself runs to completion and logs healthy progress the whole
+time, so the download looks fine while the page that should show it stays blank. Reading the source
+proves nothing either, because the live object's wiring is correct — the bug is an *extra* subscriber
+that no longer exists on screen. The tell is only in the log.
+
+So every subscription a scene makes to an autoload signal is undone when the scene leaves the tree:
+`DownloadProgressUI._ExitTree`, `MainScene._ExitTree`, and a `Detach()` on each handler that subscribes
+in its own constructor or `Initialise()`. The handlers are plain C# objects with no tree callback of
+their own, which is why `MainScene` has to call them. Subscriptions to nodes *inside* the same scene
+(`lobbyActionButton.Pressed`, `cancelDownloadButton.Pressed`) need none of this — they are freed
+together.
+
+Keep the `+=` and `-=` counts equal per file; that grep is the whole invariant.
 
 ---
 
@@ -645,6 +1643,115 @@ The transfer runs on a task thread and publishes progress with `Interlocked.Exch
 reads it back with `Interlocked.Read` and is the only place that emits `DownloadProgressUpdated` or
 touches a node. Godot signals and UI must be driven from the main thread, so completion is a
 `Volatile.Write` flag that `_Process` notices, never a callback invoked from the worker.
+
+### A signal per chunk is what made the updater slow, not the network
+`AppUpdater` read the release zip in 8 KB chunks and fired
+`CallDeferred(EmitSignal, UpdateDownloadProgress, …)` on **every one of them**. For the 87 MB v1.0.14
+release that is 11,097 marshalled main-thread calls, each one re-rendering a progress bar and
+re-setting a label, queued onto the same thread that is trying to draw at 60 fps.
+
+The network was never the constraint: the same asset pulls in **1.0 s at 89 MB/s** measured with
+curl on this machine. The download was starved by its own progress reporting.
+
+The fix is the pattern the note above already describes — the worker publishes bytes with
+`Interlocked.Exchange`, `_Process` emits at most once per frame, and the buffer matches
+`DownloadManager` at 1 MB. That turns ~11,000 emissions into at most one per frame, and 11,097 reads
+into 87. `_Process` also skips emitting when the value has not changed, so an idle updater costs
+nothing.
+
+### Installer downloads reach the downloads page as external transfers
+`UniversalInstaller` does its own HTTP (see above) and so never appeared on the downloads page —
+emulator installs emitted only `EmulatorInstallationCompleted`, with no progress at all. That was
+tolerable when an install was a single archive; it stopped being tolerable when RetroArch grew a
+227 MB cores bundle on top of its own download.
+
+`DownloadManager.BeginExternalTransfer` / `ReportExternalTransferProgress` / `CompleteExternalTransfer`
+let a transfer the manager does not own publish through the *existing* `DownloadProgressUpdated` and
+`DownloadCompleted` signals, so `DownloadProgressUI` needed no changes at the time — phase reporting was
+added later, and is covered below. They are held in a
+`ConcurrentDictionary` rather than the plain `List` used for game downloads, because the installer
+resumes on a task thread after its awaits and would otherwise mutate that list while `_Process`
+iterates it. Reads still happen only in `_Process`, so the threading rule above is unchanged.
+
+A missing `Content-Length` reports a total of 0, which `DownloadProgressDisplay.ApplyTo` already turns
+into an indeterminate bar, so no extra guard is needed at the call site.
+
+Every transfer the user starts or waits on now reports: ROMs and firmware through `DownloadManager`
+directly, the emulator archive and cores bundle through `UniversalInstaller`, save sync through
+`RomMAPI`, and the app update through `AppUpdater`.
+
+### A download entry lives as long as the operation, not as long as the transfer
+
+`DownloadProgressUI` frees an entry when it sees `DownloadCompleted`, and `HandleDownloadFinished`
+emitted that the instant the last byte landed. `MainSceneDownloadHandler` set the entry's status to
+`Extracting...` one line earlier, so the label was overwritten by a `QueueFree` in the same frame. The
+page never showed extraction at all — a multi-gigabyte ROM spent its longest phase with nothing on
+screen, which reads as a download that finished and then did nothing.
+
+A caller that keeps working after the bytes arrive now declares that up front —
+`DownloadFile(..., callerClosesEntry: true)` — and closes the entry itself with
+`CloseDeferredDownload(fileName, succeeded)` once the work is really done, publishing phase text with
+`ReportDownloadStage` in between. The manager holds that file's game id in `gameIdsAwaitingCallerClose`
+for the duration, so `IsDownloadingGame` keeps reporting true through extraction and the action button
+stays `Downloading...` until the ROM exists, instead of flicking back to `Download` mid-extract.
+
+A *failed* transfer never defers — there is no second phase to wait for, so it emits `DownloadCompleted`
+immediately and the entry clears.
+
+### The stage text has to outrank the byte counter, not race it
+
+Progress and stage land on the same entry, and `_Process` re-emits progress every frame. A status label
+written once by the extraction step is overwritten on the very next frame by
+`Downloading... 4.1 GB / 4.1 GB`. `DownloadEntryUI` therefore holds the stage as *state*: while one is
+set, `UpdateProgress` returns without touching the label and the bar stays indeterminate; clearing it
+(an empty string) hands the entry back to the byte counter. That is what lets one entry alternate
+download → extract → download extras → extract without the phases fighting each other.
+
+External transfers carry the stage on the transfer object and publish it from `_Process` only when it
+changes. The thread rule is unchanged: the installer runs on a task thread and only ever writes the
+field.
+
+### An install is one entry, not one entry per file it fetches
+
+`UniversalInstaller.Install` opened a fresh external transfer per download, so installing RetroArch
+produced an entry for the archive that vanished, then a separate entry for the cores bundle, with both
+extractions invisible in between. It now opens **one** transfer named after the emulator for the whole
+install and reports stages through it, so an install or an update is a single entry from
+`Finding the latest release...` through `Extracting...` to `Finishing the install...`.
+`EnsureCoreInstalled` does the same for an on-demand core. Emulator updates need no separate handling
+because `OnUpdateEmulatorPressed` runs the same `InstallEmulator` path.
+
+`DownloadFileAsync` keeps its public shape for callers that genuinely are one file
+(`VirtualPadDriverInstaller`); the shared body moved to `DownloadIntoTransferAsync`, which reports into
+a transfer someone else owns and zeroes its byte counts first, so a second phase does not begin pinned
+at the previous phase's total.
+
+### Entry names are only filenames some of the time
+
+The entry label ran every name through `String.GetBaseName()`, which strips whatever follows the last
+dot. That is right for the ROM temp file (`Sonic (USA).chd.zip` → `Sonic (USA).chd`) and wrong for every
+display name that is not a filename — the app updater's `Update 1.0.14` rendered as `Update 1.0`.
+`DownloadProgressDisplay.DescribeEntryName` strips only the suffixes the downloader itself appends,
+`.zip` and `.archive`, and leaves everything else intact.
+
+### Box art is the one download deliberately kept off the page
+`RomMAPI.DownloadAssetAsync` serves both save sync and `AssetManager`'s cover art, and reports
+progress **only when given a `displayName`**. Save sync passes one; `AssetManager` does not, so art
+stays silent.
+
+That asymmetry is the point. The asset queue runs two workers continuously while the user browses and
+fetches a cover for nearly every game they scroll past — hundreds of small files, each finishing in
+well under a second. Listing them would flood the downloads page with entries appearing and vanishing
+faster than they can be read, and bury the ROM or emulator install the page exists to show. Opting in
+by name means a new caller is silent until someone decides it is worth showing, rather than the
+reverse.
+
+### `HttpClient` needs an infinite timeout for large transfers
+`HttpClient.Timeout` covers the whole operation, body included, even with
+`HttpCompletionOption.ResponseHeadersRead`. The default 100 s therefore aborts any download slower
+than roughly 2.3 MB/s once it passes ~227 MB — which the RetroArch cores bundle does exactly.
+`DownloadManager` already set `Timeout.InfiniteTimeSpan`; `UniversalInstaller` and `AppUpdater` did
+not, and now do. Cancellation is the `CancellationTokenSource`'s job, not the timeout's.
 
 ### Extraction runs off the main thread
 
@@ -678,3 +1785,1087 @@ disagreeing about a single download is far harder to diagnose than either one be
 
 The preferred total is RomM's `fs_size_bytes`, passed into `DownloadFile` and trusted ahead of the
 response header.
+
+---
+
+## Input layer
+
+Findings from the Phase 0 spike (`scripts/autoloads/InputLayerSpike.cs`, throwaway). Measured on
+Windows 11, Godot 4.6.3 mono, ViGEmBus 1.22.0, against an Xbox Series X pad
+(GUID `0300fa675e040000ff02000000007801`). Anything not measured is marked as such.
+
+### Godot keeps polling joypads while its window is unfocused
+
+**Measured, and it contradicts the obvious prediction.** This is the finding the whole reader design
+hangs on, because during an emulator session the frontend is unfocused by definition.
+
+Godot 4.6 no longer has a Windows joypad backend of its own — `platform/windows/joypad_windows.cpp`
+is gone and joypad handling lives in `drivers/sdl/joypad_sdl.cpp`. Its `initialize()` sets only
+`SDL_HINT_JOYSTICK_THREAD` and `SDL_HINT_NO_SIGNAL_HANDLERS`, *not*
+`SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS`, whose SDL default is off. That predicts background
+input should be dead. It is not.
+
+With the window unfocused, Godot's read tracked a direct `XInputGetState` reference channel exactly
+(`godot 0x0001` against `xinput [0x0001,...]`). The likely reason is that SDL's background-event
+suppression is a *window focus* rule, and Godot initializes SDL for joysticks only without an SDL
+window, so the check never applies. That explanation is inferred; the behaviour is measured.
+
+Consequence: `IPhysicalPadReader` can poll Godot `Input` on the frame loop. A bundled SDL2 on a
+background thread is **not** required for correctness. Do not add one without re-measuring this.
+
+The same finding has a second consequence that has nothing to do with virtual pads: a Godot app
+keeps receiving joypad input while in the background, so the frontend will navigate its own UI from
+a pad the user is holding for something else. See "UI input must be gated on session state" below.
+
+### The virtual pad's GUID name CRC is not stable
+
+Two ViGEm pads created by two frontend instances reported different GUIDs:
+
+```
+0300 ba66 5e04 0000 8e02 0000 1401 7801
+0300 7ba6 5e04 0000 8e02 0000 1401 7801
+     ^^^^ differs
+```
+
+SDL embeds a CRC-16 of the device name in bytes 2-3, and it varies between two otherwise identical
+virtual pads. **Vendor `5e04`, product `8e02` and version `1401` are stable; the name CRC is not.**
+
+The name is useless for identification too — Godot calls both the physical Series X pad and the
+virtual pad `"XInput Controller"`. Any filtering that matched on name would have silently failed.
+
+A product-ID match still cannot be authoritative on its own, because a genuine Xbox 360 pad also
+presents `028E`. The reliable method is the one the spike uses: snapshot the joypad set before
+creating virtual pads and treat anything new as ours. Use the GUID fields only as a cross-check.
+
+### `IXbox360Controller.UserIndex` does not report the XInput slot
+
+Measured wrong twice. It reported slot 0 when XInput enumeration showed the pad in slot 1, and
+reported slot 1 when the pad was in slot 2. It appears to be read before ViGEmBus assigns an index
+and never re-read.
+
+Do not use it to establish player order. Verify against `XInputGetState` enumeration instead. The
+`LedNumber` on the feedback callback did track the assignment (0 then 1 across two runs) and may be
+the better signal, but it has not been tested to four pads.
+
+### XInput slots are assigned in arrival order, so hiding must precede pad creation
+
+Measured: with the physical pad already in slot 0, a new virtual pad took slot 1; with slots 0 and 1
+occupied, the next took slot 2. Creating a virtual pad **adds** a device and never displaces one.
+
+This makes hiding load-bearing rather than a refinement. An XInput-native emulator that defaults to
+"player 1 = slot 0" gets the *physical* pad, and the virtual pad in slot 1 is simply unused — the
+layer is bypassed silently rather than producing visible double input. Guaranteed player order
+requires hiding the physical pads *before* creating virtual ones.
+
+### ViGEm feedback registration can throw with a success code
+
+`IXbox360Controller.FeedbackReceived += ...` intermittently throws
+`Win32Exception: The operation completed successfully` (native error 0) — the signature of a wrapper
+calling `Marshal.GetLastWin32Error()` where the last error was never set. Observed on one run out of
+four, with the pad already successfully created and connected.
+
+Registration must therefore be wrapped separately from creation. Lumping them into one `try` block
+discards a working pad because an optional convenience failed, which is exactly what the spike did
+before it was fixed. Rumble passthrough is a nice-to-have; the pad is not.
+
+### Every frontend instance creates its own virtual pad
+
+Three stacked Godot instances produced three occupied XInput slots. Virtual pads are per-process and
+accumulate. `BeginSession`/`EndSession` must be strictly paired, and single-instance enforcement
+matters more once this ships than it does today.
+
+A clean exit does clean up: `_ExitTree` disconnected the pad and the slot was released, verified by
+re-probing XInput after close. A killed process was not tested.
+
+### The main-loop pump stalls for hundreds of milliseconds under load
+
+Steady state is 165 pumps/s with a 6.2 ms worst gap — comfortably above emulator polling rates. But
+the worst gap reached **686 ms during startup**, 378 ms during collection loading, and 231 ms during
+ordinary carousel navigation. While stalled, the virtual pad's state is frozen.
+
+This is harmless in the frontend's own UI, but it is the one real argument for eventually moving the
+pump off the main thread: save sync, asset loading and the ROM hashing added in `c2fbe67` all do
+main-thread work, and a stall during a session surfaces in-game as stuck or dropped input. Whether
+those stalls actually occur *during* a session (as opposed to at launch and exit) has **not** been
+measured, and should be before any thread is added.
+
+### The pads cannot be renamed on Windows, but can on Linux
+
+`ViGEmClient` exposes only `CreateXbox360Controller(vendorId, productId)` — there is no name
+parameter. The name comes from Microsoft's `xusb22.sys`, which binds to VID `0x045E` / PID `0x028E`;
+changing the VID/PID to something nameable stops the device being an XInput pad at all.
+
+Linux uinput takes an arbitrary name in `UINPUT_SETUP`, so "RomM Pad 1" is available there.
+**Unverified** — no Linux work has been done yet.
+
+Any onboarding copy must therefore describe what users will actually see, which on Windows is N
+identical entries named "Xbox 360 Controller". Distinguishing them relies on hiding making ours the
+only pads present, not on naming.
+
+### ViGEmBus is retired
+
+The repository was archived on 2023-11-02 and the README states the project is retired. v1.22.0 is
+the final release; binaries remain production-signed and downloadable, and the driver works.
+
+There is no maintained Windows alternative — vJoy produces a generic HID joystick and cannot supply
+XInput semantics. This is an accepted standing risk, and the reason `IVirtualPadBackend` should stay
+a thin seam that could be reimplemented against a successor driver.
+
+### HidHide needs elevation to install, but not to hide
+
+Installation is a kernel filter driver: elevated installer, and the README warns a reboot may be
+triggered. **Inferred, not yet confirmed:** runtime hiding needs no elevation and raises no UAC
+prompt, because the README states the configuration utility "runs in the least privileged mode and
+doesn't require elevated rights", and `HidHideCLI/` contains no `.manifest`, so the CLI builds at
+the default `asInvoker` level. Confirm empirically before relying on it — a UAC prompt per launch
+would make the whole approach unusable for a couch frontend.
+
+HidHide's `Watchdog/` component is an ETW diagnostics tracer, **not** an auto-unhide safety net.
+Nothing in HidHide rescues a crashed frontend, so clearing this app's hiding rules at startup is
+load-bearing: hiding is system-wide and persists across process death, leaving the user's pads
+invisible to every other application.
+
+### SDL's device allowlist can hide pads without any driver
+
+`SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT` takes a comma-separated list of hex `VID/PID` pairs.
+The legacy `GAMECONTROLLER` spelling is retained in SDL3 — confirmed by extracting hint strings from
+the Godot 4.6.3 binary, which links SDL3 and contains `SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT`
+with no `SDL_GAMEPAD_` equivalent. One variable therefore covers both SDL generations.
+Set to ViGEm's `0x045E/0x028E` through the existing `launch_env` mechanism, an SDL-based emulator
+enumerates only our virtual pads — no driver, no elevation, and nothing that persists past process
+exit to clean up after a crash.
+
+Per `controller-followups.md` this covers nearly the whole shipped inventory: PCSX2, DuckStation,
+Flycast, melonDS, Dolphin, ares, mGBA, Azahar, snes9x, PPSSPP and gopher64.
+
+**RetroArch is the gap** — its shipped `retroarch.default.cfg` leaves `input_joypad_driver`
+commented out, so it uses the Windows compiled-in default of `xinput` and ignores SDL hints. It can
+be switched to the `sdl2` joypad driver via that same config line, which would close the gap using
+config-writing machinery the project already has.
+
+**All of this is unverified against a real emulator.** It is a strong lead, not a result.
+
+### The SDL allowlist cannot tell our pad from a real Xbox 360 controller
+
+The allowlist is keyed on VID/PID, and ours is `0x045E/0x028E` — which is exactly what a **genuine
+Xbox 360 pad** presents. A user with a real 360 pad would have it pass the allowlist alongside our
+virtual pads, and the layer would be bypassed for that device.
+
+Measured on the dev machine, an Xbox Series X pad is *not* affected: SDL reports it with product
+`0x02FF`, its generic XInput identity, so the allowlist excludes it correctly. The hole is specific
+to devices that genuinely are, or exactly impersonate, a 360 pad.
+
+HidHide filters by device *instance path* and so does not have this hole. This is the concrete
+reason the SDL allowlist reduces how often HidHide is needed without replacing it.
+
+`SDL_HIDAPI_IGNORE_DEVICES` exists as a separate denylist for SDL's HIDAPI backend and is **not**
+currently set. Whether a physical pad can still reach an emulator through the HIDAPI path while the
+gamepad-layer allowlist is active has not been tested.
+
+### UI input is gated on focus as well as on an active session
+
+`MainScene.ShouldFrontendIgnoreInput` suppresses frontend input when an emulator session is running
+**or** when the window does not have focus. The session half was always there; the focus half was
+not, and its absence was a live bug: because Godot delivers joypad input to an unfocused window (see
+above), the frontend kept driving its own carousel while the user was holding the pad for something
+else entirely.
+
+`IsEmulatorLaunching` is deliberately **not** part of the condition. The emulator window takes focus
+as it comes up, so the focus test already covers the launching window, and folding in a flag that
+could stick true on a failed launch would risk locking the user out of their own UI.
+
+### Reading input and acting on it must stay separate
+
+The pump reads physical pads continuously — that is the entire product — while the UI acts on
+nothing. These do not collide, because `SetInputAsHandled()` only stops event propagation to UI
+nodes while the layer reads polled state through `Input.IsJoyButtonPressed`.
+
+The trap is fixing background input the blunt way. Globally ignoring joypad devices, or disabling
+joypad processing while unfocused, would suppress the frontend's navigation *and* silently kill the
+relay to the emulator — which is the one thing that has to keep working while unfocused. Gate at the
+point of acting, never at the point of reading.
+
+### The emulator-close hotkey is a long hold, not a simultaneous chord
+
+It was `LeftShoulder + RightShoulder + Back + Start` pressed together, detected in `_Input`. It is
+now the same configurable button set held continuously for `EmulatorCloseHoldSeconds` (default 2s),
+with the default set reduced to a single `Back`, detected by polling in `_Process`.
+
+Three reasons, all of which a simultaneous chord could not fix:
+
+1. **Emulators bind the same combos.** Once the input layer relays the chord onto the virtual pad
+   the emulator sees it too, and `Back + Start` is a hotkey in several of them. A long hold has no
+   emulator equivalent, so the collision stops existing rather than needing to be managed.
+2. **Accidental triggers while mapping.** `controller-followups.md` notes the old default was "all
+   buttons a user presses while mapping a controller". A hold cannot be hit in passing.
+3. **Hold timing needs polling.** `_Input` only fires when an event arrives, so duration cannot be
+   measured there. `_Process` polling is also the shape the pump will need, so the detector moves
+   into `InputLayer` unchanged when it lands.
+
+Existing installs keep whatever button set they saved; only the hold requirement is new, and it
+makes an accidental close strictly harder rather than easier. `AreEmulatorCloseHotkeysHeld` reads
+the `CloseKey1..N` `InputMap` actions, which are bound with no device filter — so once virtual pads
+exist, **our own relayed output will satisfy the hold too**. That is harmless while the relay is a
+faithful copy, but it stops being harmless the moment remapping can retarget those buttons.
+
+### Every control is a 0..1 value, including sticks
+
+`PadState` stores one float per `PadControl`, and stick axes are split into two half-range controls
+(`LeftStickLeft` / `LeftStickRight`) rather than a signed axis. Recombining them
+(`ResolveAxis(negative, positive)`) is lossless, and it makes the mapping table uniform: a remap is
+always control → control, so "d-pad drives the left stick" and "left stick drives the d-pad" fall
+out for free instead of needing special cases. Several retro systems want exactly that.
+
+Digital controls read back through `IsPressed`, which thresholds at 0.5 — so mapping an analog
+trigger onto a face button works without the caller caring.
+
+### The mapping direction is destination ← source, not source → destination
+
+`controller_config.platform_layout` maps a platform button to the SDL control the **emulator**
+expects, e.g. `"A": "FaceSouth"`. `ConfigManager.PlatformInputMappings` stores what the **user**
+picked for that same platform button. So for each entry the virtual pad's `platform_layout` control
+is the destination, and the user's choice is the source it reads from:
+
+```
+virtual[ platform_layout[button] ]  ←  physical[ PlatformInputMappings[slug][player][button] ]
+```
+
+Getting this backwards produces a mapping that looks plausible and is inverted, which is exactly the
+class of silent wrongness that made the config-file writer untrustworthy. Emulators with no
+`controller_config` get an identity table and pass through unchanged.
+
+### An explicit remap must silence the source's own default output
+
+Given identity mapping plus a user remap of platform A to `FaceEast`, the table would hold
+`FaceSouth ← FaceEast` *and* the leftover identity `FaceEast ← FaceEast`. One physical press then
+drives two virtual buttons, and since shipped emulator configs bind their A and B to those two
+controls, pressing east would fire both A and B in-game.
+
+`SilenceReroutedSources` therefore unmaps any control used as an explicit source unless it was also
+explicitly given a source of its own. Mapping one button "moves" it rather than duplicating it, and
+mapping a pair swaps them, which is what a user means by remapping.
+
+### The UI gate includes the layer's session, not just the emulator process
+
+`BeginSession` runs before `await SyncBeforeLaunch`, so virtual pads exist for as long as a save sync
+takes while `IsEmulatorRunning` is still false. Without `IsSessionActive` in the gate, the frontend
+spends that window acting on both the physical pad and its own virtual output — the same press
+counted twice. The pads have to be created before the emulator starts so it enumerates them, so the
+window cannot be removed, only gated.
+
+### Virtual pads are identified by arrival, not by name or GUID
+
+`joypadsPresentBeforeSession` is captured immediately before `TryCreatePads`, and any joypad that
+connects afterwards while pads exist is recorded as ours. This is the only reliable method — see the
+Phase 0 findings on the name being `"XInput Controller"` for both physical and virtual pads and the
+GUID's name CRC being unstable between two virtual pads.
+
+The known limitation: a **physical** pad hot-plugged during a session is misidentified as ours and
+excluded from input. Player assignment mid-session is a Phase 4 concern and this should be revisited
+with it.
+
+### The SDL allowlist works, but it filters one backend, not one emulator
+
+Verified against Dolphin with a layer session active. Its device list showed exactly one SDL
+device — `SDL/0/Xbox 360 Controller`, our virtual pad — with the physical Xbox Series X pad absent
+from the SDL enumeration entirely. `SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT` does what it claims.
+
+But Dolphin exposes four input backends, and the same list also contained:
+
+```
+WGInput/0/Xbox 360 Controller for Windows     our virtual pad
+WGInput/0/Xbox One Game Controller            the PHYSICAL pad
+XInput/0/Gamepad, XInput/1/Gamepad            both pads
+DInput/0/Keyboard Mouse
+```
+
+So the allowlist is **per backend**. Windows.Gaming.Input, XInput and DInput are untouched, and the
+physical pad remains reachable through them. "SDL-based emulator" is the wrong unit of analysis;
+what matters is which backend the emulator's binding actually names.
+
+This does not cause double input in Dolphin, because Dolphin binds one device per pad and the
+shipped config chooses it. It does mean the allowlist cannot *prevent* a user selecting the physical
+pad, and it is the concrete reason HidHide — which filters at the HID layer, beneath every
+backend — remains the only backend-agnostic answer.
+
+The two `XInput/n/Gamepad` entries are also a visual confirmation of the arrival-order slot finding:
+the physical pad holds slot 0 and the virtual pad slot 1.
+
+### The layer makes Dolphin's device name predictable for the first time
+
+`controller-followups.md` records Dolphin as the one emulator where device-agnostic bindings do not
+exist: its `DeviceQualifier` compares source, index *and* name, there is no fallback, and the name
+varies per controller model, so no shippable constant exists. Three separate attempts to predict a
+user's device identity failed.
+
+With the layer active that inverts. Every user presents the same virtual pad, so the identity is a
+constant we control. Dolphin itself wrote the authoritative string on exit:
+
+```
+Device = SDL/0/Xbox 360 Controller
+```
+
+and left every binding byte-identical to the shipped ones (`Button S`, `Shoulder R`, `Pad N`,
+`Left Y+`, …), confirming the virtual pad is indistinguishable from a real Xbox pad at the binding
+level. Only the device line ever needed to change.
+
+**The value is runtime-dependent, which is the catch.** `SDL/0/Xbox 360 Controller` is correct only
+while a layer session is running; with the layer off the correct value is the user's own pad name.
+A statically shipped line cannot be right in both states.
+
+Multiplayer forces the issue: player two needs `SDL/1/Xbox 360 Controller`, and which physical pad
+maps to which SDL index is decided by the layer's creation order at launch. Static config can only
+ever describe player one, so guaranteed player order on Dolphin requires writing the device line at
+launch — a narrow, deliberate exception to the retired config writer rather than un-suspending it.
+
+### `WriteInputLayerDeviceBindings` is that exception, and its narrowness is the point
+
+It is deliberately **not** part of `ApplyControllerMappings`, which stays suspended. Four conditions
+bound it, and all four matter:
+
+1. It runs only while `InputLayer.IsSessionActive` — with the layer off, nothing is written and the
+   shipped config governs exactly as before.
+2. It writes only `controller_section.device_key`. Every binding, calibration and static value is
+   left alone, because Dolphin's rewrite proved the shipped bindings are already correct against the
+   virtual pad. Only device identity was ever wrong.
+3. It requires `format == "ini"` and an existing file. A config the emulator has not yet created is
+   left for the emulator to create.
+4. `{sdl_index}` resolves to the **player index**, which is only meaningful because the SDL allowlist
+   makes our virtual pads the sole SDL devices. Without the allowlist the index is unpredictable and
+   this writer would be actively harmful.
+
+It does overwrite an existing `Device` line, which `controller-followups.md` records as deliberately
+disabled after the writer stamped bad values over good ones. The distinction is that the layer
+*owns* device identity for the duration of a session: it created the device, it knows the name, and
+it assigned the index. That claim is false whenever the layer is off, which is condition 1.
+
+Ports beyond the active player count are set to `device_disconnected`. A user who had deliberately
+bound a spare port to a keyboard for local play would lose it, which is the known cost of the layer
+asserting port ownership.
+
+### Non-Xbox controllers normalize through the layer, which retires the biggest open item
+
+`controller-followups.md` names non-Xbox controllers as "the single biggest open item", with **11 of
+18 systems** at risk because their shipped configs hardcode raw XInput joystick indices (ares
+`/0/3/0`, mGBA `keyA = 1`, melonDS `A = 1`, Azahar `button:1`, snes9x `(J1)Button 0`). Its proposed
+remedy was a mapping pass per controller type per emulator, per-controller-type variants in
+`default_config` as a new concept, and controller-family detection in the frontend.
+
+**None of that is needed while the layer is on.** Verified with two non-Xbox pads:
+
+- **Switch Pro Controller** — works. Nintendo's face buttons are physically transposed against Xbox,
+  and SDL maps the bottom button to south, so the layer emits it as Xbox A. That is the positional
+  convention the project already chose, now enforced in one place instead of hardcoded per config.
+- **8BitDo N64 variant** — works, including the C-button cluster, which SDL exposes as right-stick
+  axes and the layer passes through as a real right stick. N64 emulators already expect C on the
+  right stick, so an unusual physical layout arrives correct without any per-device handling.
+
+The mechanism is that SDL's gamepad database normalizes each pad to a canonical layout before Godot
+sees it, and the layer then re-emits that as an Xbox 360 pad. The emulator's raw joystick indices
+stay valid because the device it is reading genuinely *is* an Xbox pad.
+
+Two limits on the claim:
+
+1. **It only holds while the layer is on.** With it off, the original risk table stands unchanged,
+   so the shipped static configs must not be "simplified" on the strength of this.
+2. **It inherits SDL's view.** A pad SDL has no gamepad mapping for arrives as a generic joystick
+   with arbitrary button ordering, and the layer cannot fix what it is handed. The fix there is an
+   `SDL_GAMECONTROLLERCONFIG` entry, not layer code.
+
+### An 8BitDo in DInput mode does not collide with the allowlist, but XInput mode is untested
+
+Connected in DInput/HID mode the pad enumerates as `VID_2DC8&PID_3019` — its own 8BitDo identity,
+nothing like `045E/028E` — so the SDL allowlist filters it correctly and no collision occurs.
+
+The collision case could not be tested with this pad — the retro-shaped 8BitDo models offer
+Switch/DInput/macOS modes with no X-input mode at all.
+
+Measurement since then narrows the risk considerably. Windows exposes XInput-capable pads through a
+**generic** `045E/02FF` interface, and that is what SDL reports for them:
+
+| Device | SDL-visible product |
+|---|---|
+| Hyperkin, a licensed third-party Xbox pad running XInput | `02FF` |
+| Xbox Series X pad (USB composite `0B12`) | `02FF` |
+| our ViGEm virtual pad | `028E` |
+
+The Hyperkin is precisely the feared case — a third-party pad on XInput — and its child device is
+literally `USB\VID_045E&PID_02FF&IG_00`. It does not collide, and neither does the Series X pad.
+
+`028E` is the true hardware ID of a **wired Xbox 360 controller**, so the collision applies to
+devices whose real USB identity is a 360 pad: a genuine wired 360 controller, or a third-party pad
+impersonating one at the USB level rather than going through the generic XInput interface. That is a
+smaller population than "any pad in X-input mode", which is what this note originally claimed.
+
+It remains a real hole with no in-band fix — the allowlist has only VID/PID to go on and cannot
+distinguish two devices that report the same one. HidHide, filtering by device instance path, can.
+
+A **wired Xbox 360 controller** was then measured and confirms the hole at the device level:
+
+```
+XnaComposite  Xbox 360 Controller for Windows   USB\VID_045E&PID_028E\08D5629
+HIDClass      HID-compliant game controller     HID\VID_045E&PID_028E&IG_00
+```
+
+Both the device *and* its HID child are `045E:028E` — no generic `02FF` indirection, because
+`xusb22` binds directly to a device that genuinely is a 360 pad, exactly as it does for ViGEm's
+emulated one. The physical pad and our virtual pad are therefore indistinguishable to any VID/PID
+filter. Confirmation at the emulator level (counting SDL entries in Dolphin's device list) was not
+run, but the device identity leaves little room for doubt.
+
+This is also why virtual-pad identification uses the arrival snapshot rather than the GUID. With a
+real 360 pad connected, a GUID check is genuinely ambiguous, and the cross-check suggested elsewhere
+in these notes would fail on exactly this hardware.
+
+The same pad also exposes a **keyboard interface** (`MI_01`, `HID Keyboard Device`). A pad that emits
+keystrokes reaches the frontend through a path the joypad gate does not model — `ShouldFrontendIgnoreInput`
+suppresses events once they arrive, but a keyboard is a separate device the input layer neither
+reads nor hides, so it cannot be relayed to the emulator either.
+
+### PlayStation pads are the outstanding test, and for a different reason than expected
+
+No DualShock 4 or DualSense has been tested. `controller-followups.md` predicted these would break
+outright, since their raw HID order is `0=Square 1=Cross 2=Circle 3=Triangle` against Xbox's
+south/east/west/north. On the evidence from the Switch Pro and 8BitDo pads, that prediction should be
+moot with the layer on: SDL normalizes before Godot sees the device, so the layer emits a correct
+Xbox pad regardless of the source ordering.
+
+The real question for a PlayStation pad is a **different** one. SDL drives DS4 and DualSense through
+its HIDAPI driver (`SDL_JOYSTICK_HIDAPI_PS`), which is a separate enumeration path from the one
+`SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT` was observed filtering. So the plausible failure is not a
+scrambled reader but a pad that reads perfectly *and still reaches the emulator*, leaking past the
+allowlist and producing double input.
+
+When one is available, the test is therefore not "do the face buttons work" but "does the emulator's
+device list show one device or two". `SDL_HIDAPI_IGNORE_DEVICES` is the lever if it shows two.
+
+### CORRECTION: the allowlist filters SDL's gamepad layer, not "SDL-based emulators"
+
+An earlier note in this section claimed `SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT` covers "nearly the
+whole shipped inventory — PCSX2, DuckStation, Flycast, melonDS, Dolphin, ares, mGBA, Azahar, snes9x,
+PPSSPP and gopher64". **That claim was wrong**, because "does the emulator use SDL" is the wrong
+predicate.
+
+Measured with RetroArch, its joypad driver forced to `sdl2`, the allowlist set to `0x045E/0x028E`,
+and the only attached pad being an Xbox Series X reporting `045E/02FF` — a device the allowlist
+should exclude:
+
+```
+[INFO] [Input] Found joypad driver: "sdl2".
+[INFO] [Autoconf] Controller (Xbox One For Windows) (3/0) not configured, using fallback.
+```
+
+The `sdl2` driver took effect, so this is not a silent fallback to dinput, and the excluded pad
+enumerated anyway.
+
+The hint gates `SDL_ShouldIgnoreGameController`, which governs the **GameController/Gamepad** layer.
+A filtered device stops being a *gamepad* but remains a *joystick*, so anything enumerating through
+`SDL_NumJoysticks` / `SDL_JoystickOpen` still sees it. RetroArch does exactly that. Its bundled SDL
+is **2.0.14**, whose only ignore hints are `SDL_GAMECONTROLLER_IGNORE_DEVICES[_EXCEPT]` — there is no
+joystick-level equivalent, so **no environment variable can hide a pad from RetroArch**.
+
+The correct predicate is which API the emulator enumerates through:
+
+| Emulator | Status |
+|---|---|
+| Dolphin | **filtered** — measured, device list showed only our virtual pad |
+| RetroArch | **not filtered** — measured, as above |
+| everything else | **unknown** |
+
+Scanning binaries for `SDL_GameController*` versus `SDL_Joystick*` symbols does not settle it —
+Dolphin, Flycast, PPSSPP, melonDS, Azahar, snes9x and gopher64 all link SDL statically and expose no
+matching symbols, yet Dolphin is demonstrably filtered. The one useful reading was **ares**, which
+imports `SDL_Joystick*` from `SDL3.dll` with no gamepad imports, suggesting it is not filtered.
+
+Suggestively, the emulators recorded elsewhere in these notes as using **raw joystick button
+indices** (ares, mGBA, melonDS, Azahar, snes9x) are precisely those most likely to enumerate at the
+joystick layer — the same trait that makes their bindings index-based makes them invisible to a
+gamepad-layer filter. That is an inference, not a measurement; each needs a device-list count.
+
+**Consequence for the tiering.** Tier 1 is narrower and less predictable than assumed, so HidHide
+moves from "reduces how often hiding is needed" to "the only mechanism that works everywhere",
+since it filters beneath every backend and every API. Where the allowlist does not reach, the layer
+still relays and normalizes correctly — the failure mode is the physical pad remaining visible
+alongside the virtual one, giving double input and unreliable player order, not a broken layer.
+
+### HidHide was integrated, then removed
+
+`HidHideDeviceHider` existed briefly and was deleted once measurement showed hiding cannot solve the
+case it was added for — see "HidHide cannot hide an Xbox controller from XInput" below. The layer now
+ships no hiding on Windows, and `IDeviceHider` resolves to `NullDeviceHider`.
+
+The seam is kept rather than deleted because Linux hiding is a different mechanism that does work:
+`EVIOCGRAB` on an evdev node genuinely prevents other processes reading it, and that is the same path
+Linux emulators read through. Phase 3 will implement it there.
+
+The sections below are retained because they are the evidence for the decision, and because anyone
+reconsidering HidHide will otherwise re-derive them from scratch.
+
+### HidHide: measured facts that a naive integration gets wrong
+
+Installed and exercised on the dev machine (v1.5.230, Advanced Installer bootstrapper around an MSI).
+
+**The CLI needs no elevation.** Previously inferred from the absence of a build manifest; now
+measured. From a confirmed non-elevated shell, `--cloak-state`, `--dev-list` and `--app-list` all
+returned exit 0 with real output. The frontend can therefore hide and unhide silently per session
+with no UAC prompt, which is what makes the whole approach viable for a couch frontend.
+
+**Silent install works, but the exit code lies.** `/exenoui /qn` installed the driver, registered the
+service and created the uninstall entry — and returned **exit code 1**. Success must be verified by
+probing for the `HidHide` service or `HidHide.sys`, never by the process exit code. (`/exelog <path>`
+as a single quoted argument was mis-parsed and produced no log; pass it separately or omit it.)
+
+**The tools live in an `x64\` subdirectory**, not the install root:
+
+```
+%ProgramFiles%\Nefarius Software Solutions\HidHide\HidHide.man
+%ProgramFiles%\Nefarius Software Solutions\HidHide\x64\HidHideCLI.exe
+```
+
+A check for `HidHideCLI.exe` directly under `InstallLocation` — which is what the uninstall registry
+entry reports — finds nothing. `ResolveCommandLineToolPath` probes both.
+
+**No reboot was required.** The installer set a `PendingFileRename` signal, but the driver was live
+and the CLI talked to it immediately.
+
+**The application allowlist is not empty by default.** A fresh install already contains:
+
+```
+--app-reg "C:\Program Files\Nefarius Software Solutions\HidHide\x64\HidHideCLI.exe"
+```
+
+So cleanup must remove **only our own** entry with `--app-unreg`. Using `--app-clean`, or clearing
+the list, would break HidHide's own tooling and any other application using it (DS4Windows and
+similar share these lists).
+
+**`--dev-gaming` reports stale devices.** The JSON is an array of containers, each with a `devices`
+array, and entries persist for pads that are no longer attached:
+
+```json
+[ { "friendlyName": "Controller (Xbox One For Windows)", "devices": [
+  { "present": true,  "gamingDevice": true,  "usage": "Gamepad",
+    "deviceInstancePath": "HID\\VID_045E&PID_02FF&IG_00\\b&193883fd&0&0000" },
+  { "present": false, "gamingDevice": false, "usage": "absent",
+    "deviceInstancePath": "HID\\VID_045E&PID_02FF&IG_00\\b&32345211&0&0000" } ] } ]
+```
+
+Both entries are the *same physical pad* on different USB enumerations. Filtering on
+`present && gamingDevice` is mandatory; hiding a phantom path is at best useless and at worst
+hides a device the user later plugs in.
+
+`--cloak-state` answers by echoing the command form — `--cloak-on` or `--cloak-off` — not a boolean.
+
+### Hiding by instance path is what defeats the 360-pad collision
+
+The SDL allowlist cannot distinguish our virtual pad from a real wired Xbox 360 controller, because
+both report `045E:028E`. HidHide blocks by **device instance path**, which is unique per device, so
+it has no such ambiguity.
+
+The ordering constraint makes it simpler still. Hiding must happen *before* pads are created so the
+virtual pads land in XInput slots deterministically — which means **no virtual pad exists at the
+moment we enumerate**, and every gaming device present is physical by construction. The layer never
+has to tell its own output apart from real hardware. The slot-ordering requirement and the
+correctness argument for hiding turn out to be the same constraint.
+
+### Crash safety records what we hid, rather than clearing the lists
+
+Hiding is global and survives process death, so a frontend crash mid-session would leave the user's
+controllers invisible system-wide. `ConfigManager.HiddenInputDevicePaths` persists exactly which
+instance paths this app hid, and `HidHideCloakEnabledByFrontend` records whether *we* were the ones
+who turned cloaking on. `InputLayer._Ready` calls `UnhideAll` unconditionally at startup, which
+unhides precisely those paths, removes only our own allowlist entry, and restores cloaking only if
+we enabled it.
+
+Clearing the lists wholesale would have been simpler and wrong, for the reason above: they are
+shared with every other application that uses HidHide.
+
+### HidHide cannot hide an Xbox controller from XInput — so hiding is not the answer
+
+Measured, with handle-caching eliminated by probing from a fresh, non-allowlisted process:
+
+```
+control (nothing hidden):   XInput slots: [0]
+device hidden + cloak on:   XInput slots: [0]
+```
+
+`--dev-list` confirmed the device was hidden and `--cloak-state` reported `--cloak-on` throughout.
+HidHide is a **HID class filter**; XInput reaches Xbox-family pads through `xusb22.sys`, which sits
+outside the filtered path. The README documents no such limitation, so this is worth knowing.
+
+This is not a tuning problem. For the most common controller family there is **no hiding mechanism
+available at all**: the SDL allowlist misses XInput-native consumers, and HidHide misses XInput
+devices. RetroArch reading an Xbox pad is unreachable by either.
+
+HidHide would still hide non-XInput pads (DualShock, DualSense, generic HID), which is the use case
+it is popular for — hiding a physical DS4 while a virtual X360 pad stands in. It just cannot help
+where we needed it most.
+
+### Pinning the emulator's config at our virtual pad supersedes hiding
+
+Hiding existed to buy three things: guaranteed player order, no double input, and the emulator using
+our normalized pad instead of raw hardware. Writing the emulator's device binding delivers all three
+*directly* — the emulator is told which device to use, rather than being denied the alternative.
+
+**The reason config writing failed before does not apply here.** Every earlier attempt had to predict
+the user's own device identity — Azahar's GUID, ares' GUID, Dolphin's device name — which varies per
+controller model and per SDL backend, and fails silently when wrong. That history is why
+`ApplyControllerMappings` is suspended.
+
+The virtual pad inverts it. We create the device, so its name is a constant we choose and its index
+is one we can observe. `SDL/0/Xbox 360 Controller` is not a guess about the user's hardware; it is a
+fact about hardware we manufactured. That is precisely why the Dolphin device line worked where
+three previous approaches did not.
+
+Index determinism comes from two places, and both are already established:
+
+- **Gamepad-API emulators** — the SDL allowlist makes our pads the only SDL devices, so they occupy
+  indices `0..N-1` in creation order. Verified with Dolphin.
+- **XInput-native emulators** — arrival ordering puts our pads in the slots after any physical pad,
+  and the slots are directly observable via `XInputGetState` after creation. So the index can be
+  *measured at launch* and written, rather than assumed.
+
+The residual gap is emulators that read every device and merge input regardless of configuration,
+rather than binding a chosen device. Those would still double up. Which emulators behave that way is
+**not yet established** and needs a per-emulator check.
+
+What this costs, honestly: it reopens config-file writing, which this project retired for good
+reasons, and it needs per-emulator knowledge of which key names the device index. What it avoids: a
+kernel driver, an elevated install, a system-wide side effect that survives process death, and a
+crash-safety net for that side effect — none of which would have fixed RetroArch anyway.
+
+### RetroArch's joypad index is its XInput slot, and the key is not what the binary suggests
+
+RetroArch cannot be hidden from — the SDL allowlist misses it because it enumerates joysticks, and
+HidHide misses it because XInput bypasses the HID stack. It can, however, be told which pad belongs
+to which player, which achieves the same three goals directly.
+
+**The key is `input_player<N>_joypad_index`**, documented in RetroArch's own shipped
+`retroarch.default.cfg`:
+
+```
+# If desired, it is possible to override which joypads are being used for user 1 through 8.
+# First joypad available is 0.
+# input_player1_joypad_index = 0
+```
+
+Searching the binary instead turns up `input_device_p`, `input_device_reserved_device_p` and
+`input_libretro_device_p`, none of which are this setting. Guessing from those strings would have
+written a key RetroArch ignores, failing silently — the same trap that made the old config writer
+untrustworthy. Read the shipped default config, not the binary.
+
+**The index is the XInput slot.** Measured with two physical pads attached: the virtual pads landed
+in XInput slots 2 and 3, `input_player1_joypad_index = 2` and `input_player2_joypad_index = 3` were
+written, and the controller then drove the game correctly. So under the `xinput` joypad driver
+RetroArch's numbering and XInput's agree.
+
+The slot is **measured, not assumed** — `XInputSlots.ReadConnectedSlots()` is read before and after
+the virtual pads are created and the difference is ours. A hardcoded guess of `1` would have been
+correct with one physical pad and wrong with two, and `IXbox360Controller.UserIndex` was already
+found to report the wrong slot entirely.
+
+### `retroarch.cfg` is flat, and the INI updater fails silently on it
+
+It is `key = "value"` with no `[section]` headers at all. `IniConfigurationUpdater` tracks whether it
+is inside a matching section and never enters one in such a file, so it writes **nothing** and
+reports no error. `FlatConfigurationUpdater` handles this shape, appending the key when absent.
+
+The device *key* is templated per port (`input_player{port}_joypad_index`) rather than the section
+name, which is why `ControllerSection` now substitutes `{port}` into `device_key` as well as
+`section_template`.
+
+Ports beyond the active player count are deliberately left alone rather than cleared, so an index
+from a previous two-player session can persist into a one-player one. Harmless in practice — the
+index simply names a pad that is not there — but it is why player 2 may appear configured when only
+one controller is attached.
+
+### Installing ViGEmBus: one UAC prompt is the floor, and the exit code cannot be trusted
+
+Accepting the controller offer installs ViGEmBus if it is missing, because otherwise the user agrees
+to a feature and silently receives nothing but a settings status line.
+
+**A UAC prompt is unavoidable and correct.** ViGEmBus is a kernel-mode driver, and Windows requires
+consent to install one. Anything that circumvented that would be malware behaviour. What automation
+removes is the file hunting and the wizard, not the consent. The installer is launched with
+`Verb = "runas"`, so the elevation prompt is raised by Windows rather than by us.
+
+**Success is verified by capability, not by exit code.** Measured with HidHide, which uses the same
+Advanced Installer bootstrapper: `/exenoui /qn` installed the driver, registered the service and
+created the uninstall entry, and returned **exit code 1**. So the installer polls
+`ViGEmPadBackend.IsAvailable` — which attempts a real `ViGEmClient` connection — until the driver
+answers or 90 seconds pass. That tests the thing we actually need rather than a proxy for it.
+
+Both ViGEmBus (`setup/ViGEmBus.aip`) and HidHide use Advanced Installer, so `/exenoui /qn` applies to
+both. Pass `/exelog` as a separate argument or not at all; quoting it as one argument silently
+mis-parses and produces no log.
+
+**The download URL is pinned rather than resolved from the releases API.** ViGEmBus is archived and
+v1.22.0 is final, so there will never be a newer release to discover. Pinning also lets the expected
+size be pinned, which is half the verification.
+
+### The installer is verified by size and publisher, not by full Authenticode validation
+
+The download is checked for an exact byte count (6278576) and for a signing certificate whose subject
+contains `Nefarius Software Solutions`, read via `X509Certificate.CreateFromSignedFile`.
+
+**That extracts the embedded certificate; it does not validate the signature.** A tampered file would
+still carry the original certificate, so this combination detects a truncated or substituted download
+but not a modified one. Full validation needs a `WinVerifyTrust` P/Invoke.
+
+That was deliberately not added: a subtly wrong `WINTRUST_DATA` layout fails closed, which would
+block every legitimate install, and it could not be exercised on the development machine because
+ViGEmBus is already present there and the install path never runs. Untested code that gates a
+required install is worse than a documented gap. It is the obvious hardening step if this is ever
+exercised on a clean machine.
+
+### Emulators fall into three groups by how they select a controller
+
+Surveyed from the shipped `default_config` of every installed emulator. This determines what pinning
+is even possible, and it is a smaller problem than "test every emulator".
+
+**Group A — one key names the device.** Pinnable cheaply, and done:
+
+| Emulator | Key | Status |
+|---|---|---|
+| Dolphin | `Device = SDL/{n}/{name}` | written at launch |
+| RetroArch | `input_player{n}_joypad_index` | written at launch |
+| melonDS | `JoystickID` under `[Instance{n}]` | pinnable, not yet written |
+
+**Group B — the device index is embedded in every binding.** PCSX2 and DuckStation use
+`SDL-0/FaceSouth`, Azahar `port:0`, ares `/0/3/0`, snes9x `(J1)`. There is no single key to write;
+changing the device means rewriting every binding line, which is the suspended config writer's job
+and a much larger change.
+
+**These emulators are already correct if — and only if — our virtual pad is enumeration index 0.**
+That is exactly what the SDL allowlist achieves, and only for emulators enumerating through SDL's
+gamepad API. So for Group B the question is never "how do we pin it" but "is it filtered".
+
+**Group C — no device selection at all.** mGBA binds globally under `[gba.input.SDLB]`, and Flycast,
+PPSSPP and gopher64 auto-map whatever SDL hands them. Nothing to write; they take what they are
+given, so with both physical and virtual pads visible the result is unpredictable.
+
+### What that leaves to test, and the predictions
+
+Only Dolphin (filtered) and RetroArch (not filtered) are measured. The rest are inferences, recorded
+so a wrong prediction is visible as a wrong prediction:
+
+- **DuckStation and PCSX2** — expected filtered. Their `SDL-0/FaceSouth` vocabulary is SDL's
+  *gamepad*-layer naming, the same world Dolphin lives in, and Dolphin is measured filtered. If so
+  they already work with no change.
+- **ares** — expected **not** filtered. Its binary imports `SDL_Joystick*` from SDL3 with no gamepad
+  imports, and RetroArch proved joystick-layer enumeration ignores the allowlist. Its `/0/` bindings
+  would then address the physical pad. This is the highest-value test because it is the one predicted
+  broken.
+- **melonDS** — unknown, but cheap either way because it is Group A.
+- **Azahar, snes9x, mGBA** — unknown.
+
+A pinnable index is only useful once the enumeration is known: writing `JoystickID = 0` is right when
+the emulator is filtered and wrong when it is not, because our pad then sits behind the physical
+ones. So Group A pinning for melonDS is deliberately deferred until its filtering is measured, rather
+than guessing an index the way earlier config writers guessed device identities.
+
+### PCSX2's SDL index is not 0, so "filtered implies index 0" was wrong
+
+Measured with **one** physical pad attached and the layer running. PCSX2's device list showed:
+
+```
+SDL-1: XInput Controller        <- our virtual pad, the only SDL device
+XInput-0: XInput Controller 0
+XInput-1: XInput Controller 1
+```
+
+The allowlist **is** working — the physical pad is absent from the SDL source. But our pad is
+`SDL-1`, not `SDL-0`, so the shipped `[Pad1] Up = SDL-0/DPadUp` bindings addressed nothing and the
+controls were dead.
+
+Dolphin, under identical conditions, reported `SDL/0/Xbox 360 Controller`. So **the two emulators
+number SDL devices differently**, and a single `{sdl_index}` meaning cannot serve both.
+
+The likely cause is the same gamepad-versus-joystick split that explained RetroArch: PCSX2 filters at
+the gamepad layer, so the physical pad is unusable, but numbers by joystick index, where the ignored
+pad still occupies slot 0. Dolphin numbers only the devices it opened. That would make PCSX2's index
+`physical pad count + player index` — **one observation, not yet a rule**, and it needs a two-pad
+test before anything relies on it.
+
+### PCSX2 ships player 2 bound to the same device, which the layer turns into double input
+
+`controller-followups.md` records approvingly that PCSX2 "ships a working player 2 (`[Pad2]` on
+`SDL-1/`, full bindings)". With the layer running and one controller, our virtual pad *is* `SDL-1`,
+so `[Pad1]` and `[Pad2]` both read it. Every press reaches both PS2 ports, and anything accepting
+input from either port sees it twice.
+
+This is not config drift; the shipped default does it for every user. It is an unlucky collision
+between the index PCSX2 ships for player 2 and the index our pad happens to occupy.
+
+`WriteInputLayerDeviceBindings` therefore writes port occupancy as well as device bindings: ports up
+to the active player count get `type_connected`, the rest get `type_disconnected`. PCSX2 and
+DuckStation both declare `type_key`, so both are covered, and the fix does not depend on resolving
+the index question above.
+
+A side effect worth knowing: DuckStation ships `[Pad2] Type = None`, which is why a second pad works
+on PS2 but not PS1 — an open item in `controller-followups.md`. The layer now sets it to
+`AnalogController` when a second player is assigned. That enables the port but does **not** create
+bindings for it, since DuckStation ships none, so player two there is not yet complete.
+
+### Group B is pinned by retargeting the device in place, not by rewriting bindings
+
+PCSX2, DuckStation, Azahar, ares and snes9x embed the device index in every binding value rather than
+naming a device once. Rewriting those bindings from `controller_config.mappings` would mean
+re-deriving every button through `ResolvePlatformMacros` — the suspended writer, with all of its
+history.
+
+Instead the layer retargets only the device portion, in place. `device_binding_pattern` matches the
+device reference and `device_binding_template` supplies the replacement, applied within one section:
+
+```json
+"device_binding_pattern": "SDL-\\d+/",
+"device_binding_template": "SDL-{sdl_index_after_hidden}/"
+```
+
+Everything else on the line is untouched, so a user's own remapping survives and only the device it
+points at changes. Verified against a live `PCSX2.ini`: 27 bindings retargeted when the index
+differs, **zero** when it already matches, and the 15 matches in `[Hotkeys]` left alone because the
+rewrite is scoped to the player's section.
+
+### Three index macros, because three emulators mean three different things by "index"
+
+Measured, not assumed, and they genuinely disagree:
+
+| Macro | Resolves to | Needed by |
+|---|---|---|
+| `{sdl_index}` | player index | Dolphin, which numbers only devices it opened |
+| `{sdl_index_after_hidden}` | physical pad count + player index | PCSX2, which numbers by joystick index so ignored pads still consume slots |
+| `{xinput_index}` | measured XInput slot | RetroArch, which reads XInput directly |
+
+A single macro with a mode flag was rejected: the meaning is a property of how that emulator
+enumerates, so naming each meaning explicitly makes a wrong choice visible in the metadata rather
+than hidden behind a boolean.
+
+`{sdl_index_after_hidden}` rests on **one** observation — PCSX2 showing `SDL-1` with one physical pad
+attached. Two pads should put player one at `SDL-2`; until that is checked the macro is a hypothesis
+with a name.
+
+### Known gap: hotkey sections are not retargeted
+
+PCSX2 ships `[Hotkeys]` entries such as `ShutdownVM = SDL-0/Back & SDL-0/Start`. That section is not
+per-player, so the port loop never visits it and its device reference stays at `SDL-0` — which under
+the layer may address nothing.
+
+It cannot simply be added as another `controller_section`: the loop would visit it once per port and
+the last player's index would win. Retargeting it correctly means binding it to player one
+specifically, which is a separate concept from a port section and is not yet modelled.
+
+### snes9x indexes joysticks from zero, not one
+
+`controller-followups.md` records `(J1)` as the first joystick and calls the one-indexing "a genuine
+trap, since every other emulator here indexes from 0". **That is wrong**, and it sent this work down
+the wrong path once.
+
+Measured by mapping two virtual pads by hand and reading what snes9x wrote:
+
+```
+Joypad1 = (J0)POV Up      first virtual pad
+Joypad2 = (J1)POV Up      second virtual pad
+```
+
+So snes9x numbers from zero *and* counts only the devices it can see — the allowlist filters the
+physical pads out of its enumeration entirely. It belongs to Dolphin's family, not PCSX2's, and
+takes plain `{sdl_index}`.
+
+Two consequences. The `{sdl_index_after_hidden_plus_one}` macro written for it was wrong twice over
+and briefly wrote `(J3)`, addressing a joystick that does not exist. And **the shipped
+`default_config/snes9x.conf` binds Joypad1 to `(J1)`**, which addresses the *second* joystick — so
+with a single controller and the layer off it should never have worked. That is a pre-existing bug
+this work uncovered rather than caused.
+
+### One section can hold every player, so scoping by section is not always enough
+
+snes9x keeps all players in `[Controls\Win]`, distinguished only by a `Joypad1:` / `Joypad2:` key
+prefix. Retargeting scoped to a section would rewrite every player's bindings to the same device,
+which is the duplicate-port bug PCSX2 already demonstrated.
+
+`binding_key_prefix_template` scopes the rewrite to one player's keys within a shared section. Where
+a section is per-player, as in PCSX2's `[Pad1]`, it is simply omitted.
+
+snes9x's player-two mapping templates were derived from bindings snes9x itself wrote after a manual
+mapping pass, rather than hand-typed, so the button vocabulary comes from the emulator rather than
+from a guess about it.
+
+### ares writes our virtual pad's GUID, which does not survive to the next run
+
+After a manual mapping pass ares stored the device by GUID:
+
+```
+Pad.Up: 03007ba65e0400008e02000014017801/0/1/1/Lo;;
+```
+
+That is our virtual pad's GUID — and ViGEm's name CRC **changes between runs**, measured as `ba66`,
+`7ba6` and `3a64` across three sessions. So a GUID ares captures today silently matches nothing
+tomorrow. It also defeats retargeting, because the GUID sits between the colon and the device index
+where the pattern expected the index to be.
+
+`controller-followups.md` established that ares accepts **GUID-less** bindings, matching on the
+device index. The device pattern therefore matches an optional GUID as well as the index and rewrites
+both back to the index-only form, which is stable by construction:
+
+```
+Pad.Up: 03007ba6.../0/1/1/Lo;;   ->   Pad.Up: /0/1/1/Lo;;
+```
+
+This is the one place where the layer must actively *undo* what the emulator wrote, rather than
+merely filling something in. Every other emulator either leaves our value alone or rewrites it to
+something equivalent.
+
+### ares ships one virtual pad, so player two had to be created
+
+The shipped `settings.bml` seeds `VirtualPad1` only; ares creates `VirtualPad2` through `VirtualPad5`
+itself with every binding empty (`Pad.Up: ;;`). Nothing to retarget, so player two never worked.
+
+Its mapping templates were derived from the bindings ares itself wrote for player one, with the
+device portion replaced by the index macro — the same approach used for snes9x. The button
+vocabulary (`Pad.Up`, `A..South`, `L-Bumper`, and the `;;` slot suffix) therefore comes from ares
+rather than from a reading of its format.
+
+### ares requires the GUID, so the layer writes its own — refreshed every launch
+
+Measured by mapping two virtual pads by hand with the layer's writer disabled, so the result survived
+to be read:
+
+```
+VirtualPad1: 03007ba65e0400008e02000014017801/0/1/1/Lo;;
+VirtualPad2: 03003a645e0400008e02000014017801/0/1/1/Lo;;
+```
+
+Three things follow. **The GUID is mandatory** — GUID-less bindings were written and produced no input
+in game, so the `controller-followups.md` finding that ares matches on the device index alone is
+stale. **The index is `/0/` for both pads**, not `/0/` and `/1/`, because the GUID already identifies
+the device and the index is relative to it. **Our two virtual pads carry different GUIDs**, which is
+what makes a shared index of 0 work.
+
+`controller-followups.md` retired the `{controller_guid}` macro because it had to *predict the user's*
+controller GUID, which varies by pad model and SDL backend and fails silently when wrong. That
+objection does not apply here: the layer creates the device, so its GUID can simply be read from
+Godot. The macro is back, meaning something different and knowable.
+
+ViGEm's GUID is not stable — the name CRC was measured as `ba66`, `7ba6` and `3a64` across three
+sessions. Writing it once would break on the next launch. Writing it **every** launch makes that
+irrelevant, because the stored value is never more than one session old. ares is the only emulator so
+far that needs this.
+
+### The virtual pads enumerate asynchronously, so config writing has to wait for them
+
+`{controller_guid}` can only be resolved once Godot has seen the pads, and the session log shows
+`our virtual pad appeared as Godot device N` arriving *after* the config write would otherwise have
+run. `WaitForVirtualPadsToEnumerate` polls until every pad has appeared, with a 3 second ceiling, and
+the launch path awaits it before writing.
+
+Every other macro — the index ones and the device name — is known at creation time and needed no
+wait. This one is a property Godot reports about the device, not one we chose, which is why it is the
+only asynchronous input to the writer.
+
+### The two launch paths must stay in step, and a missing line in the log is the tell
+
+`LaunchEmulatorWithGameInternal` and `LaunchEmulatorWithoutGame` both start a layer session and write
+emulator config, and a hook added to one and not the other fails in a way that looks like the hook
+itself is broken. The enumeration wait was added to the game path only, so opening an emulator to
+inspect its controls wrote configs before Godot had seen the virtual pads and resolved
+`{controller_guid}` to an empty string.
+
+It was diagnosed by what the log did *not* contain. The configure path prints neither
+`Launching <emulator> for <system>` nor `Controller mapping is suspended`, so their absence
+identifies which path ran. Reading the log for missing lines was faster than three rounds of
+reasoning about the wait itself, which was never at fault.
+
+`LaunchEmulatorWithoutGame` is `async void` for this reason: it has no caller to await it, but it now
+has to await enumeration before writing config.
+
+### Which index an emulator wants, measured rather than reasoned
+
+Every one of these was established by mapping a pad by hand and reading what the emulator wrote. Three
+were guessed wrong first, so treat the reasoning as a hint and the measurement as the answer.
+
+| Emulator | Macro | What it means |
+|---|---|---|
+| Dolphin | `{sdl_index}` | numbers only devices it opened, so player index |
+| snes9x | `{sdl_index}` | same, and zero-based despite the note claiming otherwise |
+| melonDS | `{sdl_index}` | measured `JoystickID = 0` with two physical pads attached |
+| ares | `{controller_guid}` + literal `0` | identifies by GUID; the index is relative to it |
+| PCSX2 | `{sdl_index_after_hidden}` | numbers by joystick index, so ignored pads still consume slots |
+| DuckStation | `{sdl_index_after_hidden}` | shares PCSX2's input layer |
+| Azahar | `{sdl_index_after_hidden}` | measured `port:2` with two physical pads attached |
+| RetroArch | `{xinput_index}` | reads XInput directly, so the measured slot |
+
+There is no way to derive this from whether the allowlist filters the emulator. PCSX2 **is** filtered —
+its device list shows only our pads — yet still numbers as though the hidden ones were present.
+Filtering governs which devices are *usable*; numbering is a separate decision each emulator makes.
+
+The reliable procedure for a new emulator: let the layer write whatever it writes, map a pad by hand
+in the emulator, then read the config back. The emulator states its own answer, and it has been
+different from the predicted one often enough that predicting is not worth the round trip.
+
+### mGBA writes per-controller profiles that shadow the shipped bindings
+
+mGBA has no device selector — its bindings live globally in `[gba.input.SDLB]`. But once it has seen a
+specific pad it writes a `[<platform>.input-profile.<name>]` or `[<platform>.input-profile.<guid>]`
+section, and those **override** the global ones. With the layer running it produced two for our
+virtual pad:
+
+```
+[gba.input-profile.Xbox 360 Controller]              buttons bound
+[gba.input-profile.0300b9695e0400008e02000000007200] tilt and gyro only, no buttons
+```
+
+The second is our pad seen through a different backend — product `8e02` is ViGEm, but the driver byte
+is `72` (`'r'`, RawInput) rather than the `78` (`'x'`, XInput) of the SDL GUIDs. mGBA treated that as a
+separate device and gave it a buttonless profile, which swallowed all input.
+
+These sections cannot be written correctly: the GUID changes every session, so writing one leaves a
+stale section next launch and accumulates a new one each time. `controller-followups.md` already says
+never to ship them, for the same reason.
+
+So they are **removed** at launch instead, via `remove_section_patterns`, letting the shipped global
+`SDLB` bindings govern — which is the state mGBA was verified working in. This is the first case where
+the layer deletes configuration rather than writing it.
+
+The pattern is deliberately anchored to `input-profile`, so `[gba.input.SDLB]`, `[gb.input.SDLB]` and
+the keyboard section `[gba.input.QT_K]` are untouched. A user who has hand-tuned a per-controller
+profile loses it, which is the accepted cost of the layer owning device identity during a session.
+
+### Flycast is unfiltered, so its ports must be assigned for the physical pads too
+
+Flycast's Controls screen listed **four** devices with two controllers attached — both physical pads
+and both virtual ones. So it enumerates through the joystick layer and the SDL allowlist does not
+reach it, the same as RetroArch. Its binary does contain
+`SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT`, so the hint is compiled in; it simply is not the layer
+Flycast enumerates through.
+
+It maps SDL joystick index to maple port with the index in the **key**:
+
+```
+maple_sdl_joystick_0 = 0
+```
+
+Pointing our pads at ports A and B is not sufficient, because the shipped
+`maple_sdl_joystick_0 = 0` still maps the user's physical pad to port A and player one ends up
+sharing or losing the port — the symptom being a player-one pad arriving as Dreamcast port B.
+
+Both groups are therefore assigned. Our pads take ports A and B, and the physical pads are pushed to
+the remaining ports:
+
+```
+maple_sdl_joystick_2 = 0     virtual pad 1  -> port A
+maple_sdl_joystick_3 = 1     virtual pad 2  -> port B
+maple_sdl_joystick_0 = 2     physical pad 1 -> port C
+maple_sdl_joystick_1 = 3     physical pad 2 -> port D
+```
+
+Moving the physical pads rather than disabling them is deliberate: no documented value for "no port"
+was found, and guessing one risks a config Flycast rejects. The cost is that a four-player Dreamcast
+game would see the physical pads on ports C and D, which is wrong but harmless next to player one
+being on the wrong port.
+
+This works because the second section's index macro counts players, and the player count never
+exceeds the number of physical pads, so the two sections cannot collide on an index.
+
+Flycast also did **not** persist a port change made in its own UI — `emu.cfg` still held only the
+shipped entry afterwards. Hand-fixing the ports is therefore not a workaround available to users, and
+writing them at launch is the only reliable route.

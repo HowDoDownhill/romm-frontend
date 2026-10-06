@@ -30,8 +30,16 @@
       "XDG_DATA_HOME": "{emulator_dir}/data"
     }
   },
-  "launch_args_with_game": "-config config:PerGameVmu=yes \"{rom_path}\"",
+  "launch_args_with_game": "-config config:PerGameVmu=yes {netplay} \"{rom_path}\"",
   "launch_args_without_game": "",
+  "netplay": {
+    "transport": "launch_args",
+    "host_args": "-config network:GGPO=yes -config network:ActAsServer=yes -config network:server={peer_address}:{peer_port} -config network:EnableUPnP=no -config network:GGPOAnalogAxes=2 -config input:device2=0",
+    "join_args": "-config network:GGPO=yes -config network:ActAsServer=no -config network:server={peer_address}:{peer_port} -config network:EnableUPnP=no -config network:GGPOAnalogAxes=2 -config input:device2=0",
+    "max_players": 2,
+    "default_port": 19713,
+    "requires_identical_rom": true
+  },
   "install_recipe": {
     "windows": {
       "type": "github_release",
@@ -93,5 +101,24 @@
       "launch_arg_true": "-config config:rend.UseMipmaps=yes",
       "launch_arg_false": "-config config:rend.UseMipmaps=no"
     }
-  ]
+  ],
+  "controller_config": {
+    "max_controllers": 2,
+    "config_file_relative_path": "emu.cfg",
+    "format": "ini",
+    "controller_sections": [
+      {
+        "section_template": "input",
+        "port_start": 0,
+        "device_key": "maple_sdl_joystick_{sdl_index_after_hidden}",
+        "device_template": "{port}"
+      },
+      {
+        "section_template": "input",
+        "port_start": 2,
+        "device_key": "maple_sdl_joystick_{sdl_index}",
+        "device_template": "{port}"
+      }
+    ]
+  }
 }

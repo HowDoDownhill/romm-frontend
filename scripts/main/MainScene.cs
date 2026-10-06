@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 public partial class MainScene : Control
 {
@@ -12,9 +13,20 @@ public partial class MainScene : Control
     [Export] public Control gameList;
     [Export] public PackedScene gameListEntryScene;
 
+    private const float ControllerLayerOfferDelaySeconds = 1.5f;
+
+    public Button assignControllersButton => startMenuPanel?.assignControllersButton;
+
     [ExportGroup("DetailsPanel")]
     [Export] public Control detailsPanel;
     [Export] public VBoxContainer detailsPanelContainer;
+    [Export] public Control lobbyPanel;
+    [Export] public Label lobbyCodeLabel;
+    [Export] public Label lobbyStatusLabel;
+    [Export] public VBoxContainer lobbyPlayerList;
+    [Export] public Button lobbyActionButton;
+    [Export] public Button lobbyLeaveButton;
+    [Export] public Button lobbyCopyCodeButton;
     [Export] public TextureRect gameCover;
     [Export] public TextureRect gameMarquee;
     [Export] public Label gameTitle;
@@ -75,6 +87,7 @@ public partial class MainScene : Control
     public MainSceneInputHandler InputHandler { get; private set; }
     public MainSceneGameListHandler GameListHandler { get; private set; }
     public MainSceneDownloadHandler DownloadHandler { get; private set; }
+    public MainSceneNetplayHandler NetplayHandler { get; private set; }
     public MainSceneUpdaterHandler UpdaterHandler { get; private set; }
     public MainScenePopupHandler PopupHandler { get; private set; }
 
@@ -113,6 +126,8 @@ public partial class MainScene : Control
 
         GameListHandler = new MainSceneGameListHandler(this, appInstance);
         DownloadHandler = new MainSceneDownloadHandler(this, appInstance);
+        NetplayHandler = new MainSceneNetplayHandler(this, appInstance);
+        NetplayHandler.Initialise();
         UpdaterHandler = new MainSceneUpdaterHandler(this, appInstance);
         InputHandler = new MainSceneInputHandler(this, appInstance);
 
@@ -153,16 +168,23 @@ public partial class MainScene : Control
 
         appInstance.downloadManager.DownloadCompleted += DownloadHandler.OnDownloadCompleted;
         appInstance.emulatorManager.EmulatorInstallationCompleted += OnEmulatorInstallationCompleted;
+        appInstance.emulatorManager.EmulatorLaunchStateChanged += OnEmulatorLaunchStateChanged;
 
         if (startMenuPanel != null)
         {
             panelStack.Register(startMenuPanel);
             startMenuPanel.BiosViewRequested += PopupHandler.PopulateBiosSelector;
+            startMenuPanel.NetplayCancelRequested += PopupHandler.OnNetplayCancelPressed;
+            startMenuPanel.Closed += ReturnFocusToGameList;
 
             if (startMenuPanel.launchEmulatorButton != null) startMenuPanel.launchEmulatorButton.Pressed += PopupHandler.OnLaunchEmulatorPressed;
             if (startMenuPanel.updateEmulatorButton != null) startMenuPanel.updateEmulatorButton.Pressed += PopupHandler.OnUpdateEmulatorPressed;
             if (startMenuPanel.uninstallEmulatorButton != null) startMenuPanel.uninstallEmulatorButton.Pressed += PopupHandler.OnUninstallEmulatorPressed;
+            if (startMenuPanel.favoriteGameButton != null) startMenuPanel.favoriteGameButton.Pressed += PopupHandler.OnFavoriteGamePressed;
+            if (startMenuPanel.hostNetplayButton != null) startMenuPanel.hostNetplayButton.Pressed += PopupHandler.OnHostNetplayPressed;
+            if (startMenuPanel.joinNetplayButton != null) startMenuPanel.joinNetplayButton.Pressed += PopupHandler.OnJoinNetplayPressed;
             if (startMenuPanel.selectBiosButton != null) startMenuPanel.selectBiosButton.Pressed += PopupHandler.OnSelectBiosMenuPressed;
+            if (startMenuPanel.assignControllersButton != null) startMenuPanel.assignControllersButton.Pressed += InputHandler.BeginControllerAssignment;
             if (startMenuPanel.settingsButton != null) startMenuPanel.settingsButton.Pressed += PopupHandler.OnSettingsMenuPressed;
             if (startMenuPanel.refreshAllGamesButton != null) startMenuPanel.refreshAllGamesButton.Pressed += PopupHandler.OnRefreshGamesPressed;
             if (startMenuPanel.refreshCurrentSystemButton != null) startMenuPanel.refreshCurrentSystemButton.Pressed += PopupHandler.OnRefreshCurrentSystemGamesPressed;
@@ -183,8 +205,8 @@ public partial class MainScene : Control
         if (changelogPanel != null)
         {
             panelStack.Register(changelogPanel);
-            changelogPanel.Accepted += UpdaterHandler.OnAcceptUpdatePressed;
-            changelogPanel.Dismissed += UpdaterHandler.OnCancelUpdatePressed;
+            changelogPanel.Accepted += OnChangelogPanelAccepted;
+            changelogPanel.Dismissed += OnChangelogPanelDismissed;
         }
 
         GameListHandler.SelectSystemByIndex(0);
@@ -203,6 +225,38 @@ public partial class MainScene : Control
 
         var micaMaterial = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
         MicaShadow.AttachToAll(this, micaMaterial, panelShadowColor, panelShadowSize, panelShadowOffset);
+
+        NetplayHandler.ApplyStartupSessionArguments();
+        OfferControllerLayerOnceTheInterfaceHasSettled();
+    }
+
+    public override void _ExitTree()
+    {
+        if (appInstance == null)
+        {
+            return;
+        }
+
+        if (appInstance.downloadManager != null && DownloadHandler != null)
+        {
+            appInstance.downloadManager.DownloadCompleted -= DownloadHandler.OnDownloadCompleted;
+        }
+
+        if (appInstance.emulatorManager != null)
+        {
+            appInstance.emulatorManager.EmulatorInstallationCompleted -= OnEmulatorInstallationCompleted;
+            appInstance.emulatorManager.EmulatorLaunchStateChanged -= OnEmulatorLaunchStateChanged;
+        }
+
+        GameListHandler?.Detach();
+        NetplayHandler?.Detach();
+        UpdaterHandler?.Detach();
+    }
+
+    private async void OfferControllerLayerOnceTheInterfaceHasSettled()
+    {
+        await ToSignal(GetTree().CreateTimer(ControllerLayerOfferDelaySeconds), "timeout");
+        InputHandler.OfferControllerLayerIfNotYetAsked();
     }
 
     public void ApplyTheme()
@@ -317,7 +371,7 @@ public partial class MainScene : Control
             return;
         }
 
-        releasePickerPopup.Populate(emulatorName, releases);
+        releasePickerPopup.Populate(emulatorName, releases, appInstance.emulatorManager.GetInstalledVersion(emulatorName));
     }
 
     private void OnEmulatorReleaseChosen(int index)
@@ -331,8 +385,40 @@ public partial class MainScene : Control
         _ = appInstance.emulatorManager.InstallEmulator(emulatorName, chosenRelease);
     }
 
+    public bool IsBrowsingCollections { get; private set; }
+
+    public bool HasCollections => appInstance.dataBus.collectionSystems != null && appInstance.dataBus.collectionSystems.Count > 0;
+
+    public void ToggleBrowseMode()
+    {
+        if (!HasCollections && !IsBrowsingCollections)
+        {
+            return;
+        }
+
+        IsBrowsingCollections = !IsBrowsingCollections;
+        GameListHandler.currentGameSystemIndex = -1;
+        GetCache();
+        GameListHandler.SelectSystemByIndex(0);
+
+        GD.Print($"[Browse] mode={(IsBrowsingCollections ? "collections" : "systems")} entries={GameListHandler.gameSystems?.Count ?? -1} index={GameListHandler.currentGameSystemIndex}");
+    }
+
     public void GetCache()
     {
+        if (IsBrowsingCollections)
+        {
+            GameListHandler.gameSystems = appInstance.dataBus.collectionSystems;
+            GameListHandler.games = appInstance.dataBus.gameCache;
+
+            if (systemCarousel != null)
+            {
+                systemCarousel.Populate(GameListHandler.gameSystems, GameListHandler.currentGameSystemIndex >= 0 ? GameListHandler.currentGameSystemIndex : 0);
+            }
+
+            return;
+        }
+
         if (appInstance.configManager.ShowAllSystems)
         {
             GameListHandler.gameSystems = appInstance.dataBus.systems;
@@ -354,11 +440,40 @@ public partial class MainScene : Control
                 GameListHandler.gameSystems = appInstance.dataBus.systems;
             }
         }
+        GameListHandler.gameSystems = FilterSystemsForNetplayHost(GameListHandler.gameSystems);
+
         GameListHandler.games = appInstance.dataBus.gameCache;
         if (systemCarousel != null)
         {
             systemCarousel.Populate(GameListHandler.gameSystems, GameListHandler.currentGameSystemIndex >= 0 ? GameListHandler.currentGameSystemIndex : 0);
         }
+    }
+
+    private List<GameSystem> FilterSystemsForNetplayHost(List<GameSystem> candidateSystems)
+    {
+        if (appInstance.netplayLobby == null || !appInstance.netplayLobby.IsInLobby || appInstance.netplayManager == null)
+        {
+            return candidateSystems;
+        }
+
+        var netplaySystems = candidateSystems
+            .Where(system => appInstance.netplayManager.SupportsNetplay(appInstance.emulatorManager.GetMappedEmulator(system.Slug), system.Slug))
+            .ToList();
+
+        return netplaySystems.Count > 0 ? netplaySystems : candidateSystems;
+    }
+
+    public void SelectSystemFromCarousel(int systemIndex)
+    {
+        systemCarousel?.SetSelectionSilently(systemIndex);
+        GameListHandler.SelectSystemByIndex(systemIndex);
+    }
+
+    public void RefreshBrowseSourceForLobby()
+    {
+        GameListHandler.currentGameSystemIndex = -1;
+        GetCache();
+        GameListHandler.SelectSystemByIndex(0);
     }
 
     public void SetupFooterUI()
@@ -423,6 +538,11 @@ public partial class MainScene : Control
 
     private void OnFilterInstalledGamesPressed()
     {
+        if (NetplayHandler != null && NetplayHandler.HandleLobbyBackPressed())
+        {
+            return;
+        }
+
         if (GameListHandler.IsFilterTransitioning) return;
 
         GameListHandler.showOnlyInstalledGames = !GameListHandler.showOnlyInstalledGames;
@@ -435,29 +555,42 @@ public partial class MainScene : Control
 
     private void OnPlayDownloadButtonPressed()
     {
-        if (GameListHandler.currentlySelectedGame == null) return;
-
-        if (actionBtn != null && actionBtn.Disabled) return;
-
-        string emulatorName = appInstance.emulatorManager.GetMappedEmulator(GameListHandler.currentlySelectedGame.PlatformSlug);
-
-        if (!appInstance.emulatorManager.IsEmulatorInstalled(emulatorName))
+        if (NetplayHandler != null && NetplayHandler.HandleGameConfirmedInLobby())
         {
-            actionBtn.Disabled = true;
-            OpenReleasePicker(emulatorName);
             return;
         }
 
-        bool isGameDownloadedLocally = GameListHandler.CheckIfGameIsDownloaded(GameListHandler.currentlySelectedGame);
+        if (GameListHandler.currentlySelectedGame == null) return;
 
-        if (isGameDownloadedLocally)
+        var gameAction = GameListHandler.ResolveGameAction(GameListHandler.currentlySelectedGame);
+
+        if (gameAction.Disabled) return;
+
+        switch (gameAction.Kind)
         {
-            appInstance.emulatorManager.LaunchEmulatorWithGame(GameListHandler.currentlySelectedGame);
+            case GameActionKind.InstallEmulator:
+                actionBtn.Disabled = true;
+                OpenReleasePicker(gameAction.EmulatorName);
+                return;
+
+            case GameActionKind.DownloadGame:
+                DownloadHandler.DownloadGame(GameListHandler.currentlySelectedGame);
+                return;
+
+            case GameActionKind.LaunchGame:
+                appInstance.emulatorManager.LaunchEmulatorWithGame(GameListHandler.currentlySelectedGame);
+                return;
         }
-        else
+    }
+
+    private void OnEmulatorLaunchStateChanged()
+    {
+        if (GameListHandler.currentlySelectedGame != null)
         {
-            DownloadHandler.DownloadGame(GameListHandler.currentlySelectedGame);
+            GameListHandler.UpdateDetailsPanelButtons(GameListHandler.currentlySelectedGame);
         }
+
+        PopupHandler.RefreshEmulatorMenuOptions();
     }
 
     private void OnDeleteButtonPressed()
@@ -486,6 +619,45 @@ public partial class MainScene : Control
         }
     }
 
+    private void OnChangelogPanelAccepted()
+    {
+        if (changelogPanel.ActiveSubject == ChangelogPanel.PromptSubject.ControllerLayer)
+        {
+            changelogPanel.Close();
+            InputHandler.OnControllerLayerOfferAccepted();
+            return;
+        }
+
+        UpdaterHandler.OnAcceptUpdatePressed();
+    }
+
+    private void OnChangelogPanelDismissed()
+    {
+        if (changelogPanel.ActiveSubject == ChangelogPanel.PromptSubject.ControllerLayer)
+        {
+            changelogPanel.Close();
+            InputHandler.OnControllerLayerOfferDeclined();
+            return;
+        }
+
+        UpdaterHandler.OnCancelUpdatePressed();
+    }
+
+    private bool ShouldFrontendIgnoreInput()
+    {
+        if (appInstance.emulatorManager != null && appInstance.emulatorManager.IsEmulatorRunning)
+        {
+            return true;
+        }
+
+        if (appInstance.inputLayer != null && appInstance.inputLayer.IsSessionActive)
+        {
+            return true;
+        }
+
+        return GetWindow() != null && !GetWindow().HasFocus();
+    }
+
     public override void _Input(InputEvent @event)
     {
         if (SectionHandler.IsTransitioning)
@@ -506,6 +678,22 @@ public partial class MainScene : Control
         {
             if (wheelEvent.ButtonIndex == MouseButton.WheelDown) gameCarousel.SelectNext();
             else gameCarousel.SelectPrevious();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (InputHandler.isListeningForControllerAssignment)
+        {
+            if (@event is InputEventJoypadButton assignmentButton && assignmentButton.Pressed)
+            {
+                InputHandler.RecordControllerAssignment(assignmentButton.Device);
+            }
+
+            else if (@event.IsActionPressed("ui_cancel") || @event.IsActionPressed("Back"))
+            {
+                InputHandler.CancelControllerAssignment();
+            }
+
             GetViewport().SetInputAsHandled();
             return;
         }
@@ -565,31 +753,9 @@ public partial class MainScene : Control
             return;
         }
 
-        if (appInstance.emulatorManager != null && appInstance.emulatorManager.IsEmulatorRunning)
+        if (ShouldFrontendIgnoreInput())
         {
             GetViewport().SetInputAsHandled();
-            bool isComboPressed = true;
-            int hotkeyCount = appInstance.configManager.EmulatorCloseHotkeyCount;
-            if (hotkeyCount > 0)
-            {
-                for (int i = 1; i <= hotkeyCount; i++)
-                {
-                    if (!Input.IsActionPressed($"CloseKey{i}"))
-                    {
-                        isComboPressed = false;
-                        break;
-                    }
-                }
-            }
-            else
-            {
-                isComboPressed = false;
-            }
-
-            if(isComboPressed)
-            {
-                appInstance.emulatorManager.CloseEmulator();
-            }
             return;
         }
 
@@ -654,9 +820,8 @@ public partial class MainScene : Control
         {
             if (rightBumperPressedTime > 0 && Time.GetTicksMsec() - rightBumperPressedTime < 250)
             {
-                if (systemCarousel != null)
+                if (systemCarousel != null && systemCarousel.Next())
                 {
-                    systemCarousel.Next();
                     GameListHandler.BeginQuickSwitchFade();
                 }
             }
@@ -674,13 +839,21 @@ public partial class MainScene : Control
         {
             if (leftBumperPressedTime > 0 && Time.GetTicksMsec() - leftBumperPressedTime < 250)
             {
-                if (systemCarousel != null)
+                if (systemCarousel != null && systemCarousel.Previous())
                 {
-                    systemCarousel.Previous();
                     GameListHandler.BeginQuickSwitchFade();
                 }
             }
             leftBumperPressedTime = 0;
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if ((@event.IsActionPressed("Back") || @event.IsActionPressed("ui_cancel"))
+            && (downloadsListContainer == null || !downloadsListContainer.IsOpen)
+            && NetplayHandler != null
+            && NetplayHandler.HandleLobbyBackPressed())
+        {
             GetViewport().SetInputAsHandled();
             return;
         }
@@ -697,6 +870,13 @@ public partial class MainScene : Control
             if (@event.IsActionPressed("ToggleInstalled") && (downloadsListContainer == null || !downloadsListContainer.IsOpen))
             {
                 OnFilterInstalledGamesPressed();
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
+            if (@event.IsActionPressed("ToggleCollections") && (downloadsListContainer == null || !downloadsListContainer.IsOpen))
+            {
+                ToggleBrowseMode();
                 GetViewport().SetInputAsHandled();
                 return;
             }
@@ -731,6 +911,14 @@ public partial class MainScene : Control
 
         if (@event.IsActionPressed("ui_up", true) || @event.IsActionPressed("MoveUp"))
         {
+            if ((downloadsListContainer == null || !downloadsListContainer.IsOpen)
+                && NetplayHandler != null
+                && NetplayHandler.HandleLobbyNavigation(-1))
+            {
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
             if (downloadsListContainer != null && downloadsListContainer.IsOpen)
             {
                 if (downloadProgressUI is DownloadProgressUI dpUI)
@@ -744,6 +932,14 @@ public partial class MainScene : Control
 
         if (@event.IsActionPressed("ui_down", true) || @event.IsActionPressed("MoveDown"))
         {
+            if ((downloadsListContainer == null || !downloadsListContainer.IsOpen)
+                && NetplayHandler != null
+                && NetplayHandler.HandleLobbyNavigation(1))
+            {
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
             if (downloadsListContainer != null && downloadsListContainer.IsOpen)
             {
                 if (downloadProgressUI is DownloadProgressUI dpUI)
@@ -791,6 +987,16 @@ public partial class MainScene : Control
         }
     }
 
+    private void ReturnFocusToGameList()
+    {
+        if (IsAnyMenuOpen())
+        {
+            return;
+        }
+
+        gameList?.GrabFocus();
+    }
+
     private bool IsAnyMenuOpen()
     {
         return panelStack.HasOpenPanel
@@ -814,6 +1020,7 @@ public partial class MainScene : Control
         GameListHandler?.ProcessPendingDetailsRefresh();
         GameListHandler?.ProcessPendingScreenshotLoads();
         GameListHandler?.ProcessPendingImageLoads();
+        InputHandler?.UpdateEmulatorCloseHold(delta);
 
         ulong currentTime = Time.GetTicksMsec();
 

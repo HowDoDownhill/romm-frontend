@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 public class MainSceneInputHandler
 {
@@ -9,6 +10,9 @@ public class MainSceneInputHandler
 
     public bool isListeningForInput = false;
     public Action<string> inputListenCallback;
+
+    public bool isListeningForControllerAssignment = false;
+    private readonly List<int> assignedControllerDeviceIds = new List<int>();
 
     public bool isListeningForEmulatorCloseHotkeys = false;
     public int expectedEmulatorCloseHotkeysCount = 0;
@@ -27,10 +31,259 @@ public class MainSceneInputHandler
         "RightStick_Up", "RightStick_Down", "RightStick_Left", "RightStick_Right"
     };
 
+    private double secondsEmulatorCloseHotkeysHeld;
+    private bool emulatorCloseRequestedThisHold;
+
     public MainSceneInputHandler(MainScene mainScene, AppInstance appInstance)
     {
         this.mainScene = mainScene;
         this.appInstance = appInstance;
+    }
+
+    public double EmulatorCloseHoldProgress
+    {
+        get
+        {
+            float requiredSeconds = appInstance.configManager.EmulatorCloseHoldSeconds;
+            return requiredSeconds <= 0.0f ? 0.0 : Mathf.Clamp(secondsEmulatorCloseHotkeysHeld / requiredSeconds, 0.0, 1.0);
+        }
+    }
+
+    public void UpdateEmulatorCloseHold(double delta)
+    {
+        bool hotkeysAreHeld = appInstance.emulatorManager != null
+            && appInstance.emulatorManager.IsEmulatorRunning
+            && AreEmulatorCloseHotkeysHeld();
+
+        ReportCloseHotkeyHoldChange(hotkeysAreHeld);
+
+        if (!hotkeysAreHeld)
+        {
+            secondsEmulatorCloseHotkeysHeld = 0.0;
+            emulatorCloseRequestedThisHold = false;
+            return;
+        }
+
+        if (emulatorCloseRequestedThisHold)
+        {
+            return;
+        }
+
+        secondsEmulatorCloseHotkeysHeld += delta;
+
+        if (secondsEmulatorCloseHotkeysHeld < appInstance.configManager.EmulatorCloseHoldSeconds)
+        {
+            return;
+        }
+
+        emulatorCloseRequestedThisHold = true;
+        GD.Print($"[Input] emulator close hotkeys held for {appInstance.configManager.EmulatorCloseHoldSeconds}s; closing the emulator.");
+        appInstance.emulatorManager.CloseEmulator();
+    }
+
+    private bool wasHoldingEmulatorCloseHotkeys;
+
+    private void ReportCloseHotkeyHoldChange(bool hotkeysAreHeld)
+    {
+        if (hotkeysAreHeld == wasHoldingEmulatorCloseHotkeys)
+        {
+            return;
+        }
+
+        wasHoldingEmulatorCloseHotkeys = hotkeysAreHeld;
+
+        if (hotkeysAreHeld)
+        {
+            GD.Print($"[Input] emulator close hotkeys are down on device {ResolveCloseHotkeyDeviceId()}; hold for {appInstance.configManager.EmulatorCloseHoldSeconds:0.#}s to close.");
+            return;
+        }
+
+        if (!emulatorCloseRequestedThisHold && secondsEmulatorCloseHotkeysHeld > 0.0)
+        {
+            GD.Print($"[Input] emulator close hotkeys released after {secondsEmulatorCloseHotkeysHeld:0.#}s; not closing.");
+        }
+    }
+
+    private bool AreEmulatorCloseHotkeysHeld()
+    {
+        int hotkeyCount = appInstance.configManager.EmulatorCloseHotkeyCount;
+        var hotkeyButtons = appInstance.configManager.EmulatorCloseHotkeys;
+
+        if (hotkeyCount <= 0 || hotkeyButtons == null || hotkeyButtons.Count == 0)
+        {
+            return false;
+        }
+
+        int physicalDeviceId = ResolveCloseHotkeyDeviceId();
+
+        if (physicalDeviceId < 0)
+        {
+            return false;
+        }
+
+        for (int hotkeyIndex = 0; hotkeyIndex < hotkeyCount && hotkeyIndex < hotkeyButtons.Count; hotkeyIndex++)
+        {
+            if (!Input.IsJoyButtonPressed(physicalDeviceId, (JoyButton)hotkeyButtons[hotkeyIndex].AsInt32()))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private int ResolveCloseHotkeyDeviceId()
+    {
+        int layerDeviceId = appInstance.inputLayer?.ResolvePlayerOneDeviceId() ?? -1;
+
+        if (layerDeviceId >= 0)
+        {
+            return layerDeviceId;
+        }
+
+        var connectedControllers = appInstance.controllerManager?.GetConnectedControllers();
+        return connectedControllers != null && connectedControllers.Count > 0 ? connectedControllers[0].GodotDeviceId : -1;
+    }
+
+    private const float DriverInstallResultVisibleSeconds = 3.0f;
+
+    private const string ControllerLayerOfferBody =
+        "[b]Set up your controllers automatically?[/b]\n\n" +
+        "RomM can present every controller to your emulators as an Xbox 360 pad, and configure each emulator's controls for you.\n\n" +
+        "• Any controller works the same. PlayStation, Switch Pro, 8BitDo and others are translated to the Xbox 360 layout emulators expect.\n" +
+        "• Player 1 stays Player 1, in the order you plug controllers in.\n" +
+        "• Emulator controls are set up for you, instead of configuring each one by hand.\n\n" +
+        "This writes controller settings into your emulator configuration files. You can turn it off at any time in Settings.";
+
+    public void OfferControllerLayerIfNotYetAsked()
+    {
+        if (appInstance.configManager.ControllerMappingConsent != ConfigManager.ControllerMappingConsentUnasked)
+        {
+            return;
+        }
+
+        if (mainScene.changelogPanel == null || mainScene.panelStack.HasOpenPanel)
+        {
+            return;
+        }
+
+        mainScene.changelogPanel.ShowControllerLayerOffer(ControllerLayerOfferBody, "Set Up Controllers", "No Thanks");
+    }
+
+    public async void OnControllerLayerOfferAccepted()
+    {
+        appInstance.configManager.SaveControllerMappingConsent(ConfigManager.ControllerMappingConsentAccepted);
+        GD.Print("[InputLayer] the user accepted automatic controller mapping.");
+
+        await InstallVirtualPadDriverIfMissing();
+    }
+
+    private async Task InstallVirtualPadDriverIfMissing()
+    {
+        InputLayer inputLayer = appInstance.inputLayer;
+
+        if (inputLayer == null || inputLayer.IsVirtualPadBackendAvailable || !VirtualPadDriverInstaller.IsSupportedPlatform)
+        {
+            return;
+        }
+
+        mainScene.progressPanel?.ShowStatus("Preparing the controller driver...");
+
+        bool driverIsReady = await VirtualPadDriverInstaller.DownloadAndInstall(
+            appInstance,
+            () => inputLayer.IsVirtualPadBackendAvailable,
+            status => mainScene.progressPanel?.SetStatus(status));
+
+        await mainScene.ToSignal(mainScene.GetTree().CreateTimer(DriverInstallResultVisibleSeconds), "timeout");
+        mainScene.progressPanel?.Close();
+
+        if (!driverIsReady)
+        {
+            GD.PrintErr("[InputLayer] the virtual controller driver is unavailable; emulators will keep their own controller settings.");
+        }
+    }
+
+    public void OnControllerLayerOfferDeclined()
+    {
+        appInstance.configManager.SaveControllerMappingConsent(ConfigManager.ControllerMappingConsentDeclined);
+        GD.Print("[InputLayer] the user declined automatic controller mapping; emulators keep their own controller settings.");
+    }
+
+    public void BeginControllerAssignment()
+    {
+        assignedControllerDeviceIds.Clear();
+        isListeningForControllerAssignment = true;
+        appInstance.inputLayer?.ClearPlayerAssignment();
+        UpdateControllerAssignmentPrompt();
+    }
+
+    public void RecordControllerAssignment(int deviceId)
+    {
+        if (assignedControllerDeviceIds.Contains(deviceId) || IsFrontendVirtualPad(deviceId))
+        {
+            return;
+        }
+
+        assignedControllerDeviceIds.Add(deviceId);
+
+        if (assignedControllerDeviceIds.Count >= CountAssignableControllers())
+        {
+            FinishControllerAssignment();
+            return;
+        }
+
+        UpdateControllerAssignmentPrompt();
+    }
+
+    public void CancelControllerAssignment()
+    {
+        if (assignedControllerDeviceIds.Count > 0)
+        {
+            FinishControllerAssignment();
+            return;
+        }
+
+        isListeningForControllerAssignment = false;
+        UpdateControllerAssignmentPrompt();
+    }
+
+    private void FinishControllerAssignment()
+    {
+        isListeningForControllerAssignment = false;
+        appInstance.inputLayer?.SetPlayerAssignment(assignedControllerDeviceIds);
+        UpdateControllerAssignmentPrompt();
+    }
+
+    private bool IsFrontendVirtualPad(int deviceId)
+    {
+        return appInstance.inputLayer != null && appInstance.inputLayer.IsOwnVirtualDevice(deviceId);
+    }
+
+    private int CountAssignableControllers()
+    {
+        var connectedControllers = appInstance.controllerManager?.GetConnectedControllers();
+        return connectedControllers?.Count ?? 0;
+    }
+
+    public void UpdateControllerAssignmentPrompt()
+    {
+        if (mainScene.assignControllersButton == null)
+        {
+            return;
+        }
+
+        if (isListeningForControllerAssignment)
+        {
+            int nextPlayerNumber = assignedControllerDeviceIds.Count + 1;
+            mainScene.assignControllersButton.Text = $"Press a Button on Player {nextPlayerNumber}'s Controller...";
+            return;
+        }
+
+        var assignedOrder = appInstance.inputLayer?.PlayerAssignmentDeviceIds;
+
+        mainScene.assignControllersButton.Text = assignedOrder == null || assignedOrder.Count == 0
+            ? "Assign Controllers"
+            : $"Assign Controllers [{assignedOrder.Count} in Order]";
     }
 
     public void UpdateEmulatorCloseHotkeysBtnText()
@@ -46,7 +299,7 @@ public class MainSceneInputHandler
                     keyNames.Add(((JoyButton)currentKeys[i].AsInt32()).ToString());
                 }
             }
-            mainScene.emulatorCloseHotkeysBtn.Text = $"Record Hotkeys [{string.Join(", ", keyNames)}]";
+            mainScene.emulatorCloseHotkeysBtn.Text = $"Record Hotkeys [Hold {string.Join(" + ", keyNames)} for {appInstance.configManager.EmulatorCloseHoldSeconds:0.#}s]";
         }
     }
 
