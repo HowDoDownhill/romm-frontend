@@ -2534,6 +2534,21 @@ ViGEmBus is already present there and the install path never runs. Untested code
 required install is worse than a documented gap. It is the obvious hardening step if this is ever
 exercised on a clean machine.
 
+### The ViGEm backend must not be constructed off Windows
+`ViGEmPadBackend` already answered "ViGEm is a Windows-only driver" from `DetectAvailability`, but
+on Linux it never got that far. Its static `ButtonBindings` table names `Xbox360Button` values, so
+constructing the backend runs the ViGEm client assembly's module initializer, and that assembly is
+packed with Costura, whose initializer P/Invokes `kernel32!SetErrorMode` unconditionally. The
+result was a `DllNotFoundException` for `kernel32.dll` thrown out of `InputLayer._Ready`, which
+left `deviceHider` unset and `JoyConnectionChanged` unsubscribed for the rest of the run.
+Observed on the GNOME test laptop on 2026-10-06; every Linux start hit it.
+
+`InputLayer` now picks `UnsupportedPlatformPadBackend` off Windows, so no ViGEm type is touched,
+and disposes through `IDisposable` for the same reason. `SdlDeviceAllowlist` reads
+`ViGEmPadBackend.VirtualPadVendorId` and `VirtualPadProductId`, which is safe: they are `const`,
+compiled into the caller, and never load the type. A Linux backend (uinput) would slot in at the
+same selection point.
+
 ### Emulators fall into three groups by how they select a controller
 
 Surveyed from the shipped `default_config` of every installed emulator. This determines what pinning

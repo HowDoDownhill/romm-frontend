@@ -44,7 +44,7 @@ public partial class InputLayer : Node
         controllerManager = GetNode<ControllerManager>("/root/ControllerManager");
 
         physicalPadReader = new GodotPhysicalPadReader();
-        virtualPadBackend = new ViGEmPadBackend();
+        virtualPadBackend = OperatingSystem.IsWindows() ? new ViGEmPadBackend() : new UnsupportedPlatformPadBackend();
         deviceHider = new NullDeviceHider();
 
         Input.JoyConnectionChanged += OnJoyConnectionChanged;
@@ -387,6 +387,6 @@ public partial class InputLayer : Node
     {
         Input.JoyConnectionChanged -= OnJoyConnectionChanged;
         EndSession();
-        (virtualPadBackend as ViGEmPadBackend)?.Dispose();
+        (virtualPadBackend as IDisposable)?.Dispose();
     }
 }

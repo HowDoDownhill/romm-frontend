@@ -5,7 +5,7 @@ using Nefarius.ViGEm.Client;
 using Nefarius.ViGEm.Client.Targets;
 using Nefarius.ViGEm.Client.Targets.Xbox360;
 
-public class ViGEmPadBackend : IVirtualPadBackend
+public class ViGEmPadBackend : IVirtualPadBackend, IDisposable
 {
     public const ushort VirtualPadVendorId = 0x045E;
     public const ushort VirtualPadProductId = 0x028E;

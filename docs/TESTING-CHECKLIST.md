@@ -165,6 +165,8 @@ lobby from the command line, so one side can be the Linux test box (`docs/LINUX-
 
 ## 11. Input layer
 
+- [ ] Linux: startup logs no `InputLayer` exception, and the controller settings report virtual
+      controllers as unavailable on this platform.
 - [ ] First launch asks once whether to use the controller layer. The answer persists.
 - [ ] Windows: accepting installs ViGEmBus with a single UAC prompt, and the layer reports working
       afterwards. Declining UAC leaves the app usable with the layer off.
