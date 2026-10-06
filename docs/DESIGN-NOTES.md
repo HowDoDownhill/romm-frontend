@@ -2025,6 +2025,25 @@ the `CloseKey1..N` `InputMap` actions, which are bound with no device filter —
 exist, **our own relayed output will satisfy the hold too**. That is harmless while the relay is a
 faithful copy, but it stops being harmless the moment remapping can retarget those buttons.
 
+#### The hold is measured on the clock, because a covered window gets about one frame a second
+The hold originally summed `_Process` `delta`. On the GNOME laptop that never reached 2s: the
+instrumented log read `released after 1.6s (12.1s wall, 12 frames)`. Two things combine:
+
+- While a fullscreen emulator covers the frontend, XWayland throttles the occluded window's
+  presentation to roughly 1 Hz, so `_Process` runs about once a second.
+- Godot caps the per-frame `delta` at `max_physics_steps_per_frame × physics step`, 8 × 1/60 =
+  0.133s. Each throttled frame therefore contributed 0.133s for a full second of real holding, and
+  a 2s hold needed about 15s.
+
+The button reads themselves were correct the whole time. The hold is now
+`Time.GetTicksMsec()` since the first frame that saw the buttons down, so it fires within one
+throttled frame of the configured time. The log still reports the frame count, which is the quickest
+way to spot throttling.
+
+Anything else in `_Process` that runs during an emulator session inherits the same rate on Linux.
+Exit detection and save sync tolerate it. A Linux virtual-pad relay driven from `_Process` would
+not: forwarding input at 1 Hz is unusable, so such a backend needs its own thread.
+
 ### Every control is a 0..1 value, including sticks
 
 `PadState` stores one float per `PadControl`, and stick axes are split into two half-range controls

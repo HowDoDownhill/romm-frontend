@@ -69,8 +69,9 @@ Test at least one **archive** emulator (RetroArch) and one **single-file** emula
 - [ ] Reinstall over an existing install preserves `preserve_on_reinstall` paths and save data.
 - [ ] Install is refused while that emulator is running.
 - [ ] Uninstall removes the install and the button returns to `Install <emulator>`.
-- [ ] RetroArch only: the per-system core downloads on first launch of that system, into
-      `emulators/retroarch/cores/`, and switching core in settings fetches the new one next launch.
+- [ ] RetroArch only: the `RetroArch_cores.7z` bundle for the same version installs alongside
+      RetroArch, so the selected core exists at first launch with no further download. Switching
+      core in settings takes effect on the next launch.
 
 ## 5. Launch and close
 
@@ -81,7 +82,9 @@ This is the section with the worst platform divergence. Do not skip it on either
 - [ ] Launch args are correct for the system — check `{system}`, `{settings}` and `{core_path}`
       substitution, and that the ROM path stays last where the emulator requires it.
 - [ ] **Close hotkey**: hold the configured buttons for the configured hold time (default `Back` for
-      2s) while the emulator has focus. The emulator exits. A quick press does nothing.
+      2s) while the emulator has focus. The emulator exits. A quick press does nothing. Test with
+      the emulator **fullscreen**: a covered frontend runs at about 1 fps on Linux, which is where
+      a frame-based hold timer broke.
 - [ ] The frontend does **not** freeze while closing. Any wait for process exit must be off the main
       thread.
 - [ ] The emulator exits *gracefully* — not killed. Confirm by checking the game's save survived (see

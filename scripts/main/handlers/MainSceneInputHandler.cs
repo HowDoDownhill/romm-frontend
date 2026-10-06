@@ -49,7 +49,7 @@ public class MainSceneInputHandler
         }
     }
 
-    public void UpdateEmulatorCloseHold(double delta)
+    public void UpdateEmulatorCloseHold()
     {
         bool hotkeysAreHeld = appInstance.emulatorManager != null
             && appInstance.emulatorManager.IsEmulatorRunning
@@ -64,12 +64,14 @@ public class MainSceneInputHandler
             return;
         }
 
+        framesSeenThisHold++;
+
         if (emulatorCloseRequestedThisHold)
         {
             return;
         }
 
-        secondsEmulatorCloseHotkeysHeld += delta;
+        secondsEmulatorCloseHotkeysHeld = (Time.GetTicksMsec() - holdStartedAtMilliseconds) / 1000.0;
 
         if (secondsEmulatorCloseHotkeysHeld < appInstance.configManager.EmulatorCloseHoldSeconds)
         {
@@ -77,11 +79,18 @@ public class MainSceneInputHandler
         }
 
         emulatorCloseRequestedThisHold = true;
-        GD.Print($"[Input] emulator close hotkeys held for {appInstance.configManager.EmulatorCloseHoldSeconds}s; closing the emulator.");
+        GD.Print($"[Input] emulator close hotkeys held for {appInstance.configManager.EmulatorCloseHoldSeconds}s ({DescribeHoldTiming()}); closing the emulator.");
         appInstance.emulatorManager.CloseEmulator();
     }
 
     private bool wasHoldingEmulatorCloseHotkeys;
+    private ulong holdStartedAtMilliseconds;
+    private int framesSeenThisHold;
+
+    private string DescribeHoldTiming()
+    {
+        return $"{framesSeenThisHold} frames";
+    }
 
     private void ReportCloseHotkeyHoldChange(bool hotkeysAreHeld)
     {
@@ -94,13 +103,15 @@ public class MainSceneInputHandler
 
         if (hotkeysAreHeld)
         {
+            holdStartedAtMilliseconds = Time.GetTicksMsec();
+            framesSeenThisHold = 0;
             GD.Print($"[Input] emulator close hotkeys are down on device {ResolveCloseHotkeyDeviceId()}; hold for {appInstance.configManager.EmulatorCloseHoldSeconds:0.#}s to close.");
             return;
         }
 
         if (!emulatorCloseRequestedThisHold && secondsEmulatorCloseHotkeysHeld > 0.0)
         {
-            GD.Print($"[Input] emulator close hotkeys released after {secondsEmulatorCloseHotkeysHeld:0.#}s; not closing.");
+            GD.Print($"[Input] emulator close hotkeys released after {secondsEmulatorCloseHotkeysHeld:0.#}s ({DescribeHoldTiming()}); not closing.");
         }
     }
 

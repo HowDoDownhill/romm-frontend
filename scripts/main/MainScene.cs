@@ -1020,7 +1020,7 @@ public partial class MainScene : Control
         GameListHandler?.ProcessPendingDetailsRefresh();
         GameListHandler?.ProcessPendingScreenshotLoads();
         GameListHandler?.ProcessPendingImageLoads();
-        InputHandler?.UpdateEmulatorCloseHold(delta);
+        InputHandler?.UpdateEmulatorCloseHold();
 
         ulong currentTime = Time.GetTicksMsec();
 
