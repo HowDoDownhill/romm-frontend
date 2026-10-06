@@ -32,12 +32,15 @@ Understanding this pipeline is necessary before changing anything.
 
 - `GetConnectedControllers()` returns controllers discovered via Godot's
   `Input.GetConnectedJoypads()`.
-- Each gets `ConnectionOrder` from a monotonic counter (`nextConnectionOrder++`), which
-  is what `{sdl_index}` resolves to.
+- Each gets `ConnectionOrder` from a monotonic counter (`nextConnectionOrder++`), used only
+  to sort pads. `{sdl_index}` resolves to the pad's current position in that order.
 - **Verified working**: user's log showed `Applying controller mappings: 1 of 4 max controllers`.
   Detection is NOT the problem.
-- Known weakness: the counter never resets, so a disconnect/reconnect can push the first
-  physical pad to index 1+, which would then not match the emulator's SDL index 0.
+- ~~Known weakness: the counter never resets~~ **Fixed 2026-10-06.** `ConnectionOrder` is now
+  only a sort key. `{sdl_index}` and the log line use `ControllerManager.GetEnumerationIndex`,
+  the pad's position among the pads connected right now, so a reconnect no longer pushes a lone
+  pad to index 1+. Seen on the Linux laptop as `SDL index 0 → 1 → 2` for one Xbox pad. The
+  writer that reads it is suspended (`SuspendControllerMapping`), so this had no live effect.
 
 ### Application
 

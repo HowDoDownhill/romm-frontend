@@ -58,7 +58,12 @@ public partial class ControllerManager : Node
         };
 
         connectedControllers.Add(controller);
-        GD.Print($"Controller connected: {controller.ControllerName} (Device {deviceId}, SDL index {controller.ConnectionOrder}, GUID {controller.Guid})");
+        GD.Print($"Controller connected: {controller.ControllerName} (Device {deviceId}, SDL index {GetEnumerationIndex(controller)}, GUID {controller.Guid})");
+    }
+
+    public int GetEnumerationIndex(ConnectedController controller)
+    {
+        return GetAllControllersIncludingVirtual().IndexOf(controller);
     }
 
     private void RemoveController(int deviceId)

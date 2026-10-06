@@ -2830,7 +2830,7 @@ public partial class EmulatorManager : Node
                         if (string.IsNullOrEmpty(existingDevice))
                         {
                             string deviceValue = sectionDef.DeviceTemplate
-                                .Replace("{sdl_index}", connectedControllers[portOffset].ConnectionOrder.ToString())
+                                .Replace("{sdl_index}", controllerManager.GetEnumerationIndex(connectedControllers[portOffset]).ToString())
                                 .Replace("{controller_name}", connectedControllers[portOffset].ControllerName);
                             iniUpdater.UpdateValue(configFilePath, sectionName, sectionDef.DeviceKey, deviceValue, deviceValue);
                         }
@@ -2849,7 +2849,7 @@ public partial class EmulatorManager : Node
 
                 if (isControllerConnected && sectionDef.Mappings != null)
                 {
-                    int sdlIndex = connectedControllers[portOffset].ConnectionOrder;
+                    int sdlIndex = controllerManager.GetEnumerationIndex(connectedControllers[portOffset]);
                     string controllerName = connectedControllers[portOffset].ControllerName;
 
                     foreach (var mapping in sectionDef.Mappings)
@@ -2946,7 +2946,7 @@ public partial class EmulatorManager : Node
                 if (i < availableControllerCount && !string.IsNullOrEmpty(controllerConfig.AssignmentTemplate))
                 {
                     string assignmentValue = controllerConfig.AssignmentTemplate
-                        .Replace("{sdl_index}", connectedControllers[i].ConnectionOrder.ToString())
+                        .Replace("{sdl_index}", controllerManager.GetEnumerationIndex(connectedControllers[i]).ToString())
                         .Replace("{controller_name}", connectedControllers[i].ControllerName);
                     assignmentArray.Add(assignmentValue);
                 }
