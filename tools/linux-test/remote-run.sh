@@ -51,6 +51,16 @@ load_graphical_session_environment() {
         export XDG_CURRENT_DESKTOP="$(detect_session_desktop)"
     fi
 
+    # GDM sessions can leave loginctl's Desktop property empty. The compositor's own
+    # environment always carries the value the session was started with.
+    if [ -z "${XDG_CURRENT_DESKTOP:-}" ]; then
+        local compositorPid
+        compositorPid="$(pgrep -u "$(id -u)" -n -x 'gnome-shell|kwin_wayland|Hyprland|sway|niri|cosmic-comp' 2>/dev/null)"
+        if [ -n "$compositorPid" ]; then
+            export XDG_CURRENT_DESKTOP="$(tr '\0' '\n' < "/proc/$compositorPid/environ" 2>/dev/null | sed -n 's/^XDG_CURRENT_DESKTOP=//p')"
+        fi
+    fi
+
     if [ -z "${DISPLAY:-}" ]; then
         for socket in /tmp/.X11-unix/X*; do
             if [ -S "$socket" ]; then
@@ -64,7 +74,7 @@ load_graphical_session_environment() {
     # authorization protocol specified") and Godot's X11 driver fails before it can
     # fall back to Wayland.
     if [ -z "${XAUTHORITY:-}" ]; then
-        for candidate in "$HOME/.Xauthority" "$XDG_RUNTIME_DIR/xauth_"*; do
+        for candidate in "$HOME/.Xauthority" "$XDG_RUNTIME_DIR/xauth_"* "$XDG_RUNTIME_DIR/.mutter-Xwaylandauth."*; do
             if [ -f "$candidate" ]; then
                 export XAUTHORITY="$candidate"
                 break
@@ -188,12 +198,52 @@ start_app() {
     echo "started pid $(cat "$PidFile")"
 }
 
+# GNOME Shell answers its own screenshot interface with AccessDenied for any caller
+# outside the desktop session, which includes gnome-screenshot started over SSH. The
+# XDG desktop portal is the supported route: with the "screenshot" permission stored
+# for host apps (empty app id), a non-interactive request completes with no dialog.
+# The portal writes into ~/Pictures and only reports the path through a D-Bus signal,
+# so the newest file after a marker is taken instead, once its size stops changing.
+capture_with_portal() {
+    local output="$1"
+    command -v gdbus >/dev/null 2>&1 || return 1
+
+    gdbus call --session --dest org.freedesktop.impl.portal.PermissionStore \
+        --object-path /org/freedesktop/impl/portal/PermissionStore \
+        --method org.freedesktop.impl.portal.PermissionStore.SetPermission \
+        screenshot true screenshot "" "['yes']" >/dev/null 2>&1 || return 1
+
+    local marker captured="" previousSize=-1 size
+    marker="$(mktemp)"
+    sleep 1
+
+    gdbus call --session --dest org.freedesktop.portal.Desktop \
+        --object-path /org/freedesktop/portal/desktop \
+        --method org.freedesktop.portal.Screenshot.Screenshot \
+        "" "{'interactive': <false>}" >/dev/null 2>&1 || { rm -f "$marker"; return 1; }
+
+    for _ in $(seq 1 40); do
+        captured="$(find "$HOME/Pictures" -name '*.png' -newer "$marker" 2>/dev/null | head -1)"
+        if [ -n "$captured" ]; then
+            size="$(stat -c %s "$captured" 2>/dev/null || echo 0)"
+            [ "$size" -gt 0 ] && [ "$size" = "$previousSize" ] && break
+            previousSize="$size"
+        fi
+        sleep 0.25
+    done
+    rm -f "$marker"
+
+    [ -n "$captured" ] && [ -s "$captured" ] || return 1
+    mv -f "$captured" "$output"
+}
+
 try_screenshot_tool() {
     local tool="$1" output="$2"
-    command -v "$tool" >/dev/null 2>&1 || return 1
+    [ "$tool" = portal ] || command -v "$tool" >/dev/null 2>&1 || return 1
     rm -f "$output"
 
     case "$tool" in
+        portal)           capture_with_portal "$output" ;;
         grim)             grim "$output" >/dev/null 2>&1 ;;
         grimblast)        grimblast save screen "$output" >/dev/null 2>&1 ;;
         wayshot)          wayshot -f "$output" >/dev/null 2>&1 ;;
@@ -220,8 +270,8 @@ wait_for_file() {
 screenshot_tool_preference() {
     case "${XDG_CURRENT_DESKTOP:-}" in
         *KDE*|*kde*)       echo "spectacle grim grimblast wayshot maim import" ;;
-        *GNOME*|*gnome*)   echo "gnome-screenshot grim wayshot maim import" ;;
-        *)                 echo "grim grimblast wayshot spectacle gnome-screenshot maim import" ;;
+        *GNOME*|*gnome*)   echo "portal gnome-screenshot grim wayshot maim import" ;;
+        *)                 echo "grim grimblast wayshot spectacle portal gnome-screenshot maim import" ;;
     esac
 }
 

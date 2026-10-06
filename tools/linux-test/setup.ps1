@@ -62,27 +62,39 @@ echo "  session $(loginctl show-session "$(loginctl list-sessions --no-legend | 
 
 Write-Host ""
 Write-Host "=== 5. rsync in WSL (delta sync from Windows) ===" -ForegroundColor Cyan
-& wsl -d $Config.wslDistro -- sh -c 'command -v rsync >/dev/null 2>&1'
-if ($LASTEXITCODE -eq 0) {
-    Write-Host "  ok      rsync in WSL/$($Config.wslDistro)"
-} else {
-    Write-Host "  MISSING rsync in WSL/$($Config.wslDistro)" -ForegroundColor Yellow
-    Write-Host "          wsl -d $($Config.wslDistro) -u root -- pacman -Sy --noconfirm rsync openssh"
-    Write-Host "          (without it, deploy.ps1 falls back to a slower full tarball copy)"
+# WSL is optional: without it deploy.ps1 sends a full tarball each push instead of an rsync delta.
+$wslReady = $false
+if (Get-Command wsl -ErrorAction SilentlyContinue) {
+    try { & wsl -d $Config.wslDistro -- true *> $null; $wslReady = ($LASTEXITCODE -eq 0) } catch { $wslReady = $false }
 }
 
-$remoteKeyName = Split-Path $Config.identityFile -Leaf
-$wslKeyCheck = & wsl -d $Config.wslDistro -- sh -c "test -f ~/.ssh/$remoteKeyName && echo yes || echo no"
-if ("$wslKeyCheck".Trim() -eq 'yes') {
-    Write-Host "  ok      key present in WSL"
+if (-not $wslReady) {
+    Write-Host "  SKIP    WSL distro '$($Config.wslDistro)' is not available" -ForegroundColor Yellow
+    Write-Host "          deploy.ps1 will use a full tarball copy each push. For delta sync:"
+    Write-Host "          wsl --install -d archlinux, then re-run this script"
 } else {
-    Write-Host "  Copying key into WSL so rsync can use it..."
-    # The key cannot be referenced in place at /mnt/c/... - drvfs reports 777 and ssh
-    # refuses a world-readable private key. Copy it inside WSL rather than piping it
-    # through PowerShell, which re-encodes the stream and corrupts the PEM.
-    $wslKeyPath = "$(& wsl -d $Config.wslDistro -- wslpath -a ($Config.identityFile -replace '\\', '/'))".Trim()
-    & wsl -d $Config.wslDistro -- sh -c "mkdir -p ~/.ssh && chmod 700 ~/.ssh && tr -d '\r' < '$wslKeyPath' > ~/.ssh/$remoteKeyName && chmod 600 ~/.ssh/$remoteKeyName && echo copied"
-    if ($LASTEXITCODE -ne 0) { throw "Failed to copy the key into WSL." }
+    & wsl -d $Config.wslDistro -- sh -c 'command -v rsync >/dev/null 2>&1'
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  ok      rsync in WSL/$($Config.wslDistro)"
+    } else {
+        Write-Host "  MISSING rsync in WSL/$($Config.wslDistro)" -ForegroundColor Yellow
+        Write-Host "          wsl -d $($Config.wslDistro) -u root -- pacman -Sy --noconfirm rsync openssh"
+        Write-Host "          (without it, deploy.ps1 falls back to a slower full tarball copy)"
+    }
+
+    $remoteKeyName = Split-Path $Config.identityFile -Leaf
+    $wslKeyCheck = & wsl -d $Config.wslDistro -- sh -c "test -f ~/.ssh/$remoteKeyName && echo yes || echo no"
+    if ("$wslKeyCheck".Trim() -eq 'yes') {
+        Write-Host "  ok      key present in WSL"
+    } else {
+        Write-Host "  Copying key into WSL so rsync can use it..."
+        # The key cannot be referenced in place at /mnt/c/... - drvfs reports 777 and ssh
+        # refuses a world-readable private key. Copy it inside WSL rather than piping it
+        # through PowerShell, which re-encodes the stream and corrupts the PEM.
+        $wslKeyPath = "$(& wsl -d $Config.wslDistro -- wslpath -a ($Config.identityFile -replace '\\', '/'))".Trim()
+        & wsl -d $Config.wslDistro -- sh -c "mkdir -p ~/.ssh && chmod 700 ~/.ssh && tr -d '\r' < '$wslKeyPath' > ~/.ssh/$remoteKeyName && chmod 600 ~/.ssh/$remoteKeyName && echo copied"
+        if ($LASTEXITCODE -ne 0) { throw "Failed to copy the key into WSL." }
+    }
 }
 
 Write-Host ""

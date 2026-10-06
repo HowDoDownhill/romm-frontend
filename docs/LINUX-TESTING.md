@@ -21,9 +21,15 @@ sudo pacman -S --needed openssh rsync grim && sudo systemctl enable --now sshd
 
 The screenshot backend is compositor-specific: `grim` needs the `wlr-screencopy` protocol,
 which KWin and Mutter do not implement, so on KDE it is present-but-broken and `spectacle`
-is the working tool (`gnome-screenshot` on GNOME). `remote-run.sh` reads the desktop from
-`loginctl`, orders the candidates accordingly, and actually runs each one rather than
-trusting `command -v`.
+is the working tool. `remote-run.sh` reads the desktop from `loginctl`, falls back to the
+compositor's own environment when `loginctl` leaves it empty (GDM does), orders the candidates
+accordingly, and actually runs each one rather than trusting `command -v`.
+
+GNOME needs no screenshot package. GNOME Shell answers its screenshot interface with
+`AccessDenied` for anything started outside the desktop session, so `gnome-screenshot` over SSH
+fails. The `portal` backend goes through the XDG desktop portal instead: it stores the
+`screenshot` permission for host apps on first use, after which a non-interactive capture
+needs no dialog. Measured on GNOME Shell 50.5.
 
 On Windows:
 
@@ -40,6 +46,12 @@ powershell -File tools/linux-test/setup.ps1
 That generates a dedicated `~/.ssh/romm-linux-test` key, installs it on the Arch machine (one
 password prompt), copies it into WSL so `rsync` can use it, and reports anything missing on
 either side.
+
+WSL is optional. Without it, setup skips the WSL step and `deploy.ps1` uses the Windows OpenSSH
+client to send the whole build as a tarball on every push (about 180 MB, fine on a LAN).
+
+`deploy.ps1` defaults `GODOT_BIN` to the original machine's Godot path. Set it to the local
+Godot 4.7.2 mono console executable before deploying from anywhere else.
 
 ## Daily use
 
@@ -224,7 +236,8 @@ is the live one.
 | `no Wayland or X display found` | Nobody is logged in at the test machine's desktop. The session must be active, not just booted. |
 | Full 182 MB transfer every push | `rsync` missing on one end. `deploy.ps1` needs it on **both**. |
 | `Load key ...: invalid format` | The key was piped into WSL through PowerShell, which re-encodes it. Copy it inside WSL with `tr -d '\r' < /mnt/c/...`. |
-| `no working screenshot tool` | Compositor has no supported backend installed. Install `spectacle` (KDE), `gnome-screenshot` (GNOME) or `grim` (wlroots). |
+| `no working screenshot tool` | Compositor has no supported backend installed. Install `spectacle` (KDE) or `grim` (wlroots). On GNOME, check `gdbus` exists and the portal (`xdg-desktop-portal-gnome`) is running. |
+| `Authorization required, but no authorization protocol specified` | No X authority file found for XWayland. GNOME keeps it at `$XDG_RUNTIME_DIR/.mutter-Xwaylandauth.*`, KDE/SDDM at `xauth_*`. |
 | App on the wrong GPU | See GPU selection above. |
 
 Ad-hoc multi-line `ssh` commands with quotes or parentheses get mangled by PowerShell's

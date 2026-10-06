@@ -165,10 +165,18 @@ function ConvertTo-WslPath {
 # rsync must exist on both ends. WSL only supplies the sending half - Windows has
 # no rsync of its own - so a missing binary on either side means the tarball path.
 function Test-RsyncAvailable {
-    & wsl -d $Config.wslDistro -- sh -c 'command -v rsync >/dev/null 2>&1' 2>$null
-    if ($LASTEXITCODE -ne 0) { return $false }
-
     $previousPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & wsl -d $Config.wslDistro -- sh -c 'command -v rsync >/dev/null 2>&1' *> $null
+        $wslExit = $LASTEXITCODE
+    } catch {
+        $wslExit = 1
+    } finally {
+        $ErrorActionPreference = $previousPreference
+    }
+    if ($wslExit -ne 0) { return $false }
+
     $ErrorActionPreference = 'Continue'
     try {
         & ssh -p $Config.port -i $Config.identityFile -o BatchMode=yes $Target 'command -v rsync >/dev/null 2>&1' 2>&1 | Out-Null
