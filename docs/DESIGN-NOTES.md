@@ -1070,6 +1070,34 @@ covers the frontend too, but only from the next launch onward.
 
 ## Rendering and theming
 
+### The canvas expands to the screen's shape, and the carousel sizes itself from its own rect
+The window is borderless fullscreen with `canvas_items` stretch and `expand` aspect. The canvas
+keeps a 1080-unit short side and grows along the long one: 2560×1080 at 21:9 (the development
+monitor is 5120×2160), 1920×1200 at 16:10, 1920×1440 at 4:3. Under the default `keep` aspect every
+non-16:9 screen got black bars.
+
+The main scene is full-rect containers, so the header, footer, settings, downloads and start menu
+reflowed with no changes. Two pieces did not:
+
+- `VerticalCarousel` sized cards and spacing from the **viewport** (card width = 25% of viewport
+  width). At 21:9 the cards grew about 33% while the height stayed put, overlapping each other and
+  the header. It now derives an effective canvas from its own rect: the smaller of
+  `Size / referenceCarouselSize` (945×873, its measured size at 1920×1080) times
+  `referenceCanvasSize`. At 16:9 that is exactly the old viewport, so the layout is pixel-identical;
+  elsewhere the cards keep their size and re-centre in the wider or taller rect.
+- `GameMarquee` used `expand_mode = 5` (fit width proportional), so its minimum height grew with the
+  panel's width and pushed the screenshots and summary out of the details panel at 21:9. It is now
+  `expand_mode = 1` with keep-aspect-centred stretch, and its row takes a 1.2 stretch ratio against
+  the screenshot row, which reproduces the 16:9 split (477 of 873).
+
+Verified with `--ui-capture=<png> --ui-capture-size=WxH [--ui-capture-view=settings|downloads|start]`
+after `--`, which switches to a window of that size from code (`--windowed` and `--resolution` lose to
+the project's fullscreen mode, and Movie Maker records at the project size regardless), waits for the
+UI to settle, saves the frame and quits. The log line reports the canvas, carousel and details sizes.
+
+Known gap: on narrow or small screens the UI scales down as a whole (0.75 at 4:3, 0.67 on a
+1280×800 handheld), so settings text reaches about 9 px. That needs a UI scale setting, not layout.
+
 ### Mica frosted glass needs the normal draw flow
 Popups are deliberately **not** `TopLevel`. Staying in the normal draw flow (added last, so they
 render on top) is what lets Godot auto-copy the back buffer for the mica shader. `TopLevel` plus a

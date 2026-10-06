@@ -17,6 +17,8 @@ public partial class VerticalCarousel : Control
     [Export] public int preloadItemsHalfCount = 2;
     [Export] public bool scaleItemsToWindow = true;
     [Export] public float windowWidthRatio = 0.25f;
+    [Export] public Vector2 referenceCanvasSize = new Vector2(1920, 1080);
+    [Export] public Vector2 referenceCarouselSize = new Vector2(945, 873);
 
     public int SelectedIndex = 0;
     private Tween tween;
@@ -103,6 +105,17 @@ public partial class VerticalCarousel : Control
         UpdateLayout(false);
     }
 
+    private Vector2 ResolveEffectiveCanvasSize()
+    {
+        if (Size.X <= 0.0f || Size.Y <= 0.0f || referenceCarouselSize.X <= 0.0f || referenceCarouselSize.Y <= 0.0f)
+        {
+            return GetViewport().GetVisibleRect().Size;
+        }
+
+        float layoutScale = Mathf.Min(Size.X / referenceCarouselSize.X, Size.Y / referenceCarouselSize.Y);
+        return referenceCanvasSize * layoutScale;
+    }
+
     private static float GetItemAspectRatio(Control child)
     {
         if (child is ICarouselItem item)
@@ -138,7 +151,8 @@ public partial class VerticalCarousel : Control
         }
 
         Vector2 center = Size / 2.0f;
-        float viewportWidth = GetViewport().GetVisibleRect().Size.X;
+        Vector2 effectiveCanvasSize = ResolveEffectiveCanvasSize();
+        float viewportWidth = effectiveCanvasSize.X;
         float targetWidth = viewportWidth * windowWidthRatio;
 
         for (int i = 0; i < childCount; i++)
@@ -186,7 +200,7 @@ public partial class VerticalCarousel : Control
             float absDiff = Mathf.Abs(diff);
             float t = Mathf.Clamp(absDiff / visibleItemsHalfCount, 0.0f, 1.0f);
 
-            float currentItemSpacing = useScreenPercentageForOffsets ? GetViewport().GetVisibleRect().Size.Y * itemSpacingRatio : itemSpacing;
+            float currentItemSpacing = useScreenPercentageForOffsets ? effectiveCanvasSize.Y * itemSpacingRatio : itemSpacing;
             float currentDepthOffset = useScreenPercentageForOffsets ? viewportWidth * depthOffsetRatio : depthOffset;
             float currentXOffset = useScreenPercentageForOffsets ? viewportWidth * xOffsetRatio : xOffset;
 

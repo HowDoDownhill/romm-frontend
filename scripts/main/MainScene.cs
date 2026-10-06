@@ -228,6 +228,54 @@ public partial class MainScene : Control
 
         NetplayHandler.ApplyStartupSessionArguments();
         OfferControllerLayerOnceTheInterfaceHasSettled();
+        CaptureLayoutIfRequested();
+    }
+
+    private const string LayoutCaptureArgumentPrefix = "--ui-capture=";
+    private const string LayoutCaptureSizeArgumentPrefix = "--ui-capture-size=";
+    private const string LayoutCaptureViewArgumentPrefix = "--ui-capture-view=";
+    private const double LayoutCaptureSettleSeconds = 8.0;
+    private const double LayoutCaptureViewDelaySeconds = 4.0;
+
+    private async void CaptureLayoutIfRequested()
+    {
+        string[] userArguments = OS.GetCmdlineUserArgs();
+        string captureArgument = userArguments.FirstOrDefault(argument => argument.StartsWith(LayoutCaptureArgumentPrefix));
+
+        if (captureArgument == null)
+        {
+            return;
+        }
+
+        string sizeArgument = userArguments.FirstOrDefault(argument => argument.StartsWith(LayoutCaptureSizeArgumentPrefix));
+        string[] sizeParts = sizeArgument?.Substring(LayoutCaptureSizeArgumentPrefix.Length).Split('x');
+
+        if (sizeParts != null && sizeParts.Length == 2 && int.TryParse(sizeParts[0], out int captureWidth) && int.TryParse(sizeParts[1], out int captureHeight))
+        {
+            DisplayServer.WindowSetMode(DisplayServer.WindowMode.Windowed);
+            DisplayServer.WindowSetSize(new Vector2I(captureWidth, captureHeight));
+            DisplayServer.WindowSetPosition(Vector2I.Zero);
+        }
+
+        string capturePath = captureArgument.Substring(LayoutCaptureArgumentPrefix.Length);
+        string viewArgument = userArguments.FirstOrDefault(argument => argument.StartsWith(LayoutCaptureViewArgumentPrefix));
+        await ToSignal(GetTree().CreateTimer(LayoutCaptureViewDelaySeconds), SceneTreeTimer.SignalName.Timeout);
+
+        switch (viewArgument?.Substring(LayoutCaptureViewArgumentPrefix.Length))
+        {
+            case "settings": SectionHandler.ShowSection(MainSceneSectionHandler.Section.Settings, false); break;
+            case "downloads": SectionHandler.ShowSection(MainSceneSectionHandler.Section.Downloads, false); break;
+            case "start": ToggleStartMenu(); break;
+        }
+
+        await ToSignal(GetTree().CreateTimer(LayoutCaptureSettleSeconds - LayoutCaptureViewDelaySeconds), SceneTreeTimer.SignalName.Timeout);
+        await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+
+        Image capturedFrame = GetViewport().GetTexture().GetImage();
+        Error saveResult = capturedFrame.SavePng(capturePath);
+        string openPanel = panelStack.TopPanel?.Name ?? "none";
+        GD.Print($"[Layout] captured {capturedFrame.GetWidth()}x{capturedFrame.GetHeight()} (canvas {GetViewportRect().Size}, carousel {gameList?.Size}, details {detailsPanel?.Size}, open panel {openPanel}, section {SectionHandler?.CurrentSection}) to {capturePath}: {saveResult}");
+        GetTree().Quit();
     }
 
     public override void _ExitTree()

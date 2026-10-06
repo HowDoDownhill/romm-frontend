@@ -64,7 +64,7 @@ Each emulator is described by an `EmulatorMeta` object:
 - `settings_fields` — List of per-emulator settings (boolean toggles, dropdowns) with `launch_arg_true`, `launch_arg_false`, `launch_arg_format` for dynamic argument injection. A field can instead target a config file through `config_file_relative_path`, `config_section` and `config_key`; with no `config_section` the file is treated as flat `key = value` (RetroArch). `apply_on_launch` writes the saved value, or the default, into that file at every launch, so a default reaches existing installs. `operating_systems` limits a field to the listed OSes, both in the settings UI and at launch.
 
 ## Rendering and Inputs
-The application renders a 1920×1080 viewport in borderless fullscreen (`window/size/mode=3`) with `canvas_items` stretch mode, so it fills any monitor and letterboxes non-16:9 panels, using GL Compatibility renderer (D3D12 on Windows). The input map defines Joypad and Keyboard actions:
+The application renders a 1920×1080 viewport in borderless fullscreen (`window/size/mode=3`) with `canvas_items` stretch mode and `expand` aspect, so it fills any monitor: the canvas keeps a 1080-unit short side and grows along the long one (2560×1080 at 21:9, 1920×1200 at 16:10, 1920×1440 at 4:3), using GL Compatibility renderer (D3D12 on Windows). The input map defines Joypad and Keyboard actions:
 - **Navigation**: `MoveUp`, `MoveDown`, `CylceSystemUp`, `CycleSystemDown` (note: `CylceSystemUp` has a typo in the project)
 - **Actions**: `Select`, `Back`, `ToggleSettings`, `ToggleDownloadsPage`, `DeleteGame`, `CancelDownload`, `ToggleInstalled`
 - **Dynamic**: `CloseKey1`–`CloseKey4` (configurable emulator close hotkey combo, managed by `ConfigManager.ApplyInputMap()`)

@@ -286,6 +286,7 @@ size_flags_horizontal = 3
 [node name="NameMargin" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel" unique_id=166909246]
 layout_mode = 2
 size_flags_vertical = 3
+size_flags_stretch_ratio = 1.2
 theme_override_constants/margin_left = 5
 theme_override_constants/margin_top = 5
 theme_override_constants/margin_right = 5
@@ -293,7 +294,7 @@ theme_override_constants/margin_bottom = 5
 
 [node name="GameMarquee" type="TextureRect" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/NameMargin" unique_id=992628909]
 layout_mode = 2
-expand_mode = 5
+expand_mode = 1
 stretch_mode = 5
 
 [node name="ScreenShotsContainer" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel" unique_id=1774844344]

@@ -128,6 +128,10 @@ This is the section with the worst platform divergence. Do not skip it on either
 - [ ] BIOS/firmware selection per system persists.
 - [ ] Panel open/close, section transitions, and the panel stack behave with both mouse and controller.
 - [ ] Theme and background changes apply.
+- [ ] The UI fills the screen with no black bars at 16:9, 16:10, 21:9 and 4:3. Capture each with
+      `-- --ui-capture=<png> --ui-capture-size=WxH` (add `--ui-capture-view=settings|downloads|start`
+      for the other screens): carousel cards keep their size, the details banner fits its row, and
+      the summary is not clipped.
 
 ## 9. Cross-platform traps
 
