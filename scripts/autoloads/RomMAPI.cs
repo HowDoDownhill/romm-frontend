@@ -624,7 +624,7 @@ public partial class RomMAPI : Node
                 Name = "romm-frontend",
                 Client = "romm-frontend",
                 Platform = OS.GetName().ToLower(),
-                Hostname = OS.GetEnvironment("COMPUTERNAME") is string windowsHostname && windowsHostname.Length > 0 ? windowsHostname : OS.GetEnvironment("HOSTNAME"),
+                Hostname = System.Environment.MachineName,
                 SyncMode = "api",
                 AllowExisting = true
             };

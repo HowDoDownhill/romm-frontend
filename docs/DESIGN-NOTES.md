@@ -173,6 +173,23 @@ This matters beyond tidiness: `device_id` is what save sync attributes uploads t
 one-shot devices make the server's own sync history meaningless, and any future presence built on the
 device registry would be unusable.
 
+#### The hostname has to come from the OS, because Linux had none
+RomM 5.3.1's `get_device_by_fingerprint` matches on `mac_address`, then `ip_address` + `platform`,
+then `hostname` + `platform`. The app sends only the hostname, so that is the only match it can get.
+It was read from `COMPUTERNAME`, falling back to `HOSTNAME`. `COMPUTERNAME` exists only on Windows,
+and `HOSTNAME` is a bash variable that is not exported, so a desktop-launched process on Linux sees
+neither and the payload carried `hostname: null`. Every Linux run without a stored `DeviceId`
+therefore registered a new device. Measured on 2026-10-06: 20 devices on the server, 11 of them Linux
+rows with a null hostname created in 14 minutes on 2026-08-18, one per `tools/linux-test` deploy,
+since the harness deliberately withholds `DeviceId`.
+
+`System.Environment.MachineName` is `gethostname()` on Unix and the NetBIOS name on Windows. That is
+the same value `COMPUTERNAME` held, so existing Windows devices still match.
+
+The 422 from `CompleteSyncAsync` noted in the save-sync commit no longer reproduces. Against 5.3.1
+the same payload, seven-digit fractional seconds included, passes validation, and play sessions are
+being recorded with their sync session id.
+
 ### A netplay session must not outlive the emulator
 `NetplayManager` holds the session as autoload state, and `{netplay}` resolves from it on every
 launch. If a session were left active after the emulator closed, the *next* ordinary launch would

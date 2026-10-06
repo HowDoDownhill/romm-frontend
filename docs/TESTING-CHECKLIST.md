@@ -98,6 +98,9 @@ This is the section with the worst platform divergence. Do not skip it on either
 - [ ] The emulator's save directory is a link into `saves/<emulator>/...` after install and launch.
 - [ ] Play, save in-game, exit via the close hotkey — the save file appears in the central store.
 - [ ] Save sync to RomM runs after exit and uploads only real save data, never preserved config.
+- [ ] The play session appears under `GET /api/play-sessions` with the right ROM and duration.
+- [ ] Clear `DeviceId` in `config.cfg` and relaunch: RomM returns the **same** device for this
+      machine (`GET /api/devices` gains no new row), and the device has a hostname, on both OSes.
 - [ ] Switching a system to a different emulator warns that saves are not converted.
 - [ ] Reinstalling the emulator does not destroy saves or save states.
 - [ ] Save states land inside the install directory, not in a per-user location outside it.
