@@ -1385,7 +1385,7 @@ public class MainSceneNetplayHandler
         }
     }
 
-    private async void OnStartRequested(string hostAddress, int netplayPort)
+    private void OnStartRequested(string hostAddress, int netplayPort)
     {
         var selectedGame = ResolveSelectedLobbyGame();
 
