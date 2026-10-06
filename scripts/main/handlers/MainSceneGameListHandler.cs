@@ -814,7 +814,7 @@ public partial class MainSceneGameListHandler
             return;
         }
 
-        mainScene.gameDescription.Text = game.Description;
+        mainScene.gameDescription.Text = System.Net.WebUtility.HtmlDecode(game.Description ?? "");
 
         var descScroller = mainScene.gameDescription.GetNodeOrNull<AutoScrollHelper>("AutoScrollHelper");
         if (descScroller == null)

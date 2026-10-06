@@ -1,5 +1,5 @@
 {
-  "name": "flycast",
+  "name": "Flycast",
   "executable_name": {
     "windows": "flycast.exe",
     "macos": "flycast"

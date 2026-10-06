@@ -1664,6 +1664,21 @@ Keep the `+=` and `-=` counts equal per file; that grep is the whole invariant.
 
 ## Downloads
 
+### Asset downloads land under a temporary name and are tracked while in flight
+`AssetManager` decides what to fetch with `File.Exists`, and de-duplicated by game only while that
+game's items were still queued. A worker dequeuing the last item dropped the game from the pending
+map before its download finished, so a second `RequestGameAssets` for the same game in that window
+queued the same file again. Two workers then opened one path with `FileShare.None`, and the loser
+logged "The process cannot access the file ... covers_3d/493.png because it is being used by
+another process" (seen on the Linux laptop). Paths are now held in `inFlightAssetPaths` from dequeue
+until the download returns, and requests for them are dropped.
+
+`DownloadAssetAsync` also wrote straight to the final name. An interrupted download left a truncated
+image that `File.Exists` then accepted forever, so that cover never loaded. It now writes
+`<name>.<guid>.part` and renames it over the target only when the body is complete, deleting the
+partial file on any failure. Save sync downloads through the same method, so a cut-off save can no
+longer be copied into the save store either.
+
 ### Downloads deliberately bypass Godot's `HttpRequest`
 
 `HttpRequest` counts bytes in **32-bit ints** — `SafeNumeric<int> downloaded` and `int body_len` in

@@ -1,5 +1,5 @@
 {
-  "name": "pcsx2",
+  "name": "PCSX2",
   "executable_name": {
     "windows": "pcsx2-qt.exe",
     "macos": "pcsx2"

@@ -1,5 +1,5 @@
 {
-  "name": "snes9x",
+  "name": "Snes9x",
   "executable_name": {
     "windows": "snes9x-x64.exe",
     "macos": "snes9x"
