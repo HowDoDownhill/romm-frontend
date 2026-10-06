@@ -434,6 +434,7 @@ public partial class RomMAPI : Node
     public async Task<bool> DownloadAssetAsync(string assetUrl, string destinationFilePath, string displayName = null)
     {
         var externalTransfer = string.IsNullOrEmpty(displayName) ? null : appInstance?.downloadManager?.BeginExternalTransfer(displayName);
+        string partialFilePath = $"{destinationFilePath}.{Guid.NewGuid():N}.part";
 
         try
         {
@@ -444,7 +445,7 @@ public partial class RomMAPI : Node
                 long totalBytes = assetResponse.Content.Headers.ContentLength ?? 0;
 
                 using (var assetStream = await assetResponse.Content.ReadAsStreamAsync())
-                using (var destinationFileStream = new System.IO.FileStream(destinationFilePath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None, TransferBufferSizeBytes, true))
+                using (var destinationFileStream = new System.IO.FileStream(partialFilePath, System.IO.FileMode.Create, System.IO.FileAccess.Write, System.IO.FileShare.None, TransferBufferSizeBytes, true))
                 {
                     var transferBuffer = new byte[TransferBufferSizeBytes];
                     long bytesTransferred = 0;
@@ -464,6 +465,7 @@ public partial class RomMAPI : Node
                     }
                 }
 
+                System.IO.File.Move(partialFilePath, destinationFilePath, true);
                 appInstance?.downloadManager?.CompleteExternalTransfer(externalTransfer, true);
                 return true;
             }
@@ -479,6 +481,7 @@ public partial class RomMAPI : Node
             GD.PrintErr($"Failed to download asset {assetUrl}: {exception.Message}");
         }
 
+        try { System.IO.File.Delete(partialFilePath); } catch { }
         appInstance?.downloadManager?.CompleteExternalTransfer(externalTransfer, false);
         return false;
     }

@@ -30,6 +30,7 @@ public partial class AssetManager : Node
 
     private readonly LinkedList<AssetDownloadItem> pendingAssetDownloadQueue = new();
     private readonly Dictionary<int, int> pendingItemCountByGameId = new();
+    private readonly HashSet<string> inFlightAssetPaths = new();
     private readonly object queueLock = new();
 
     private int maximumConcurrentDownloadWorkers = 4;
@@ -59,6 +60,13 @@ public partial class AssetManager : Node
         lock (queueLock)
         {
             if (pendingItemCountByGameId.ContainsKey(game.Id))
+            {
+                return;
+            }
+
+            items.RemoveAll(item => inFlightAssetPaths.Contains(item.LocalFilePath));
+
+            if (items.Count == 0)
             {
                 return;
             }
@@ -196,6 +204,7 @@ public partial class AssetManager : Node
 
             item = first.Value;
             pendingAssetDownloadQueue.RemoveFirst();
+            inFlightAssetPaths.Add(item.LocalFilePath);
 
             if (pendingItemCountByGameId.TryGetValue(item.GameId, out int remaining))
             {
@@ -237,7 +246,20 @@ public partial class AssetManager : Node
             {
                 if (TryDequeueNextDownload(out var downloadTask))
                 {
-                    bool downloadSucceeded = await appInstance.rommApi.DownloadAssetAsync(downloadTask.DownloadUrl, downloadTask.LocalFilePath);
+                    bool downloadSucceeded;
+
+                    try
+                    {
+                        downloadSucceeded = await appInstance.rommApi.DownloadAssetAsync(downloadTask.DownloadUrl, downloadTask.LocalFilePath);
+                    }
+
+                    finally
+                    {
+                        lock (queueLock)
+                        {
+                            inFlightAssetPaths.Remove(downloadTask.LocalFilePath);
+                        }
+                    }
 
                     if (downloadSucceeded)
                     {
