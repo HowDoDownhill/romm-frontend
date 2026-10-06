@@ -704,7 +704,21 @@ public static class UniversalInstaller
 
         else
         {
-            archiveToolExecutablePath = "7z";
+            string bundledToolPlatformDirectory = currentOperatingSystem == "macos" ? "macOS" : "linux";
+            string bundledArchiveToolPath = Path.Combine(appInstance.configManager.ApplicationRootDirectory, "tools", "7zip", bundledToolPlatformDirectory, "7zz");
+
+            if (File.Exists(bundledArchiveToolPath))
+            {
+                try { Process.Start("chmod", $"+x \"{bundledArchiveToolPath}\"")?.WaitForExit(); } catch { }
+                archiveToolExecutablePath = bundledArchiveToolPath;
+            }
+
+            else
+            {
+                GD.PrintErr($"Bundled 7-Zip missing at {bundledArchiveToolPath}. Falling back to 7z on PATH.");
+                archiveToolExecutablePath = "7z";
+            }
+
             archiveToolArguments = $"x \"{archiveFilePath}\" -o\"{extractionDestinationDirectory}\" -y";
         }
 
