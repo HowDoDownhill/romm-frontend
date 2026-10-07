@@ -229,6 +229,48 @@ public partial class MainScene : Control
         NetplayHandler.ApplyStartupSessionArguments();
         OfferControllerLayerOnceTheInterfaceHasSettled();
         CaptureLayoutIfRequested();
+        RunBenchmarkIfRequested();
+    }
+
+    private const string BenchmarkArgumentPrefix = "--ui-bench=";
+    private const double BenchmarkSettleSeconds = 4.0;
+
+    private async void RunBenchmarkIfRequested()
+    {
+        string[] userArguments = OS.GetCmdlineUserArgs();
+        string benchmarkArgument = userArguments.FirstOrDefault(argument => argument.StartsWith(BenchmarkArgumentPrefix));
+
+        if (benchmarkArgument == null)
+        {
+            return;
+        }
+
+        ApplyCaptureWindowSize(userArguments);
+
+        while (gameList is not VerticalCarousel benchCarousel || benchCarousel.ItemCount == 0)
+        {
+            await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        }
+
+        ulong libraryReadyMilliseconds = Time.GetTicksMsec();
+        await ToSignal(GetTree().CreateTimer(BenchmarkSettleSeconds), SceneTreeTimer.SignalName.Timeout);
+
+        var benchmark = new UiBenchmark();
+        AddChild(benchmark);
+        benchmark.Begin(this, benchmarkArgument.Substring(BenchmarkArgumentPrefix.Length), libraryReadyMilliseconds);
+    }
+
+    private static void ApplyCaptureWindowSize(string[] userArguments)
+    {
+        string sizeArgument = userArguments.FirstOrDefault(argument => argument.StartsWith(LayoutCaptureSizeArgumentPrefix));
+        string[] sizeParts = sizeArgument?.Substring(LayoutCaptureSizeArgumentPrefix.Length).Split('x');
+
+        if (sizeParts != null && sizeParts.Length == 2 && int.TryParse(sizeParts[0], out int width) && int.TryParse(sizeParts[1], out int height))
+        {
+            DisplayServer.WindowSetMode(DisplayServer.WindowMode.Windowed);
+            DisplayServer.WindowSetSize(new Vector2I(width, height));
+            DisplayServer.WindowSetPosition(Vector2I.Zero);
+        }
     }
 
     private const string LayoutCaptureArgumentPrefix = "--ui-capture=";
@@ -247,15 +289,7 @@ public partial class MainScene : Control
             return;
         }
 
-        string sizeArgument = userArguments.FirstOrDefault(argument => argument.StartsWith(LayoutCaptureSizeArgumentPrefix));
-        string[] sizeParts = sizeArgument?.Substring(LayoutCaptureSizeArgumentPrefix.Length).Split('x');
-
-        if (sizeParts != null && sizeParts.Length == 2 && int.TryParse(sizeParts[0], out int captureWidth) && int.TryParse(sizeParts[1], out int captureHeight))
-        {
-            DisplayServer.WindowSetMode(DisplayServer.WindowMode.Windowed);
-            DisplayServer.WindowSetSize(new Vector2I(captureWidth, captureHeight));
-            DisplayServer.WindowSetPosition(Vector2I.Zero);
-        }
+        ApplyCaptureWindowSize(userArguments);
 
         string capturePath = captureArgument.Substring(LayoutCaptureArgumentPrefix.Length);
         string viewArgument = userArguments.FirstOrDefault(argument => argument.StartsWith(LayoutCaptureViewArgumentPrefix));
@@ -703,8 +737,10 @@ public partial class MainScene : Control
             return true;
         }
 
-        return GetWindow() != null && !GetWindow().HasFocus();
+        return !IsAutomatedInputRunning && GetWindow() != null && !GetWindow().HasFocus();
     }
+
+    public bool IsAutomatedInputRunning { get; set; }
 
     public override void _Input(InputEvent @event)
     {
@@ -1065,6 +1101,7 @@ public partial class MainScene : Control
 
     public override void _Process(double delta)
     {
+        GameListHandler?.PumpDecodedImages();
         GameListHandler?.ProcessPendingDetailsRefresh();
         GameListHandler?.ProcessPendingScreenshotLoads();
         GameListHandler?.ProcessPendingImageLoads();

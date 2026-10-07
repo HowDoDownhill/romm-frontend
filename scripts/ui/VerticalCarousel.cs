@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using System.Collections.Generic;
 
 public partial class VerticalCarousel : Control
 {
@@ -21,8 +22,18 @@ public partial class VerticalCarousel : Control
     [Export] public Vector2 referenceCarouselSize = new Vector2(945, 873);
 
     public int SelectedIndex = 0;
+    public int ItemCount { get; private set; }
     private Tween tween;
     public bool IsAnimating => tween != null && tween.IsValid() && tween.IsRunning();
+
+    public Func<Control> ItemFactory;
+    public event Action<Control, int> ItemBound;
+    public event Action<Control> ItemReleased;
+
+    private readonly Dictionary<int, Control> cardsByItemIndex = new Dictionary<int, Control>();
+    private readonly Stack<Control> idleCards = new Stack<Control>();
+
+    public IReadOnlyDictionary<int, Control> BoundCards => cardsByItemIndex;
 
     [Signal]
     public delegate void ItemSelectedEventHandler(long index);
@@ -41,9 +52,7 @@ public partial class VerticalCarousel : Control
 
     public override void _GuiInput(InputEvent @event)
     {
-        int childCount = GetChildCount();
-
-        if (childCount == 0)
+        if (ItemCount == 0)
         {
             return;
         }
@@ -81,28 +90,70 @@ public partial class VerticalCarousel : Control
 
     public void SelectNext()
     {
-        int childCount = GetChildCount();
-        if (childCount == 0) return;
-        SelectedIndex = (SelectedIndex + 1) % childCount;
+        if (ItemCount == 0) return;
+        SelectedIndex = (SelectedIndex + 1) % ItemCount;
         UpdateLayout(true);
     }
 
     public void SelectPrevious()
     {
-        int childCount = GetChildCount();
-        if (childCount == 0) return;
-        SelectedIndex = (SelectedIndex - 1 + childCount) % childCount;
+        if (ItemCount == 0) return;
+        SelectedIndex = (SelectedIndex - 1 + ItemCount) % ItemCount;
         UpdateLayout(true);
+    }
+
+    public void ReloadItems(int itemCount, int selectedIndex)
+    {
+        foreach (int itemIndex in new List<int>(cardsByItemIndex.Keys))
+        {
+            ReleaseCard(itemIndex);
+        }
+
+        ItemCount = Math.Max(0, itemCount);
+        SelectedIndex = ItemCount == 0 ? 0 : Math.Clamp(selectedIndex, 0, ItemCount - 1);
+        UpdateLayout(false);
     }
 
     public void Refresh()
     {
-        if (SelectedIndex >= GetChildCount() && GetChildCount() > 0)
+        if (SelectedIndex >= ItemCount && ItemCount > 0)
         {
-            SelectedIndex = GetChildCount() - 1;
+            SelectedIndex = ItemCount - 1;
         }
 
         UpdateLayout(false);
+    }
+
+    private void ReleaseCard(int itemIndex)
+    {
+        if (!cardsByItemIndex.Remove(itemIndex, out Control card))
+        {
+            return;
+        }
+
+        card.Visible = false;
+        ItemReleased?.Invoke(card);
+        idleCards.Push(card);
+    }
+
+    private Control AcquireCard(int itemIndex)
+    {
+        Control card = idleCards.Count > 0 ? idleCards.Pop() : ItemFactory?.Invoke();
+
+        if (card == null)
+        {
+            return null;
+        }
+
+        if (card.GetParent() == null)
+        {
+            AddChild(card);
+        }
+
+        cardsByItemIndex[itemIndex] = card;
+        card.Visible = true;
+        ItemBound?.Invoke(card, itemIndex);
+        return card;
     }
 
     private Vector2 ResolveEffectiveCanvasSize()
@@ -131,18 +182,78 @@ public partial class VerticalCarousel : Control
         return 0.0f;
     }
 
-    public void UpdateLayout(bool animated = true)
+    private int WrappedOffsetFromSelection(int itemIndex)
     {
-        int childCount = GetChildCount();
+        int diff = itemIndex - SelectedIndex;
+        int halfCount = ItemCount / 2;
 
-        if (childCount == 0)
+        if (diff > halfCount)
         {
-            return;
+            diff -= ItemCount;
         }
 
+        else if (diff < -halfCount)
+        {
+            diff += ItemCount;
+        }
+
+        return diff;
+    }
+
+    private List<(int ItemIndex, int Offset)> ResolveWindow()
+    {
+        int windowHalfCount = visibleItemsHalfCount + preloadItemsHalfCount;
+        var window = new List<(int, int)>();
+
+        if (ItemCount <= windowHalfCount * 2 + 1)
+        {
+            for (int itemIndex = 0; itemIndex < ItemCount; itemIndex++)
+            {
+                window.Add((itemIndex, WrappedOffsetFromSelection(itemIndex)));
+            }
+
+            return window;
+        }
+
+        for (int offset = -windowHalfCount; offset <= windowHalfCount; offset++)
+        {
+            window.Add((((SelectedIndex + offset) % ItemCount + ItemCount) % ItemCount, offset));
+        }
+
+        return window;
+    }
+
+    public void UpdateLayout(bool animated = true)
+    {
         if (tween != null && tween.IsValid())
         {
             tween.Kill();
+        }
+
+        if (ItemCount == 0)
+        {
+            foreach (int itemIndex in new List<int>(cardsByItemIndex.Keys))
+            {
+                ReleaseCard(itemIndex);
+            }
+
+            return;
+        }
+
+        List<(int ItemIndex, int Offset)> window = ResolveWindow();
+        var itemsInWindow = new HashSet<int>();
+
+        foreach (var entry in window)
+        {
+            itemsInWindow.Add(entry.ItemIndex);
+        }
+
+        foreach (int itemIndex in new List<int>(cardsByItemIndex.Keys))
+        {
+            if (!itemsInWindow.Contains(itemIndex))
+            {
+                ReleaseCard(itemIndex);
+            }
         }
 
         if (animated)
@@ -154,10 +265,25 @@ public partial class VerticalCarousel : Control
         Vector2 effectiveCanvasSize = ResolveEffectiveCanvasSize();
         float viewportWidth = effectiveCanvasSize.X;
         float targetWidth = viewportWidth * windowWidthRatio;
+        float currentItemSpacing = useScreenPercentageForOffsets ? effectiveCanvasSize.Y * itemSpacingRatio : itemSpacing;
+        float currentDepthOffset = useScreenPercentageForOffsets ? viewportWidth * depthOffsetRatio : depthOffset;
+        float currentXOffset = useScreenPercentageForOffsets ? viewportWidth * xOffsetRatio : xOffset;
 
-        for (int i = 0; i < childCount; i++)
+        bool tweenHasWork = false;
+
+        foreach (var (itemIndex, offset) in window)
         {
-            Control child = GetChild<Control>(i);
+            bool isNewlyBound = !cardsByItemIndex.TryGetValue(itemIndex, out Control child);
+
+            if (isNewlyBound)
+            {
+                child = AcquireCard(itemIndex);
+
+                if (child == null)
+                {
+                    continue;
+                }
+            }
 
             if (scaleItemsToWindow)
             {
@@ -178,33 +304,10 @@ public partial class VerticalCarousel : Control
 
             child.PivotOffset = child.Size / 2.0f;
 
-            int diff = i - SelectedIndex;
-
-            int halfCount = childCount / 2;
-
-            if (diff > halfCount)
-            {
-                diff -= childCount;
-            }
-
-            else if (diff < -halfCount)
-            {
-                diff += childCount;
-            }
-
-            if (childCount % 2 == 0 && diff == halfCount)
-            {
-
-            }
-
-            float absDiff = Mathf.Abs(diff);
+            float absDiff = Mathf.Abs(offset);
             float t = Mathf.Clamp(absDiff / visibleItemsHalfCount, 0.0f, 1.0f);
 
-            float currentItemSpacing = useScreenPercentageForOffsets ? effectiveCanvasSize.Y * itemSpacingRatio : itemSpacing;
-            float currentDepthOffset = useScreenPercentageForOffsets ? viewportWidth * depthOffsetRatio : depthOffset;
-            float currentXOffset = useScreenPercentageForOffsets ? viewportWidth * xOffsetRatio : xOffset;
-
-            float targetY = center.Y + (diff * currentItemSpacing) - (child.Size.Y / 2.0f);
+            float targetY = center.Y + (offset * currentItemSpacing) - (child.Size.Y / 2.0f);
             float targetX = center.X - (child.Size.X / 2.0f) - (t * t * currentDepthOffset) + currentXOffset;
 
             Vector2 targetPos = new Vector2(targetX, targetY);
@@ -217,33 +320,26 @@ public partial class VerticalCarousel : Control
 
             child.ZIndex = visibleItemsHalfCount - Mathf.RoundToInt(absDiff);
 
-            if (absDiff > visibleItemsHalfCount + preloadItemsHalfCount)
+            if (animated && !isNewlyBound)
             {
-
-                child.Visible = false;
-                child.Position = targetPos;
-                child.Scale = targetScale;
-                child.Modulate = targetColor;
+                tween.TweenProperty(child, "position", targetPos, animationDuration);
+                tween.TweenProperty(child, "scale", targetScale, animationDuration);
+                tween.TweenProperty(child, "modulate", targetColor, animationDuration);
+                tweenHasWork = true;
             }
 
             else
             {
-                child.Visible = true;
-
-                if (animated)
-                {
-                    tween.TweenProperty(child, "position", targetPos, animationDuration);
-                    tween.TweenProperty(child, "scale", targetScale, animationDuration);
-                    tween.TweenProperty(child, "modulate", targetColor, animationDuration);
-                }
-
-                else
-                {
-                    child.Position = targetPos;
-                    child.Scale = targetScale;
-                    child.Modulate = targetColor;
-                }
+                child.Position = targetPos;
+                child.Scale = targetScale;
+                child.Modulate = targetColor;
             }
+        }
+
+        if (animated && !tweenHasWork)
+        {
+            tween.Kill();
+            tween = null;
         }
 
         EmitSignal(SignalName.ItemFocused, SelectedIndex);

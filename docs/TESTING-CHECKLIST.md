@@ -132,6 +132,9 @@ This is the section with the worst platform divergence. Do not skip it on either
       `-- --ui-capture=<png> --ui-capture-size=WxH` (add `--ui-capture-view=settings|downloads|start`
       for the other screens): carousel cards keep their size, the details banner fits its row, and
       the summary is not clipped.
+- [ ] `-- --ui-bench=<report>` finishes with every phase's end state showing the input landed, no
+      frame over 33 ms, and no more than a couple over 16.7 ms in any phase. Compare against the
+      table in DESIGN-NOTES "Measure with `--ui-bench`".
 
 ## 9. Cross-platform traps
 

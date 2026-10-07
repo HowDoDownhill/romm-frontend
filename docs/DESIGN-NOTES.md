@@ -1268,12 +1268,50 @@ A false result from an asset download is usually just a 404 (no art on the serve
 and not worth logging. Genuine failures are already logged with URL/status detail inside
 `DownloadAssetAsync`.
 
+### Measure with `--ui-bench`, not by feel
+`-- --ui-bench=<report> [--ui-capture-size=WxH]` waits for the library, then drives the real input path
+(injected `ui_down`/`ui_up` and bumper press-release pairs) through idle, held scrolling, a scroll
+flood and ten system switches each way, with vsync off and steps timed on the clock. It writes per-phase
+frame-time percentiles plus counts over 8.3 / 16.7 / 33 ms, and each phase's end position so a run
+whose input never landed is visible. The window is unfocused when started from a script, so the
+benchmark sets `MainScene.IsAutomatedInputRunning` to get past the focus gate.
+
+Measured on 2026-10-07 at 1920x1080, RTX 5080, worst frame / frames over 16.7 ms:
+
+| Phase | Before | Virtualised carousel | + off-thread decode |
+|---|---|---|---|
+| Scroll onto unseen games | 26 ms / 37 | 34 ms / 40 | **6.6 ms / 0** |
+| System switch | 275 ms / 26 | 27 ms / 19 | **17.5 ms / 1** |
+| System switch back | 163 ms / 11 | 17.5 ms / 1 | **5.5 ms / 0** |
+
+### The game carousel holds a window of cards, not one per game
+It built one `GameCard` per game and laid all of them out on every move. Probed: creating or freeing
+cards on a system switch cost up to 163 ms (one system shows 1567 games; shrinking to 24 still took 22
+ms of frees), and laying out every child cost up to 44 ms.
+
+`VerticalCarousel` now owns a pool sized to its visible-plus-preload window (13 cards with the scene's
+3 + 3). `ItemCount` is the logical length, `ItemFactory` creates cards, `ItemBound(card, index)` and
+`ItemReleased(card)` let the game list handler bind and unbind games. A card keeps its game for as long
+as that index stays in the window, so moves still tween continuously; a newly bound card is placed at
+its target directly, which is what the old hidden-then-shown card did too. `ReloadItems` is the data
+changed path; `Refresh` and `UpdateLayout` keep existing bindings. Wraparound is unchanged: with fewer
+items than the window, each item takes its wrapped offset as before.
+
+### Image decoding runs on worker threads
+Covers, the details banner and cover, and screenshot thumbnails were decoded on the main thread
+(PNG/JPEG/WebP from buffer), about 5-8 ms each, and a single large cover overran the per-frame budget
+on its own. `AsyncImageLoader` decodes (and downscales: covers to 1024 px wide, banners to 1920,
+thumbnails to 115) on up to three pool threads; `PumpDecodedImages` creates textures on the main thread
+within 4 ms per frame and runs the callbacks. Requests for the same file and width share one decode.
+
+Every callback re-checks its target before applying: a card must still be bound to the same game, and
+the details panel must still show the same `currentlySelectedGame`. Screenshot thumbnails are requested
+together and appended strictly in order as each becomes ready, so their order matches the old
+synchronous load. While a banner decodes, the title text shows in its place.
+
 ### Cover decodes are spread across frames
-Cover art is decoded on the main thread at roughly 5ms per entry. The carousel reveals ~25 entries at
-once when a list is built, which stalled the frame for ~130ms right between the fade-out and fade-in
-of a system switch. Loads are budgeted **by time rather than by a fixed count** — a fixed count
-blows the frame budget on slower machines, since decode time varies with image size and disk. One
-load always runs so the queue cannot stall. Each entry keeps its placeholder until its turn.
+Superseded by the two notes above; the ordering rule below still holds. Cover art used to be decoded
+on the main thread at roughly 5ms per entry, budgeted by time per frame.
 
 The queue is drained highest-card-on-screen first rather than oldest-request-first, so the list fills
 downward instead of outward from the selected game. That ordering has to happen at drain time, not
