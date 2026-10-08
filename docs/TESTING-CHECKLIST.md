@@ -128,6 +128,10 @@ This is the section with the worst platform divergence. Do not skip it on either
 - [ ] Linux, RetroArch: the log shows `Applied retroarch setting video_driver = vulkan` at launch,
       a GB/GBA game holds full speed on a hybrid laptop, and switching Video Driver to OpenGL
       takes effect on the next launch. The setting does not appear on Windows.
+- [ ] RetroArch: holding Start for 2 s opens RetroArch's menu (the "Open RetroArch Menu With"
+      default), changing the setting takes effect next launch, and Quit RetroArch from the menu
+      ends the session: `run.log` shows `[Emulator] session ended for ...` and the play session
+      reaches RomM.
 - [ ] Preferred emulator and preferred core per system persist and take effect.
 - [ ] BIOS/firmware selection per system persists.
 - [ ] Panel open/close, section transitions, and the panel stack behave with both mouse and controller.

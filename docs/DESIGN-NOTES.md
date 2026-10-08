@@ -919,6 +919,18 @@ its bundled tree, RetroArch's own defaults are already correct; overriding them 
 versioned folder name in a second place. Only `savefile_directory` and `savestate_directory` are
 redirected, so saves land in the central save store like every other emulator.
 
+### RetroArch's menu opens with a controller combo the player picks
+RetroArch toggles its menu from the pad only through the autoconfig profile's Guide button. An Xbox
+Series pad over Bluetooth on Linux did not report Guide, so on the laptop the menu, and with it
+RetroArch's own Quit, could not be reached from the controller at all.
+
+The `menu_combo` setting writes `input_menu_toggle_gamepad_combo` at every launch, defaulting to
+Hold Start. Values follow `enum input_combo_type` in RetroArch's `input/input_defines.h` (0 none,
+2 L3+R3, 3 L1+R1+Start+Select, 4 Start+Select, 7 Hold Start, 9 Down+Select, 10 L2+R2). Hold Select
+(8) is left out because Back is Select and a 2 s hold of Back is the frontend's own close hotkey.
+"Guide Button Only" (0) restores RetroArch's default. Verified on the laptop: Hold Start opened the
+menu, and Quit RetroArch from it ended the session with exit detection and play-session sync.
+
 ### RetroArch on Linux renders through Vulkan, because GL halves the frame rate under PRIME offload
 Reported as "very low FPS" in Game Boy and GBA on the hybrid laptop (Intel Tiger Lake iGPU driving a
 3840×2400 panel at 60 Hz with 150% fractional scaling, RTX 3060 Laptop, nvidia-open 615.71, GNOME

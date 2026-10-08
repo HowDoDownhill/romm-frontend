@@ -1027,6 +1027,9 @@ public partial class EmulatorManager : Node
         }
 
         DateTime sessionEnd = DateTime.UtcNow;
+        GD.Print(activeGame != null
+            ? $"[Emulator] session ended for {activeGame.Name} after {(sessionEnd - activeSessionStart).TotalSeconds:0}s."
+            : "[Emulator] session ended (launched without a game).");
 
         bool joinedSomeoneElsesSession = appInstance.netplayManager?.Role == NetplayRole.Join;
 

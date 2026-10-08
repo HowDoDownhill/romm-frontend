@@ -94,6 +94,24 @@
       },
       "config_file_relative_path": "retroarch.cfg",
       "config_key": "video_driver"
+    },
+    {
+      "id": "menu_combo",
+      "label": "Open RetroArch Menu With",
+      "type": "dropdown",
+      "apply_on_launch": true,
+      "default_value_string": "7",
+      "options": {
+        "Hold Start": "7",
+        "L3 + R3": "2",
+        "Start + Select": "4",
+        "L1 + R1 + Start + Select": "3",
+        "L2 + R2": "10",
+        "Down + Select": "9",
+        "Guide Button Only": "0"
+      },
+      "config_file_relative_path": "retroarch.cfg",
+      "config_key": "input_menu_toggle_gamepad_combo"
     }
   ],
   "core_launch_arg": "-L \"{core_path}\"",
