@@ -141,6 +141,11 @@ This is the section with the worst platform divergence. Do not skip it on either
 - [ ] BIOS/firmware selection per system persists.
 - [ ] Panel open/close, section transitions, and the panel stack behave with both mouse and controller.
 - [ ] Theme and background changes apply.
+- [ ] Text follows the four styles: settings, descriptions, start menu and card titles are the same
+      Body size; no new `font_size` override in scenes or code (`grep -rn "theme_override_font_sizes\|AddThemeFontSizeOverride"`).
+- [ ] Interface Size: each value applies immediately and persists; at 130% and 150% on a 1280×800
+      window the button bar, settings sidebar and start menu still fit. Auto logs its choice as
+      `[UI] interface size` and picks 130% on a Steam Deck or other screen 900 px or less tall.
 - [ ] The UI fills the screen with no black bars at 16:9, 16:10, 21:9 and 4:3. Capture each with
       `-- --ui-capture=<png> --ui-capture-size=WxH` (add `--ui-capture-view=settings|downloads|start`
       for the other screens): carousel cards keep their size, the details banner fits its row, and

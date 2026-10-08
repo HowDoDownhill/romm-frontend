@@ -120,7 +120,6 @@ public partial class MainScene : Control
         margin.AddThemeConstantOverride("margin_top", 10);
         margin.AddThemeConstantOverride("margin_bottom", 10);
         fuzzySearchLabel = new Label();
-        fuzzySearchLabel.AddThemeFontSizeOverride("font_size", 24);
         margin.AddChild(fuzzySearchLabel);
         fuzzySearchPopup.ContentRoot.AddChild(margin);
 

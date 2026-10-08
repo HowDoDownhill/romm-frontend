@@ -39,11 +39,11 @@ public partial class ReleasePickerPopup : UiPanel
         margin.AddChild(vbox);
 
         titleLabel = new Label { HorizontalAlignment = HorizontalAlignment.Center };
-        titleLabel.AddThemeFontSizeOverride("font_size", 22);
+        titleLabel.ThemeTypeVariation = "TitleLabel";
         vbox.AddChild(titleLabel);
 
         statusLabel = new Label { HorizontalAlignment = HorizontalAlignment.Center };
-        statusLabel.AddThemeFontSizeOverride("font_size", 16);
+        statusLabel.ThemeTypeVariation = "CaptionLabel";
         vbox.AddChild(statusLabel);
 
         scrollContainer = new ScrollContainer

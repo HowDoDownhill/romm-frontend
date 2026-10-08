@@ -32,6 +32,7 @@ size_flags_vertical = 3
 layout_mode = 2
 
 [node name="Status" type="Label" parent="Panel/VBoxContainer" unique_id=49181105]
+theme_type_variation = &"CaptionLabel"
 layout_mode = 2
 
 [node name="ProgressBar" type="ProgressBar" parent="Panel/VBoxContainer" unique_id=67073736]

@@ -64,7 +64,7 @@ size_flags_vertical = 8
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 8
-theme_override_font_sizes/font_size = 32
+theme_type_variation = &"TitleButton"
 text = "Install"
 expand_icon = true
 
@@ -72,6 +72,6 @@ expand_icon = true
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 8
-theme_override_font_sizes/font_size = 32
+theme_type_variation = &"TitleButton"
 text = "Close"
 expand_icon = true

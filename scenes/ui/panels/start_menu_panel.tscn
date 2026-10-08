@@ -193,6 +193,7 @@ text = "----------"
 horizontal_alignment = 1
 
 [node name="NetplayInfoLabel" type="Label" parent="Panel/NetplayContainer/NetplayView"]
+theme_type_variation = &"CaptionLabel"
 layout_mode = 2
 text = ""
 horizontal_alignment = 1

@@ -1,0 +1,16 @@
+[gd_resource type="Theme" format=3]
+
+[resource]
+default_font_size = 26
+CaptionLabel/base_type = &"Label"
+CaptionLabel/font_sizes/font_size = 20
+DisplayButton/base_type = &"Button"
+DisplayButton/font_sizes/font_size = 48
+DisplayLabel/base_type = &"Label"
+DisplayLabel/font_sizes/font_size = 48
+FlatButton/base_type = &"Button"
+FlatButton/font_sizes/font_size = 32
+TitleButton/base_type = &"Button"
+TitleButton/font_sizes/font_size = 32
+TitleLabel/base_type = &"Label"
+TitleLabel/font_sizes/font_size = 32

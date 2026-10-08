@@ -68,12 +68,10 @@ stretch_mode = 5
 visible = false
 layout_mode = 2
 mouse_filter = 2
-theme_override_font_sizes/font_size = 24
 horizontal_alignment = 1
 autowrap_mode = 3
 
 [node name="TitleLabel" type="Label" parent="Body"]
-theme_override_font_sizes/font_size = 24
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0

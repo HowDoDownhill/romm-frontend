@@ -1081,8 +1081,6 @@ public class MainSceneNetplayHandler
                 HorizontalAlignment = HorizontalAlignment.Center
             };
 
-            memberRow.AddThemeFontSizeOverride("font_size", MemberRowFontSize);
-
             if (boldMemberFont != null)
             {
                 memberRow.AddThemeFontOverride("font", boldMemberFont);
@@ -1092,7 +1090,6 @@ public class MainSceneNetplayHandler
         }
     }
 
-    private const int MemberRowFontSize = 24;
 
     private static readonly Font boldMemberFont = ResourceLoader.Exists(BoldFontPath)
         ? ResourceLoader.Load<Font>(BoldFontPath)

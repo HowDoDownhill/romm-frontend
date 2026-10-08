@@ -1107,8 +1107,48 @@ after `--`, which switches to a window of that size from code (`--windowed` and 
 the project's fullscreen mode, and Movie Maker records at the project size regardless), waits for the
 UI to settle, saves the frame and quits. The log line reports the canvas, carousel and details sizes.
 
-Known gap: on narrow or small screens the UI scales down as a whole (0.75 at 4:3, 0.67 on a
-1280×800 handheld), so settings text reaches about 9 px. That needs a UI scale setting, not layout.
+On narrow or small screens the UI scales down as a whole (0.75 at 4:3, 0.67 on a 1280×800
+handheld). Interface Size, below, is the answer to that.
+
+### Text uses four named sizes from one theme
+Sizes used to be set node by node, and anything without an override fell back to Godot's 16 px:
+settings labels, the settings menu, the start menu, game descriptions, download names, login. The
+footer sat at 32, card titles at 24, settings values at 20, popups at 16 and 22. The text a player
+reads most was the smallest.
+
+`assets/themes/app_theme.tres` is the project theme (`gui/theme/custom`). Its `default_font_size` is
+Body, so any text with no style is Body, and four sizes cover the app at the 1080-unit reference
+canvas:
+
+| Style | Size | Used by |
+|---|---|---|
+| Display (`DisplayLabel`, `DisplayButton`) | 48 | header system name and its arrows |
+| Title (`TitleLabel`, `TitleButton`, `FlatButton`) | 32 | button bars, panel and popup titles, lobby code |
+| Body (theme default) | 26 | settings labels and values, descriptions, start menu, card titles, lists, login |
+| Caption (`CaptionLabel`) | 20 | download status, settings group headers, system-jump names, netplay info |
+
+Nothing in scenes or code sets a font size directly any more; use a variation. `FlatButton` was
+already referenced by every footer button but defined nowhere, so it silently meant "Button"; the
+theme now defines it with only a font size, which leaves its look unchanged.
+
+Larger text needed two layout changes. The settings sidebar scrolled sideways once names outgrew it;
+horizontal scrolling is off and labels end in an ellipsis. Footer buttons had a 300-unit minimum
+width inside 175-unit containers, so five of them needed 1550 units whatever their text and ran off a
+1477-unit canvas at 130%. They now size to their text with a 32-unit gap and a 24-unit inset; the
+bars are end-aligned, so a changing action label moves only itself. The screenshot column in the
+details panel is fixed at 245 units (two 115 px thumbnails) so the description gets the rest of the
+row.
+
+### Interface Size scales the whole UI
+General Settings has Interface Size: Auto, 85%, 100%, 115%, 130%, 150%. It sets the root window's
+`ContentScaleFactor`, which multiplies the stretch scale; with `expand` the canvas shrinks by the
+same factor and the containers reflow (130% at 1280×800 gives a 1477×923 canvas). Applied in
+`ConfigManager._Ready` right after the config loads, and live when changed.
+
+Auto (`InterfaceScale.ResolveAutomatic`) is 130% when the screen's short side is 900 px or less
+(Steam Deck, 768p laptops) or under 6 inches tall by a DPI of at least 150, and 100% otherwise. DPI
+under 150 is ignored because desktop Linux commonly reports a placeholder 96. The decision and the
+inputs are logged as `[UI] interface size ...` at startup.
 
 ### Linux prefers native Wayland, and the frontend stops drawing while an emulator runs
 `display/display_server/driver.linuxbsd` is `wayland`; Godot falls back to X11 when there is no

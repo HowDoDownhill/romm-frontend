@@ -32,6 +32,9 @@ public partial class ConfigManager : Node
     public bool PreferDiscreteGpu { get; private set; }
     public string AppTheme { get; private set; }
     public string AppBackground { get; private set; }
+    public string InterfaceSize { get; private set; }
+
+    public static readonly string[] InterfaceSizes = { "Auto", "85%", "100%", "115%", "130%", "150%" };
 
     public static readonly (string Name, string ShaderPath)[] BackgroundStyles = new (string, string)[]
     {
@@ -242,6 +245,7 @@ public partial class ConfigManager : Node
         EnsureRequiredDirectoriesExist();
         LoadThemes();
         LoadConfiguration();
+        InterfaceScale.Apply(GetTree().Root, InterfaceSize);
     }
 
     public void DetermineApplicationRootDirectory()
@@ -347,6 +351,7 @@ public partial class ConfigManager : Node
         ShowAllSystems = (bool)configurationFile.GetValue("UI", "ShowAllSystems", false);
         AppTheme = (string)configurationFile.GetValue("UI", "AppTheme", "Default");
         AppBackground = (string)configurationFile.GetValue("UI", "AppBackground", "Flow");
+        InterfaceSize = (string)configurationFile.GetValue("UI", "InterfaceSize", "Auto");
 
         EmulatorCloseHotkeyCount = (int)configurationFile.GetValue("Input", "EmulatorCloseHotkeyCount", DefaultEmulatorCloseHotkeyCount);
         var defaultHotkeyButtons = BuildDefaultEmulatorCloseHotkeys();
@@ -408,6 +413,7 @@ public partial class ConfigManager : Node
         ShowAllSystems = false;
         AppTheme = "Default";
         AppBackground = "Flow";
+        InterfaceSize = "Auto";
 
         EmulatorCloseHotkeyCount = DefaultEmulatorCloseHotkeyCount;
         EmulatorCloseHotkeys = BuildDefaultEmulatorCloseHotkeys();
@@ -443,6 +449,7 @@ public partial class ConfigManager : Node
         configurationFile.SetValue("UI", "ShowAllSystems", ShowAllSystems);
         configurationFile.SetValue("UI", "AppTheme", AppTheme);
         configurationFile.SetValue("UI", "AppBackground", AppBackground);
+        configurationFile.SetValue("UI", "InterfaceSize", InterfaceSize);
         configurationFile.SetValue("Input", "EmulatorCloseHotkeyCount", EmulatorCloseHotkeyCount);
         configurationFile.SetValue("Input", "EmulatorCloseHotkeys", EmulatorCloseHotkeys);
         configurationFile.SetValue("Input", "EmulatorCloseHoldSeconds", EmulatorCloseHoldSeconds);
@@ -528,6 +535,12 @@ public partial class ConfigManager : Node
     public void SaveAppBackground(string backgroundStyle)
     {
         AppBackground = backgroundStyle;
+        SaveConfig();
+    }
+
+    public void SaveInterfaceSize(string interfaceSize)
+    {
+        InterfaceSize = interfaceSize;
         SaveConfig();
     }
 

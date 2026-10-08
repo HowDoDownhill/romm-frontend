@@ -30,19 +30,16 @@ public partial class CarouselButton : HBoxContainer
         var leftArrow = new Label();
         leftArrow.Text = "< ";
         leftArrow.AddThemeColorOverride("font_color", new Color(0.5f, 0.5f, 0.5f, 1f));
-        leftArrow.AddThemeFontSizeOverride("font_size", 20);
         AddChild(leftArrow);
 
         valueLabel = new Label();
         valueLabel.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         valueLabel.HorizontalAlignment = HorizontalAlignment.Center;
-        valueLabel.AddThemeFontSizeOverride("font_size", 20);
         AddChild(valueLabel);
 
         var rightArrow = new Label();
         rightArrow.Text = " >";
         rightArrow.AddThemeColorOverride("font_color", new Color(0.5f, 0.5f, 0.5f, 1f));
-        rightArrow.AddThemeFontSizeOverride("font_size", 20);
         AddChild(rightArrow);
 
         if (Selected != -1)

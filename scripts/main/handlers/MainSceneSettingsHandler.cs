@@ -80,6 +80,7 @@ public class MainSceneSettingsHandler
     {
         var label = new Label();
         label.Text = headerName;
+        label.ThemeTypeVariation = "CaptionLabel";
         label.AddThemeColorOverride("font_color", new Color(0.7f, 0.7f, 0.7f, 1f));
 
         var margin = new MarginContainer();
@@ -298,6 +299,37 @@ public class MainSceneSettingsHandler
         var backgroundEntry = settingsListEntryScene.Instantiate<SettingsListEntry>();
         backgroundEntry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(backgroundFieldBox);
         vbox.AddChild(backgroundEntry);
+
+        HBoxContainer interfaceSizeFieldBox = new HBoxContainer();
+        Label interfaceSizeLabel = new Label();
+        interfaceSizeLabel.Text = "Interface Size";
+        interfaceSizeLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        interfaceSizeFieldBox.AddChild(interfaceSizeLabel);
+
+        CarouselButton interfaceSizeOptionButton = new CarouselButton();
+        int selectedInterfaceSizeIdx = 0;
+
+        for (int i = 0; i < ConfigManager.InterfaceSizes.Length; i++)
+        {
+            interfaceSizeOptionButton.AddItem(ConfigManager.InterfaceSizes[i], i);
+            if (ConfigManager.InterfaceSizes[i] == appInstance.configManager.InterfaceSize)
+            {
+                selectedInterfaceSizeIdx = i;
+            }
+        }
+
+        interfaceSizeOptionButton.Select(selectedInterfaceSizeIdx);
+        interfaceSizeOptionButton.ItemSelected += (long index) =>
+        {
+            string interfaceSize = interfaceSizeOptionButton.GetItemText((int)index);
+            appInstance.configManager.SaveInterfaceSize(interfaceSize);
+            InterfaceScale.Apply(mainScene.GetTree().Root, interfaceSize);
+        };
+
+        interfaceSizeFieldBox.AddChild(interfaceSizeOptionButton);
+        var interfaceSizeEntry = settingsListEntryScene.Instantiate<SettingsListEntry>();
+        interfaceSizeEntry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(interfaceSizeFieldBox);
+        vbox.AddChild(interfaceSizeEntry);
 
         HBoxContainer discreteGpuFieldBox = new HBoxContainer();
         Label discreteGpuLabel = new Label();

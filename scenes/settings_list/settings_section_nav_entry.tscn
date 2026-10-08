@@ -26,5 +26,7 @@ theme_override_constants/margin_bottom = 10
 
 [node name="Label" type="Label" parent="PanelContainer/MarginContainer"]
 layout_mode = 2
+size_flags_horizontal = 3
 mouse_filter = 2
 text = "Section Name"
+text_overrun_behavior = 3

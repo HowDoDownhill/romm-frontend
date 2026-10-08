@@ -71,7 +71,7 @@ public partial class SystemJumpPopup : UiPanel
             }
 
             var label = new Label { Text = system.Name, HorizontalAlignment = HorizontalAlignment.Center, AutowrapMode = TextServer.AutowrapMode.WordSmart, CustomMinimumSize = new Vector2(140, 0) };
-            label.AddThemeFontSizeOverride("font_size", 16);
+            label.ThemeTypeVariation = "CaptionLabel";
             vbox.AddChild(label);
 
             entryBtn.Pressed += () =>
