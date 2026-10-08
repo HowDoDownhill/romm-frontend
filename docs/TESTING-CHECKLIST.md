@@ -114,6 +114,8 @@ This is the section with the worst platform divergence. Do not skip it on either
 - [ ] Clear `DeviceId` in `config.cfg` and relaunch: RomM returns the **same** device for this
       machine (`GET /api/devices` gains no new row), and the device has a hostname, on both OSes.
 - [ ] Switching a system to a different emulator warns that saves are not converted.
+- [ ] A game with both an untagged and an emulator-tagged save on RomM downloads only the tagged
+      one (`Skipping untagged save ...` in the log); a game with only untagged saves still gets them.
 - [ ] Reinstalling the emulator does not destroy saves or save states.
 - [ ] Save states land inside the install directory, not in a per-user location outside it.
 

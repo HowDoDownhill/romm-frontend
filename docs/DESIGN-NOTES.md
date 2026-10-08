@@ -1712,6 +1712,20 @@ the contents, which already live in the store.
 same system, because their save formats differ. This means switching emulator still does not carry
 saves across; that has to be opted into per verified-compatible pair, not enabled blindly.
 
+### Untagged server saves are skipped once the emulator has its own
+Uploads carry an `emulator` tag, and downloads are filtered by it, but saves uploaded before tagging
+have none and were accepted by every emulator so they would keep syncing. On the laptop that pulled
+Emerald's `.sav` (save #25, 131088 bytes: mGBA's SRAM plus its 16-byte RTC footer, from July) into
+RetroArch's store beside RetroArch's own tagged `.srm` (#68). RetroArch never reads it, so it sat
+there as a second, stale save.
+
+`SyncBeforeLaunch` now skips untagged saves for a game when the server already holds a save tagged
+with the mapped emulator. Tagging came later than every untagged save, so a tagged one is always
+the newer copy. With no tagged save, untagged ones still download: that is the pre-tagging data the
+player may need, and for many emulators it is in the right format. Skipped saves never enter
+`emulatorScopedServerSaveIds`, so negotiation cannot download them either. Files already downloaded
+before this change are left in place.
+
 ### Recursive delete must not be trusted around junctions
 On Windows, `Directory.Delete(path, recursive: true)` on a tree containing a junction throws
 `UnauthorizedAccessException` and leaves the tree in place. .NET calls `DeleteVolumeMountPoint` on

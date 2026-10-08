@@ -52,7 +52,7 @@ public partial class SystemJumpPopup : UiPanel
             int index = i;
 
             var entryBtn = new Button();
-            entryBtn.CustomMinimumSize = new Vector2(150, 150);
+            entryBtn.CustomMinimumSize = new Vector2(150, 180);
             StyleEntryButton(entryBtn);
 
             var vbox = new VBoxContainer();
@@ -70,7 +70,7 @@ public partial class SystemJumpPopup : UiPanel
                 vbox.AddChild(icon);
             }
 
-            var label = new Label { Text = system.Name, HorizontalAlignment = HorizontalAlignment.Center, AutowrapMode = TextServer.AutowrapMode.WordSmart, CustomMinimumSize = new Vector2(140, 0) };
+            var label = new Label { Text = system.Name, HorizontalAlignment = HorizontalAlignment.Center, AutowrapMode = TextServer.AutowrapMode.WordSmart, CustomMinimumSize = new Vector2(140, 0), MaxLinesVisible = 3, TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis };
             label.ThemeTypeVariation = "CaptionLabel";
             vbox.AddChild(label);
 

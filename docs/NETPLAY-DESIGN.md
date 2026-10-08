@@ -322,13 +322,14 @@ Opening and leaving a lobby both call `RefreshBrowseSourceForLobby`, which re-ru
 reselects from index 0, because the filtered list is a different length and the old index may no
 longer exist.
 
-### Clients need a grace period before connecting
+### Clients connect only once the host is listening
 
-The host's RetroArch takes seconds to boot its core and start listening. `ReleaseMembersToStart` is
-therefore sent *after* the host launches, and clients still wait `HostStartupGraceSeconds` before
-launching their own — `--connect` against a host that is not yet listening simply fails, with no
-retry. Five seconds is a guess that wants replacing with a real "host is listening" signal once
-there is a way to observe it.
+The host's emulator takes seconds to boot its core and start listening, and `--connect` against a
+host that is not yet listening fails with no retry. The original design had clients wait a fixed
+`HostStartupGraceSeconds` (5 s). That was replaced: the host polls its own TCP and UDP listener
+tables for the netplay port and sends `ReleaseMembersToStart` only once the port is open, with a
+timeout that releases the players anyway. See DESIGN-NOTES "The host waits until the emulator is
+actually listening, rather than guessing".
 
 ### The host is the reference build, and versions are compared against it
 

@@ -49,10 +49,20 @@ public partial class SaveSyncManager : Node
 
         if (serverSavesJson.ValueKind == JsonValueKind.Array)
         {
+            bool emulatorHasTaggedSave = serverSavesJson.EnumerateArray()
+                .Any(serverSave => !IsUntaggedServerSave(serverSave) && ServerSaveBelongsToEmulator(serverSave, mappedEmulatorName));
+
             foreach (var serverSave in serverSavesJson.EnumerateArray())
             {
                 if (!ServerSaveBelongsToEmulator(serverSave, mappedEmulatorName))
                 {
+                    continue;
+                }
+
+                if (emulatorHasTaggedSave && IsUntaggedServerSave(serverSave))
+                {
+                    string untaggedFileName = serverSave.TryGetProperty("file_name", out var untaggedNameProp) ? untaggedNameProp.GetString() : "?";
+                    GD.Print($"Skipping untagged save {untaggedFileName} for {game.Name}: {mappedEmulatorName} already has its own save for this game.");
                     continue;
                 }
 
@@ -386,6 +396,13 @@ public partial class SaveSyncManager : Node
     private string GetMappedEmulatorForGame(Game game)
     {
         return game?.System == null ? null : appInstance.emulatorManager.GetMappedEmulator(game.System.Slug);
+    }
+
+    private static bool IsUntaggedServerSave(JsonElement serverSave)
+    {
+        return !serverSave.TryGetProperty("emulator", out var emulatorProperty)
+            || emulatorProperty.ValueKind != JsonValueKind.String
+            || string.IsNullOrEmpty(emulatorProperty.GetString());
     }
 
     private static bool ServerSaveBelongsToEmulator(JsonElement serverSave, string emulatorSlug)

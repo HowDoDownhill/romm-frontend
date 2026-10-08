@@ -299,6 +299,7 @@ public partial class MainScene : Control
             case "settings": SectionHandler.ShowSection(MainSceneSectionHandler.Section.Settings, false); break;
             case "downloads": SectionHandler.ShowSection(MainSceneSectionHandler.Section.Downloads, false); break;
             case "start": ToggleStartMenu(); break;
+            case "jump": OpenSystemJumpPopup(); break;
         }
 
         await ToSignal(GetTree().CreateTimer(LayoutCaptureSettleSeconds - LayoutCaptureViewDelaySeconds), SceneTreeTimer.SignalName.Timeout);
