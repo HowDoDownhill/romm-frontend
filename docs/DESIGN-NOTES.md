@@ -1098,6 +1098,25 @@ UI to settle, saves the frame and quits. The log line reports the canvas, carous
 Known gap: on narrow or small screens the UI scales down as a whole (0.75 at 4:3, 0.67 on a
 1280×800 handheld), so settings text reaches about 9 px. That needs a UI scale setting, not layout.
 
+### Linux prefers native Wayland, and the frontend stops drawing while an emulator runs
+`display/display_server/driver.linuxbsd` is `wayland`; Godot falls back to X11 when there is no
+Wayland session (Steam Deck game mode, X11 desktops). Under XWayland with GNOME's 150% fractional
+scaling the window rendered at 5120x3200 and was scaled down, and frame pacing was erratic even with
+the blur off (p50 2.9 ms, p95 26-46 ms). Natively it renders at the panel's 3840x2400. On the laptop,
+idle frame time with both changes went from 22.6 ms to 7.3 ms.
+
+Native Wayland does not throttle a window a fullscreen emulator covers: the close-hold log showed 291
+frames in 2 s, the frontend rendering at ~145 fps behind RetroArch and competing with it for the
+GPU. `EmulatorManager.SetFrontendBackgrounded` turns `RenderingServer.RenderLoopEnabled` off and caps
+`Engine.MaxFps` at 30 from launch until the exit branch in `_Process`, then restores both. Input
+polling, the clock-timed close hold and exit detection run at 30 Hz (verified: 61 frames per 2 s
+hold, exit detected immediately). The frontend never needs to draw while covered: its input is
+ignored for the whole session anyway.
+
+Verified on GNOME 50 / Wayland: hold-Back close, return of focus and controller input, exit
+detection and play-session sync. The window icon is unsupported there (no `xdg-toplevel-icon`),
+which is cosmetic.
+
 ### Mica takes 8 samples, because 32 cost two-thirds of every frame for no visible difference
 `mica_panel.gdshader` blurs with a rotated golden-angle spiral read from the screen texture. On the
 GNOME laptop (3840x2400 native Wayland, RTX 3060 Laptop) the idle frame time by sample count was

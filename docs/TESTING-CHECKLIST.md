@@ -85,6 +85,10 @@ This is the section with the worst platform divergence. Do not skip it on either
       2s) while the emulator has focus. The emulator exits. A quick press does nothing. Test with
       the emulator **fullscreen**: a covered frontend runs at about 1 fps on Linux, which is where
       a frame-based hold timer broke.
+- [ ] While a game runs the frontend stops drawing: the close-hold log line reports about 60 frames
+      for a 2 s hold, and the frontend redraws normally after the emulator exits.
+- [ ] Linux: the frontend runs on native Wayland (`run.log` window size equals the panel resolution,
+      not a 2x-scaled XWayland size) and falls back to X11 where Wayland is unavailable.
 - [ ] The frontend does **not** freeze while closing. Any wait for process exit must be off the main
       thread.
 - [ ] The emulator exits *gracefully* — not killed. Confirm by checking the game's save survived (see

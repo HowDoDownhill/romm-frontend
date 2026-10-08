@@ -1044,6 +1044,7 @@ public partial class EmulatorManager : Node
 
         activeEmulatorProcess = null;
         activeGame = null;
+        SetFrontendBackgrounded(false);
         appInstance.inputLayer?.EndSession();
         appInstance.netplayManager?.EndSession();
 
@@ -1055,6 +1056,31 @@ public partial class EmulatorManager : Node
         }
 
         EmitSignal(SignalName.EmulatorLaunchStateChanged);
+    }
+
+    private const int BackgroundedFramesPerSecond = 30;
+    private bool isFrontendBackgrounded;
+    private int maxFpsBeforeBackgrounding;
+
+    private void SetFrontendBackgrounded(bool backgrounded)
+    {
+        if (backgrounded == isFrontendBackgrounded)
+        {
+            return;
+        }
+
+        isFrontendBackgrounded = backgrounded;
+
+        if (backgrounded)
+        {
+            maxFpsBeforeBackgrounding = Engine.MaxFps;
+            Engine.MaxFps = BackgroundedFramesPerSecond;
+            RenderingServer.RenderLoopEnabled = false;
+            return;
+        }
+
+        RenderingServer.RenderLoopEnabled = true;
+        Engine.MaxFps = maxFpsBeforeBackgrounding;
     }
 
     private void BeginEmulatorLivenessGrace()
@@ -2302,6 +2328,7 @@ public partial class EmulatorManager : Node
                 activeGame = game;
                 activeSessionStart = sessionStart;
                 BeginEmulatorLivenessGrace();
+                SetFrontendBackgrounded(true);
             }
 
             else
@@ -2500,6 +2527,7 @@ public partial class EmulatorManager : Node
             {
                 activeEmulatorProcess = emulatorProcess;
                 BeginEmulatorLivenessGrace();
+                SetFrontendBackgrounded(true);
 
                 emulatorProcess.EnableRaisingEvents = true;
                 emulatorProcess.Exited += (sender, exitEventArgs) =>

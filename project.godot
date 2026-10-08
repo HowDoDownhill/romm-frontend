@@ -40,6 +40,7 @@ ControllerIcons="*uid://cbgqhfjlifwga"
 
 [display]
 
+display_server/driver.linuxbsd="wayland"
 window/size/viewport_width=1920
 window/size/viewport_height=1080
 window/size/mode=3
