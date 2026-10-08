@@ -162,6 +162,9 @@ public class Firmware
     [JsonPropertyName("id")]
     public int Id { get; set; }
 
+    [JsonPropertyName("platform_id")]
+    public int PlatformId { get; set; }
+
     [JsonPropertyName("file_name")]
     public string FileName { get; set; }
 

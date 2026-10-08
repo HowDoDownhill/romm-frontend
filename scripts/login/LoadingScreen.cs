@@ -19,6 +19,7 @@ public partial class LoadingScreen : Control
 
     public override void _Ready()
     {
+        StartupTimeline.Mark("loading screen");
         appInstance = GetNode<AppInstance>("/root/AppInstance");
 
         var micaMaterial = GD.Load<ShaderMaterial>("res://assets/materials/mica_panel.tres");
@@ -34,7 +35,13 @@ public partial class LoadingScreen : Control
             statusLabel.Text = "Checking cache...";
         }
 
-        var (cachedSystems, cachedGames) = appInstance.cacheManager.LoadCache();
+        var startupTimer = System.Diagnostics.Stopwatch.StartNew();
+
+        Task<Dictionary<int, List<Firmware>>> firmwareRequest = GetFirmwareByPlatformAsync();
+        Task<List<Collection>> collectionsRequest = appInstance.rommApi.GetCollectionsAsync();
+
+        var (cachedSystems, cachedGames) = await Task.Run(() => appInstance.cacheManager.LoadCache());
+        long cacheMilliseconds = startupTimer.ElapsedMilliseconds;
 
         if (cachedSystems != null && cachedSystems.Any() && cachedGames != null && cachedGames.Any())
         {
@@ -63,14 +70,16 @@ public partial class LoadingScreen : Control
                 progressBar.Value = 100;
             }
 
+            await firmwareRequest;
             await SyncFirmwareAsync();
-
             await PopulateAvailableFirmwareAsync();
+            long firmwareMilliseconds = startupTimer.ElapsedMilliseconds - cacheMilliseconds;
 
-            await LoadCollectionsAsync();
+            await LoadCollectionsAsync(collectionsRequest);
+            long collectionsMilliseconds = startupTimer.ElapsedMilliseconds - cacheMilliseconds - firmwareMilliseconds;
 
+            GD.Print($"[Startup] {StartupTimeline.Describe()}; cache {cacheMilliseconds} ms, then firmware +{firmwareMilliseconds} ms, collections +{collectionsMilliseconds} ms ({appInstance.dataBus.systems.Count} systems; requests overlapped the cache read)");
 
-            await Task.Delay(200);
             GetTree().ChangeSceneToFile("res://scenes/main_scene.tscn");
         }
 
@@ -169,14 +178,14 @@ public partial class LoadingScreen : Control
         GetTree().ChangeSceneToFile("res://scenes/main_scene.tscn");
     }
 
-    private async Task LoadCollectionsAsync()
+    private async Task LoadCollectionsAsync(Task<List<Collection>> startedRequest = null)
     {
         if (statusLabel != null)
         {
             statusLabel.Text = "Loading collections...";
         }
 
-        var collections = await appInstance.rommApi.GetCollectionsAsync();
+        var collections = await (startedRequest ?? appInstance.rommApi.GetCollectionsAsync());
         appInstance.dataBus.collectionSystems = CollectionProjection.Project(collections, appInstance.dataBus.gameCache);
 
         var favoriteCollection = collections?.FirstOrDefault(collection => collection.IsFavorite);
@@ -202,11 +211,12 @@ public partial class LoadingScreen : Control
         }
 
         var firmwareToDownload = new List<(Firmware fw, string slug, string systemName)>();
-        
+        var firmwareByPlatform = await GetFirmwareByPlatformAsync();
+
         foreach (var system in appInstance.dataBus.systems)
         {
-            List<Firmware> systemFirmware = await appInstance.rommApi.GetFirmwareAsync(system.Id);
-            
+            firmwareByPlatform.TryGetValue(system.Id, out List<Firmware> systemFirmware);
+
             if (systemFirmware != null && systemFirmware.Any())
             {
                 foreach (var fw in systemFirmware)
@@ -263,15 +273,31 @@ public partial class LoadingScreen : Control
         }
     }
     
+    private Dictionary<int, List<Firmware>> firmwareByPlatformId;
+
+    private async Task<Dictionary<int, List<Firmware>>> GetFirmwareByPlatformAsync()
+    {
+        if (firmwareByPlatformId != null)
+        {
+            return firmwareByPlatformId;
+        }
+
+        List<Firmware> allFirmware = await appInstance.rommApi.GetFirmwareAsync() ?? new List<Firmware>();
+        firmwareByPlatformId = allFirmware.GroupBy(firmware => firmware.PlatformId).ToDictionary(group => group.Key, group => group.ToList());
+        return firmwareByPlatformId;
+    }
+
     private async Task PopulateAvailableFirmwareAsync()
     {
+        var firmwareByPlatform = await GetFirmwareByPlatformAsync();
+
         foreach (var system in appInstance.dataBus.systems)
         {
             var firmwareDir = appInstance.configManager.BiosPath.PathJoin(system.Slug);
 
             if (DirAccess.DirExistsAbsolute(firmwareDir))
             {
-                var firmwaresFromApi = await appInstance.rommApi.GetFirmwareAsync(system.Id);
+                var firmwaresFromApi = firmwareByPlatform.TryGetValue(system.Id, out List<Firmware> platformFirmware) ? platformFirmware : new List<Firmware>();
                 var localFiles = DirAccess.GetFilesAt(firmwareDir);
 
                 var availableFirmwares = new List<Firmware>();

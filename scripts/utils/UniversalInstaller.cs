@@ -19,7 +19,7 @@ public static class UniversalInstaller
 
     static UniversalInstaller()
     {
-        sharedHttpClient = new System.Net.Http.HttpClient { Timeout = System.Threading.Timeout.InfiniteTimeSpan };
+        sharedHttpClient = new System.Net.Http.HttpClient(HttpHandlers.Create()) { Timeout = System.Threading.Timeout.InfiniteTimeSpan };
         sharedHttpClient.DefaultRequestHeaders.UserAgent.ParseAdd("RomM-Frontend/1.0");
     }
 

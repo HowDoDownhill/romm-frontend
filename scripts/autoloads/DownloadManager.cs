@@ -19,7 +19,7 @@ public partial class DownloadManager : Node
     private const int TransferBufferSizeBytes = 1024 * 1024;
     private const double DiagnosticsLogIntervalSeconds = 2.0;
 
-    private static readonly System.Net.Http.HttpClient transferClient = new System.Net.Http.HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+    private static readonly System.Net.Http.HttpClient transferClient = new System.Net.Http.HttpClient(HttpHandlers.Create()) { Timeout = Timeout.InfiniteTimeSpan };
 
     private AppInstance appInstance;
 

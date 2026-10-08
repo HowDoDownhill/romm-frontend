@@ -20,6 +20,7 @@ public partial class AppInstance : Node
     
     public override void _Ready()
     {
+        StartupTimeline.Mark("first autoload");
         configManager = GetNode<ConfigManager>("/root/ConfigManager");
         rommApi = GetNode<RomMAPI>("/root/RomMAPI");
         downloadManager = GetNode<DownloadManager>("/root/DownloadManager");

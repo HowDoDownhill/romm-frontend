@@ -24,6 +24,7 @@ public partial class LoginScreen : Control
     
     public override void _Ready()
     {
+        StartupTimeline.Mark("login screen");
         appInstance = GetNode<AppInstance>("/root/AppInstance");
         
         loginButton.Pressed += OnLoginButtonPressed;
@@ -70,7 +71,9 @@ public partial class LoginScreen : Control
         string username = rommUserInput.Text;
         string password = rommPasswordInput.Text;
         string apiKey = rommApiKeyInput.Text;
+        StartupTimeline.Mark("auth start");
         result = await appInstance.rommApi.AuthenticateAsync(username, password, host, apiKey);
+        StartupTimeline.Mark("auth done");
 
         if (result.isSuccess)
         {

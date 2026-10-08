@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 public partial class RomMAPI : Node
 {
-    private readonly System.Net.Http.HttpClient httpClient = new System.Net.Http.HttpClient();
+    private readonly System.Net.Http.HttpClient httpClient = new System.Net.Http.HttpClient(HttpHandlers.Create());
     public string ApiHost => apiHostUrl;
     private string apiHostUrl;
     private string authenticationToken;

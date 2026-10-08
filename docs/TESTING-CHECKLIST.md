@@ -46,6 +46,11 @@ Delete (or move aside) `config.cfg`, `games.cache`, `systems.cache`, `emulators/
 - [ ] "Hide games without box art" and "Show all systems" both take effect.
 - [ ] Fuzzy search filters; an empty buffer does not filter.
 - [ ] Cache rebuild (delete cache files, re-fetch from the loading screen) works.
+- [ ] Startup from a warm cache: the `[Startup]` log line shows `auth done` under a second after
+      `auth start` on both OSes (5 s there means the IPv6 lookup stall is back), and
+      `startup_to_library_ms` stays in line with DESIGN-NOTES "Startup".
+- [ ] An old indented `games.cache` is compacted once on load (`Compacted the game cache ...`), and
+      the library is unchanged afterwards.
 
 ## 3. Downloading
 

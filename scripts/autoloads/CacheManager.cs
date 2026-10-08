@@ -103,8 +103,8 @@ public partial class CacheManager : Node
 
     public void SaveCache(List<GameSystem> gameSystems, Dictionary<int, List<Game>> gameCacheBySystemId)
     {
-        WriteJsonToFile(systemsCacheFilePath, gameSystems, RommJsonContext.Default.ListGameSystem);
-        WriteJsonToFile(gamesCacheFilePath, gameCacheBySystemId, RommJsonContext.Default.DictionaryInt32ListGame);
+        WriteJsonToFile(systemsCacheFilePath, gameSystems, CacheJsonContext.Default.ListGameSystem);
+        WriteJsonToFile(gamesCacheFilePath, gameCacheBySystemId, CacheJsonContext.Default.DictionaryInt32ListGame);
     }
 
     public void RebuildGameCache()
@@ -117,8 +117,8 @@ public partial class CacheManager : Node
 
     public (List<GameSystem> systems, Dictionary<int, List<Game>> games) LoadCache()
     {
-        var cachedSystems = ReadJsonFromFile(systemsCacheFilePath, RommJsonContext.Default.ListGameSystem);
-        var cachedGames = ReadJsonFromFile(gamesCacheFilePath, RommJsonContext.Default.DictionaryInt32ListGame);
+        var cachedSystems = ReadJsonFromFile(systemsCacheFilePath, CacheJsonContext.Default.ListGameSystem);
+        var cachedGames = ReadJsonFromFile(gamesCacheFilePath, CacheJsonContext.Default.DictionaryInt32ListGame);
 
         if (cachedSystems != null && cachedGames != null)
         {
@@ -152,6 +152,13 @@ public partial class CacheManager : Node
 
             if (isCacheValid)
             {
+                if (IsIndentedJsonFile(gamesCacheFilePath))
+                {
+                    long indentedBytes = (long)FileAccess.GetFileAsBytes(gamesCacheFilePath).Length;
+                    SaveCache(cachedSystems, cachedGames);
+                    GD.Print($"Compacted the game cache from {indentedBytes / 1024} KB to {(long)FileAccess.GetFileAsBytes(gamesCacheFilePath).Length / 1024} KB.");
+                }
+
                 return (cachedSystems, cachedGames);
             }
 
@@ -178,6 +185,19 @@ public partial class CacheManager : Node
         fileHandle.StoreString(serializedJsonContent);
     }
 
+    private static bool IsIndentedJsonFile(string filePath)
+    {
+        using var fileHandle = FileAccess.Open(filePath, FileAccess.ModeFlags.Read);
+
+        if (fileHandle == null || fileHandle.GetLength() < 2)
+        {
+            return false;
+        }
+
+        byte[] leadingBytes = fileHandle.GetBuffer(System.Math.Min(16, (long)fileHandle.GetLength()));
+        return System.Array.IndexOf(leadingBytes, (byte)'\n') >= 0;
+    }
+
     private T ReadJsonFromFile<T>(string filePath, System.Text.Json.Serialization.Metadata.JsonTypeInfo<T> typeInfo) where T : class
     {
         if (!FileAccess.FileExists(filePath))
@@ -185,15 +205,14 @@ public partial class CacheManager : Node
             return null;
         }
 
-        using var fileHandle = FileAccess.Open(filePath, FileAccess.ModeFlags.Read);
+        byte[] fileJsonBytes = FileAccess.GetFileAsBytes(filePath);
 
-        if (fileHandle == null)
+        if (fileJsonBytes == null || fileJsonBytes.Length == 0)
         {
-            GD.PrintErr($"Failed to open file for reading: {filePath}");
+            GD.PrintErr($"Failed to read file: {filePath}");
             return null;
         }
 
-        string fileJsonContent = fileHandle.GetAsText();
-        return JsonSerializer.Deserialize(fileJsonContent, typeInfo);
+        return JsonSerializer.Deserialize(fileJsonBytes, typeInfo);
     }
 }

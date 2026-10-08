@@ -1312,6 +1312,43 @@ A false result from an asset download is usually just a 404 (no art on the serve
 and not worth logging. Genuine failures are already logged with URL/status detail inside
 `DownloadAssetAsync`.
 
+### Startup: read the `[Startup]` line before guessing
+The loading screen prints one line per cached start: `StartupTimeline` marks (first autoload, login
+screen, auth start/done, loading screen) as absolute and delta milliseconds, then the cache read and
+what firmware and collections still cost after it. `startup_to_library_ms` in a `--ui-bench` report is
+the end-to-end figure. On 2026-10-07 the two machines told different stories:
+
+| Step | PC (Windows) | Laptop (Arch, Wi-Fi) |
+|---|---|---|
+| Login check | 0.1 s | **5.25 s, every launch** |
+| Cache read (42 MB indented JSON) | 0.42 s | 1.2 s |
+| Firmware: two `GET /api/firmware?platform_id=` per system, sequential | ~0.7 s | similar |
+
+Four fixes, each measured:
+
+- **Name lookup.** On the laptop `getent ahosts` for the RomM host took 5030 ms while curl took 8 ms.
+  glibc sends the A and AAAA queries together; the router at 192.168.1.1 never answers the AAAA one,
+  so glibc waits out its 5 s timeout before returning the A record it already has. .NET resolves
+  through glibc, so every new connection paid 5 s. `HttpHandlers.Create()` gives every `HttpClient` a
+  `ConnectCallback` that resolves IPv4 and IPv6 as separate lookups and connects with whichever family
+  answers first with addresses. An IPv6-only network still works: its IPv4 lookup comes back empty
+  quickly. Windows' resolver does not have the problem.
+- **Firmware.** `GET /api/firmware` with no platform returns all 151 entries in ~31 ms, against ~25 ms
+  per platform. `Firmware` now maps `platform_id`; the list is fetched once and grouped, and both the
+  sync and the availability pass read the same dictionary.
+- **Overlap.** The firmware and collections requests start before the cache read, which runs on a
+  worker thread, so on the PC they finish while it is still parsing. The fixed 200 ms pause before the
+  scene change is gone.
+- **Cache format.** `CacheJsonContext` writes the cache unindented and without nulls, and
+  `ReadJsonFromFile` parses the file's bytes directly where it used to decode them into a string
+  first. An indented cache is rewritten compact once, during the load that finds it (42.3 MB to
+  32.9 MB here; all 14232 games identical field by field). Read time on the PC fell from 420 to 173 ms.
+  The shared `RommJsonContext` keeps its settings because API payloads use it too.
+
+Result, launch to a usable library from a warm cache: PC 2.4-3.9 s to 1.47 s; laptop 9.5 s to 1.8 s
+(login check 5.25 s to 0.3-0.5 s, cache read 1.2 s to 0.35 s). The first launch after updating also
+compacts the old cache, 3.5 s on the laptop, once.
+
 ### Measure with `--ui-bench`, not by feel
 `-- --ui-bench=<report> [--ui-capture-size=WxH]` waits for the library, then drives the real input path
 (injected `ui_down`/`ui_up` and bumper press-release pairs) through idle, held scrolling, a scroll

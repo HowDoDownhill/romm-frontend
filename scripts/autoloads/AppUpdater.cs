@@ -16,7 +16,7 @@ public partial class AppUpdater : Node
     private const string RepoName = "romm-frontend";
     private const int TransferBufferSizeBytes = 1024 * 1024;
 
-    private readonly System.Net.Http.HttpClient httpClient = new System.Net.Http.HttpClient { Timeout = Timeout.InfiniteTimeSpan };
+    private readonly System.Net.Http.HttpClient httpClient = new System.Net.Http.HttpClient(HttpHandlers.Create()) { Timeout = Timeout.InfiniteTimeSpan };
 
     private AppInstance appInstance;
 
