@@ -26,13 +26,6 @@ public partial class AppInstance : Node
         downloadManager = GetNode<DownloadManager>("/root/DownloadManager");
         cacheManager = GetNode<CacheManager>("/root/CacheManager");
         emulatorManager = GetNode<EmulatorManager>("/root/EmulatorManager");
-        bool isRunningOnLinux = OS.HasFeature("linux") || OS.GetName() == "Linux" || OS.GetName() == "X11" || OS.GetName() == "Wayland";
-
-        if (isRunningOnLinux && !OS.HasFeature("editor"))
-        {
-            string appDir = configManager.ApplicationRootDirectory;
-            OS.Execute("chmod", new string[] { "-R", "a+rwx", appDir }, new Godot.Collections.Array());
-        }
         dataBus = GetNode<DataBus>("/root/DataBus");
         controllerManager = GetNode<ControllerManager>("/root/ControllerManager");
         Callable.From(ApplyDiscreteGpuPreference).CallDeferred();

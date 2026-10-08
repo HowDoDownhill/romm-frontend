@@ -36,8 +36,29 @@ public partial class StartMenuPanel : UiPanel
 
     public bool IsBiosViewOpen => biosView != null && biosView.Visible;
 
+    private static readonly Vector2 MinimumPanelSize = new Vector2(400, 600);
+    private const float PanelInset = 20.0f;
+
+    public override void _Ready()
+    {
+        base._Ready();
+        AboutToOpen += FitPanelToMenu;
+    }
+
+    private void FitPanelToMenu()
+    {
+        Vector2 contentSize = menuView != null ? menuView.GetCombinedMinimumSize() + new Vector2(PanelInset, PanelInset) : Vector2.Zero;
+        Vector2 panelSize = new Vector2(Mathf.Max(MinimumPanelSize.X, contentSize.X), Mathf.Max(MinimumPanelSize.Y, contentSize.Y));
+
+        OffsetLeft = -panelSize.X / 2.0f;
+        OffsetRight = panelSize.X / 2.0f;
+        OffsetTop = -panelSize.Y / 2.0f;
+        OffsetBottom = panelSize.Y / 2.0f;
+    }
+
     public void ShowMenuView()
     {
+        FitPanelToMenu();
         if (menuView != null) menuView.Visible = true;
         if (biosView != null) biosView.Visible = false;
         if (netplayView != null) netplayView.Visible = false;

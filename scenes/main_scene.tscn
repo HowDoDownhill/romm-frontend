@@ -23,6 +23,9 @@ script = ExtResource("7_18nlu")
 [sub_resource type="Resource" id="Resource_mngbo"]
 script = ExtResource("7_18nlu")
 
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_description"]
+content_margin_right = 12.0
+
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_pu3yx"]
 
 [sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_gubc5"]
@@ -324,6 +327,7 @@ metadata/_smooth_scroll_default_mouse_filter_set = true
 layout_mode = 2
 size_flags_horizontal = 3
 mouse_filter = 1
+theme_override_styles/normal = SubResource("StyleBoxEmpty_description")
 metadata/_smooth_scroll_default_mouse_filter_set = true
 
 [node name="DownloadProgressContainer" type="MarginContainer" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel" unique_id=1605044611]

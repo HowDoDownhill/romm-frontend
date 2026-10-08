@@ -1525,6 +1525,20 @@ their query away.
 
 ## Configuration and paths
 
+### Autoload `_Ready` order: AppInstance runs before ConfigManager has loaded
+Autoloads become ready in `project.godot` order, and `AppInstance` is first, so in its `_Ready`
+every `ConfigManager` value is still unset: `ApplicationRootDirectory` is null and settings hold
+their C# defaults. Anything in `AppInstance._Ready` that needs config must be deferred, as
+`ApplyDiscreteGpuPreference` is (`CallDeferred` runs after every autoload is ready).
+
+The 1.0.5 "Linux Permissions" startup step broke this rule: it ran `chmod -R a+rwx` on
+`ApplicationRootDirectory` synchronously, while that was still null, so it never did anything.
+Verified on the laptop: a file set to 600 stayed 600 across a launch. It was removed rather than
+fixed, because everything that must be executable is already handled where it is created
+(emulator executables after install in `UniversalInstaller`, the bundled 7-Zip before each use, the
+updater's own files, extracted ROMs), and running it would have made the whole application
+directory world-writable on every start.
+
 ### Two kinds of path, two resolution rules
 - **App-layout dirs** (downloads, install_scripts, tools, assets) are always derived from the
   executable's own folder and deliberately never persisted, so a build stays relocatable: move it to
