@@ -1,8 +1,14 @@
 @echo off
+cd /d "%~dp0"
 echo Building Release Packages...
 
 :: Run the existing build script
-call build.bat
+call "%~dp0build.bat" nopause
+if errorlevel 1 (
+    echo Build failed; no release packages were made.
+    pause
+    exit /b 1
+)
 
 echo.
 echo Preparing release folder...

@@ -16,7 +16,19 @@ if [ -z "$GODOT_BIN" ]; then
     exit 1
 fi
 
+if ! command -v "$GODOT_BIN" >/dev/null 2>&1 && [ ! -x "$GODOT_BIN" ]; then
+    echo "Godot not found at $GODOT_BIN. Set GODOT_BIN to the Godot 4.7.2 mono binary."
+    exit 1
+fi
+
 echo "Using Godot: $GODOT_BIN"
+
+require_assemblies() {
+    if [ ! -f "$1/GodotSharp.dll" ]; then
+        echo "$2 export produced no .NET assemblies in $1."
+        exit 1
+    fi
+}
 
 # Mirror of xcopy "SRC" "DEST" /E /I /Y - create DEST, merge into it, overwrite.
 copy_tree() {
@@ -32,6 +44,7 @@ echo "Exporting app to Windows..."
 mkdir -p build/windows
 rm -rf build/windows/data_romm-frontend_*
 "$GODOT_BIN" --headless --export-release "Windows Desktop" "build/windows/romm-frontend.exe"
+require_assemblies build/windows/data_romm-frontend_windows_x86_64 Windows
 
 echo "Copying install_scripts and tools to Windows build..."
 copy_tree "install_scripts" "build/windows/install_scripts"
@@ -41,6 +54,7 @@ echo "Exporting game to Linux..."
 mkdir -p build/linux
 rm -rf build/linux/data_romm-frontend_*
 "$GODOT_BIN" --headless --export-release "Linux Desktop" "build/linux/romm-frontend.x86_64"
+require_assemblies build/linux/data_romm-frontend_linuxbsd_x86_64 Linux
 
 echo "Copying install_scripts and tools to Linux build..."
 copy_tree "install_scripts" "build/linux/install_scripts"

@@ -25,6 +25,9 @@ filesystem, a real controller, a real OS difference.
 - [ ] `build/<platform>/` contains the binary, the `.pck`, the `data_romm-frontend_*` runtime folder,
       `install_scripts/` and `tools/`.
 - [ ] Run `build.sh` a second time without deleting `build/` — no nested `install_scripts/install_scripts`.
+- [ ] With Godot unavailable (unset `GODOT_BIN`, not on PATH, or a wrong path), `build.bat` and
+      `build.sh` stop with a message before deleting anything, and `build-release` makes no zips.
+- [ ] Both release zips contain `data_romm-frontend_*/GodotSharp.dll` (a good Windows zip is ~90 MB).
 - [ ] Exported binary launches and reaches the login screen.
 
 ## 1. First run on a clean profile
