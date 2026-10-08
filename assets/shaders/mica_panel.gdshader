@@ -12,6 +12,7 @@ uniform vec4 mix_color : source_color = vec4(0.0, 0.0, 0.0, 0.4);
 // reading. Lifting to a floor (rather than adding a flat brightness) leaves panels over bright
 // content untouched, which is the same job Acrylic's luminosity layer does.
 uniform float luminosity_floor : hint_range(0.0, 1.0) = 0.0;
+uniform int sample_count : hint_range(0, 64) = 8;
 // NOTE: panel edge treatment is NOT drawn here. Anything reconstructed from UV derivatives ends up
 // ~1px asymmetric (top/left vs bottom/right) because of sub-pixel rasterization, and this shader
 // forces alpha to 1.0 so a stylebox shadow drawn by the panel itself would render as an opaque
@@ -37,10 +38,10 @@ void fragment() {
     vec4 acc = texture(screen_texture, SCREEN_UV);
     float total = 1.0;
 
-    // 32-point golden-angle spiral, uniformly covering the disk.
-    const int SAMPLES = 32;
-    for (int i = 0; i < SAMPLES; i++) {
-        float t = (float(i) + 0.5) / float(SAMPLES);
+    // Golden-angle spiral of sample_count points, uniformly covering the disk. 8 is indistinguishable
+    // from 32 at the material's 150 px radius and tint (max 5/255 per channel), at a quarter of the cost.
+    for (int i = 0; i < sample_count; i++) {
+        float t = (float(i) + 0.5) / float(sample_count);
         float r = sqrt(t);                 // uniform disk distribution
         float a = float(i) * 2.399963;     // golden angle
         vec2 offset = rot * vec2(cos(a), sin(a)) * r;

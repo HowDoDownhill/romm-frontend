@@ -1098,6 +1098,19 @@ UI to settle, saves the frame and quits. The log line reports the canvas, carous
 Known gap: on narrow or small screens the UI scales down as a whole (0.75 at 4:3, 0.67 on a
 1280×800 handheld), so settings text reaches about 9 px. That needs a UI scale setting, not layout.
 
+### Mica takes 8 samples, because 32 cost two-thirds of every frame for no visible difference
+`mica_panel.gdshader` blurs with a rotated golden-angle spiral read from the screen texture. On the
+GNOME laptop (3840x2400 native Wayland, RTX 3060 Laptop) the idle frame time by sample count was
+32: 14.2 ms, 16: 9.2, 8: 7.0, 0: 4.9, so the blur was about 9 ms of a 14 ms frame. The cost is per
+pixel, which is why it only showed on a high-resolution panel; the Windows idle frame went from
+0.75 to 0.31 ms.
+
+At the material's 150 px radius and 0.4 tint almost everything averages away. Compared with 32
+samples, 8 changes no pixel by more than 5/255 in the header, details panel or start menu (the start
+menu sits over cover art, the hardest case), at 1080p and at 4K; two captures of the same build
+already differ by up to 2. `sample_count` is a uniform defaulting to 8, so a future quality setting
+can raise it.
+
 ### Mica frosted glass needs the normal draw flow
 Popups are deliberately **not** `TopLevel`. Staying in the normal draw flow (added last, so they
 render on top) is what lets Godot auto-copy the back buffer for the mica shader. `TopLevel` plus a
