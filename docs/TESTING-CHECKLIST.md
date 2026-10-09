@@ -23,7 +23,8 @@ filesystem, a real controller, a real OS difference.
 - [ ] `dotnet build` succeeds with 0 warnings, 0 errors.
 - [ ] `./build.sh` (or `build.bat`) exports **both** Windows and Linux without errors.
 - [ ] `build/<platform>/` contains the binary, the `.pck`, the `data_romm-frontend_*` runtime folder,
-      `install_scripts/` and `tools/`.
+      `install_scripts/` and `tools/7zip/`, and nothing else under `tools/` (the developer tools hold
+      private test-machine details).
 - [ ] Run `build.sh` a second time without deleting `build/` — no nested `install_scripts/install_scripts`.
 - [ ] With Godot unavailable (unset `GODOT_BIN`, not on PATH, or a wrong path), `build.bat` and
       `build.sh` stop with a message before deleting anything, and `build-release` makes no zips.

@@ -1487,6 +1487,17 @@ Measured on 2026-10-07 at 1920x1080, RTX 5080, worst frame / frames over 16.7 ms
 | System switch | 275 ms / 26 | 27 ms / 19 | **17.5 ms / 1** |
 | System switch back | 163 ms / 11 | 17.5 ms / 1 | **5.5 ms / 0** |
 
+### The demo video is recorded, not screen-captured
+`tools/demo/record-demo.ps1` runs the app with `-- --ui-demo` under `--write-movie` at a fixed
+60 fps and encodes `releases/romm-frontend-demo.mp4` plus a copy under 10 MB for GitHub embeds.
+`UiDemo` is a timeline of simulated presses and direct calls (view switches,
+`PreviewAppearance`), measured in game time. Fixed-fps recording advances game time by exactly one
+frame per frame however slow encoding is, so motion is smooth on any machine. Two things run on
+the wall clock instead: the 250 ms bumper hold that opens the system picker, so the demo holds RB
+until the picker is open, and network and image loads, which finish relatively sooner in the video.
+`PreviewAppearance` changes the look without saving it, and the script raises MJPEG quality with a
+temporary `override.cfg`, restoring any existing one. The tour needs a logged-in profile.
+
 ### The game carousel holds a window of cards, not one per game
 It built one `GameCard` per game and laid all of them out on every move. Probed: creating or freeing
 cards on a system switch cost up to 163 ms (one system shows 1567 games; shrinking to 24 still took 22

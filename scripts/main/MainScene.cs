@@ -238,14 +238,16 @@ public partial class MainScene : Control
     }
 
     private const string BenchmarkArgumentPrefix = "--ui-bench=";
+    private const string DemoArgument = "--ui-demo";
     private const double BenchmarkSettleSeconds = 4.0;
 
     private async void RunBenchmarkIfRequested()
     {
         string[] userArguments = OS.GetCmdlineUserArgs();
         string benchmarkArgument = userArguments.FirstOrDefault(argument => argument.StartsWith(BenchmarkArgumentPrefix));
+        bool demoRequested = userArguments.Contains(DemoArgument);
 
-        if (benchmarkArgument == null)
+        if (benchmarkArgument == null && !demoRequested)
         {
             return;
         }
@@ -259,6 +261,14 @@ public partial class MainScene : Control
 
         ulong libraryReadyMilliseconds = Time.GetTicksMsec();
         await ToSignal(GetTree().CreateTimer(BenchmarkSettleSeconds), SceneTreeTimer.SignalName.Timeout);
+
+        if (demoRequested)
+        {
+            var demo = new UiDemo();
+            AddChild(demo);
+            demo.Begin(this);
+            return;
+        }
 
         var benchmark = new UiBenchmark();
         AddChild(benchmark);
@@ -285,9 +295,19 @@ public partial class MainScene : Control
     private const string LayoutCaptureThemeArgumentPrefix = "--ui-capture-theme=";
     private const string LayoutCaptureBackgroundArgumentPrefix = "--ui-capture-background=";
 
-    private string ActiveThemeName => CaptureArgument(LayoutCaptureThemeArgumentPrefix) ?? appInstance.configManager.AppTheme;
+    private string previewThemeName;
+    private string previewBackgroundName;
 
-    private string ActiveBackgroundName => CaptureArgument(LayoutCaptureBackgroundArgumentPrefix) ?? appInstance.configManager.AppBackground;
+    private string ActiveThemeName => previewThemeName ?? CaptureArgument(LayoutCaptureThemeArgumentPrefix) ?? appInstance.configManager.AppTheme;
+
+    private string ActiveBackgroundName => previewBackgroundName ?? CaptureArgument(LayoutCaptureBackgroundArgumentPrefix) ?? appInstance.configManager.AppBackground;
+
+    public void PreviewAppearance(string themeName, string backgroundName)
+    {
+        previewThemeName = themeName;
+        previewBackgroundName = backgroundName;
+        ApplyTheme();
+    }
 
     private static string CaptureArgument(string prefix)
     {
@@ -851,6 +871,8 @@ public partial class MainScene : Control
     }
 
     public bool IsAutomatedInputRunning { get; set; }
+
+    public bool HasOpenPanel => panelStack.HasOpenPanel;
 
     public override void _Input(InputEvent @event)
     {

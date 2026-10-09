@@ -48,7 +48,8 @@ require_assemblies build/windows/data_romm-frontend_windows_x86_64 Windows
 
 echo "Copying install_scripts and tools to Windows build..."
 copy_tree "install_scripts" "build/windows/install_scripts"
-copy_tree "tools" "build/windows/tools"
+rm -rf "build/windows/tools"
+copy_tree "tools/7zip" "build/windows/tools/7zip"
 
 echo "Exporting game to Linux..."
 mkdir -p build/linux
@@ -58,7 +59,8 @@ require_assemblies build/linux/data_romm-frontend_linuxbsd_x86_64 Linux
 
 echo "Copying install_scripts and tools to Linux build..."
 copy_tree "install_scripts" "build/linux/install_scripts"
-copy_tree "tools" "build/linux/tools"
+rm -rf "build/linux/tools"
+copy_tree "tools/7zip" "build/linux/tools/7zip"
 
 chmod +x "build/linux/romm-frontend.x86_64" "build/linux/tools/7zip/linux/7zz"
 

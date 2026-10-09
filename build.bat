@@ -41,7 +41,8 @@ if not exist "build\windows\data_romm-frontend_windows_x86_64\GodotSharp.dll" (
 
 echo Copying install_scripts and tools to Windows build...
 xcopy "install_scripts" "build\windows\install_scripts" /E /I /Y /Q
-xcopy "tools" "build\windows\tools" /E /I /Y /Q
+if exist "build\windows\tools" rmdir /s /q "build\windows\tools"
+xcopy "tools\7zip" "build\windows\tools\7zip" /E /I /Y /Q
 
 echo Exporting game to Linux...
 if not exist build\linux mkdir build\linux
@@ -58,7 +59,8 @@ if not exist "build\linux\data_romm-frontend_linuxbsd_x86_64\GodotSharp.dll" (
 
 echo Copying install_scripts and tools to Linux build...
 xcopy "install_scripts" "build\linux\install_scripts" /E /I /Y /Q
-xcopy "tools" "build\linux\tools" /E /I /Y /Q
+if exist "build\linux\tools" rmdir /s /q "build\linux\tools"
+xcopy "tools\7zip" "build\linux\tools\7zip" /E /I /Y /Q
 
 echo Build complete!
 if /i not "%~1"=="nopause" pause
