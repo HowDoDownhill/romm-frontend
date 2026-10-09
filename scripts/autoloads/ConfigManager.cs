@@ -33,6 +33,9 @@ public partial class ConfigManager : Node
     public string AppTheme { get; private set; }
     public string AppBackground { get; private set; }
     public string InterfaceSize { get; private set; }
+    public string GameListView { get; private set; }
+
+    public static readonly string[] GameListViews = { "Carousel", "Grid", "List" };
 
     public static readonly string[] InterfaceSizes = { "Auto", "85%", "100%", "115%", "130%", "150%" };
 
@@ -352,6 +355,7 @@ public partial class ConfigManager : Node
         AppTheme = (string)configurationFile.GetValue("UI", "AppTheme", "Default");
         AppBackground = (string)configurationFile.GetValue("UI", "AppBackground", "Flow");
         InterfaceSize = (string)configurationFile.GetValue("UI", "InterfaceSize", "Auto");
+        GameListView = (string)configurationFile.GetValue("UI", "GameListView", GameListViews[0]);
 
         EmulatorCloseHotkeyCount = (int)configurationFile.GetValue("Input", "EmulatorCloseHotkeyCount", DefaultEmulatorCloseHotkeyCount);
         var defaultHotkeyButtons = BuildDefaultEmulatorCloseHotkeys();
@@ -414,6 +418,7 @@ public partial class ConfigManager : Node
         AppTheme = "Default";
         AppBackground = "Flow";
         InterfaceSize = "Auto";
+        GameListView = GameListViews[0];
 
         EmulatorCloseHotkeyCount = DefaultEmulatorCloseHotkeyCount;
         EmulatorCloseHotkeys = BuildDefaultEmulatorCloseHotkeys();
@@ -450,6 +455,7 @@ public partial class ConfigManager : Node
         configurationFile.SetValue("UI", "AppTheme", AppTheme);
         configurationFile.SetValue("UI", "AppBackground", AppBackground);
         configurationFile.SetValue("UI", "InterfaceSize", InterfaceSize);
+        configurationFile.SetValue("UI", "GameListView", GameListView);
         configurationFile.SetValue("Input", "EmulatorCloseHotkeyCount", EmulatorCloseHotkeyCount);
         configurationFile.SetValue("Input", "EmulatorCloseHotkeys", EmulatorCloseHotkeys);
         configurationFile.SetValue("Input", "EmulatorCloseHoldSeconds", EmulatorCloseHoldSeconds);
@@ -535,6 +541,12 @@ public partial class ConfigManager : Node
     public void SaveAppBackground(string backgroundStyle)
     {
         AppBackground = backgroundStyle;
+        SaveConfig();
+    }
+
+    public void SaveGameListView(string gameListView)
+    {
+        GameListView = gameListView;
         SaveConfig();
     }
 

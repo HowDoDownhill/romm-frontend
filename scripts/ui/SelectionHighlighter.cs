@@ -13,7 +13,7 @@ public static class SelectionHighlighter
         viewport.GetTree().ProcessFrame += OnProcessFrame;
     }
 
-    public static void Set(Control item, Control area, bool selected)
+    public static void Set(Control item, Control area, bool selected, float grow = 0.0f)
     {
         if (!GodotObject.IsInstanceValid(item) || !GodotObject.IsInstanceValid(area) || item.GetParent() is not Control host || !host.IsInsideTree())
         {
@@ -28,7 +28,7 @@ public static class SelectionHighlighter
                 indicatorsByHost[host.GetInstanceId()] = indicator;
             }
 
-            indicator.MoveTo(area);
+            indicator.MoveTo(area, grow);
         }
 
         else if (indicatorsByHost.TryGetValue(host.GetInstanceId(), out SelectionIndicator indicator))

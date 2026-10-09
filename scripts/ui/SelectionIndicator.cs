@@ -13,6 +13,7 @@ public sealed class SelectionIndicator
     private readonly Control host;
     private readonly Rid canvasItem;
     private Control target;
+    private float grow;
     private Rect2 currentRect;
     private float alpha;
     private bool active;
@@ -27,9 +28,10 @@ public sealed class SelectionIndicator
 
     public bool IsHostValid => GodotObject.IsInstanceValid(host) && host.IsInsideTree();
 
-    public void MoveTo(Control area)
+    public void MoveTo(Control area, float areaGrow)
     {
         target = area;
+        grow = areaGrow;
         active = true;
 
         if (alpha < FreshStartAlpha && TryResolveTargetRect(out Rect2 startRect))
@@ -103,7 +105,7 @@ public sealed class SelectionIndicator
         Transform2D toHost = host.GetGlobalTransform().AffineInverse() * target.GetGlobalTransform();
         Vector2 start = toHost * Vector2.Zero;
         Vector2 end = toHost * target.Size;
-        rect = new Rect2(start, end - start).Abs();
+        rect = new Rect2(start, end - start).Abs().Grow(grow);
         return true;
     }
 }

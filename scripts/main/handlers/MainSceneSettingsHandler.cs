@@ -383,6 +383,31 @@ public class MainSceneSettingsHandler
         scrollContainer.AddChild(vbox);
         mainScene.sectionOptionsContainer.AddChild(formContainer);
 
+        HBoxContainer viewFieldBox = new HBoxContainer();
+        Label viewLabel = new Label();
+        viewLabel.Text = "Game View";
+        viewLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
+        viewFieldBox.AddChild(viewLabel);
+
+        CarouselButton viewOptionButton = new CarouselButton();
+
+        for (int i = 0; i < ConfigManager.GameListViews.Length; i++)
+        {
+            viewOptionButton.AddItem(ConfigManager.GameListViews[i], i);
+        }
+
+        viewOptionButton.Select(System.Math.Max(0, System.Array.IndexOf(ConfigManager.GameListViews, appInstance.configManager.GameListView)));
+        viewOptionButton.ItemSelected += (long index) =>
+        {
+            appInstance.configManager.SaveGameListView(ConfigManager.GameListViews[index]);
+            mainScene.SetGameListView((int)index);
+        };
+
+        viewFieldBox.AddChild(viewOptionButton);
+        var viewEntry = settingsListEntryScene.Instantiate<SettingsListEntry>();
+        viewEntry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(viewFieldBox);
+        vbox.AddChild(viewEntry);
+
         HBoxContainer fieldBox = new HBoxContainer();
 
         Label label = new Label();

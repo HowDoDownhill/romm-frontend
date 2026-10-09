@@ -41,7 +41,8 @@ The core logic of the application relies on Godot's AutoLoad (Singleton) system,
   - `scripts/login/` — Login and loading screen controllers (`LoginScreen.cs`, `LoadingScreen.cs`). The `LoadingScreen` handles cache-or-fetch logic, firmware sync, and firmware-to-system assignment.
   - `scripts/main/` — Main scene controller (`MainScene.cs`) and game grid items (`GameGridItem.cs`).
   - `scripts/scenes/` — Scene-specific controllers (currently contains `update/` placeholder).
-  - `scripts/ui/` — Custom UI components (`VerticalCarousel.cs` for 3D-like selection menus).
+  - `scripts/ui/` — Custom UI components. The game list views (`VerticalCarousel`, `GameGridView`,
+    `GameTextListView`) share a card pool in `GameListView`.
   - `scripts/utils/` — Utility classes (`UniversalInstaller.cs` for downloading and extracting emulators via GitHub API or direct URLs, with 7zip-based archive extraction).
 
 ## Core Data Models (`scripts/data/DataTypes.cs`)

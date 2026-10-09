@@ -28,21 +28,26 @@ public partial class MainSceneGameListHandler
         appInstance.downloadManager.DownloadProgressUpdated += OnDownloadProgressUpdated;
         appInstance.assetManager.AssetDownloaded += OnAssetDownloaded;
 
-        if (mainScene.gameList is VerticalCarousel gameCarousel)
+        foreach (GameListView view in mainScene.gameListViews)
         {
-            gameCarousel.ItemFactory = CreateGameCard;
-            gameCarousel.ItemBound += OnCarouselItemBound;
-            gameCarousel.ItemReleased += OnCarouselItemReleased;
+            view.ItemFactory = view switch
+            {
+                GameTextListView => CreateGameRow,
+                GameGridView => CreateGridCard,
+                _ => CreateGameCard
+            };
+            view.ItemBound += OnCarouselItemBound;
+            view.ItemReleased += OnCarouselItemReleased;
         }
     }
 
     public void Detach()
     {
-        if (mainScene.gameList is VerticalCarousel gameCarousel)
+        foreach (GameListView view in mainScene.gameListViews)
         {
-            gameCarousel.ItemFactory = null;
-            gameCarousel.ItemBound -= OnCarouselItemBound;
-            gameCarousel.ItemReleased -= OnCarouselItemReleased;
+            view.ItemFactory = null;
+            view.ItemBound -= OnCarouselItemBound;
+            view.ItemReleased -= OnCarouselItemReleased;
         }
 
         if (appInstance.downloadManager != null)
@@ -64,7 +69,7 @@ public partial class MainSceneGameListHandler
     {
         InvalidateCachedAssetTextures(gameId);
 
-        if ((assetType == "box3d" || assetType == "box2d") && cardByGameId.TryGetValue(gameId, out GameCard card))
+        if ((assetType == "box3d" || assetType == "box2d") && cardByGameId.TryGetValue(gameId, out Control card))
         {
             cardsWithLoadedCover.Remove(card);
 
@@ -122,13 +127,7 @@ public partial class MainSceneGameListHandler
 
     private void ScrollGameListTo(int gameIndex)
     {
-        if (mainScene.gameList == null)
-        {
-            return;
-        }
-
-        mainScene.gameList.Set("SelectedIndex", gameIndex);
-        mainScene.gameList.Call("UpdateLayout", true);
+        mainScene.ActiveGameList?.SelectIndex(gameIndex, true);
     }
 
     public void SelectGameOnceSystemSettles(int romId)
@@ -486,9 +485,9 @@ public partial class MainSceneGameListHandler
     }
 
     private const double ImageLoadBudgetMs = 4.0;
-    private readonly List<GameCard> pendingImageLoads = new List<GameCard>();
+    private readonly List<Control> pendingImageLoads = new List<Control>();
 
-    private void RequestImageLoad(GameCard entry)
+    private void RequestImageLoad(Control entry)
     {
         if (entry == null || pendingImageLoads.Contains(entry))
         {
@@ -508,7 +507,7 @@ public partial class MainSceneGameListHandler
 
         while (pendingImageLoads.Count > 0)
         {
-            GameCard entry = TakeTopmostPending();
+            Control entry = TakeTopmostPending();
 
             if (entry == null)
             {
@@ -524,7 +523,7 @@ public partial class MainSceneGameListHandler
         }
     }
 
-    private GameCard TakeTopmostPending()
+    private Control TakeTopmostPending()
     {
         pendingImageLoads.RemoveAll(candidate => !GodotObject.IsInstanceValid(candidate) || !candidate.Visible);
 
@@ -542,7 +541,7 @@ public partial class MainSceneGameListHandler
             }
         }
 
-        GameCard entry = pendingImageLoads[topmost];
+        Control entry = pendingImageLoads[topmost];
         pendingImageLoads.RemoveAt(topmost);
         return entry;
     }
@@ -560,7 +559,7 @@ public partial class MainSceneGameListHandler
 
         currentSystemControllerIcon = ResolveSystemControllerIcon();
 
-        if (mainScene.gameList is VerticalCarousel gameCarousel)
+        if (mainScene.ActiveGameList is GameListView gameCarousel)
         {
             int targetIndex = 0;
             if (currentlySelectedGame != null)
@@ -579,9 +578,9 @@ public partial class MainSceneGameListHandler
         }
     }
 
-    private readonly Dictionary<GameCard, Game> gameByCard = new Dictionary<GameCard, Game>();
-    private readonly Dictionary<int, GameCard> cardByGameId = new Dictionary<int, GameCard>();
-    private readonly HashSet<GameCard> cardsWithLoadedCover = new HashSet<GameCard>();
+    private readonly Dictionary<Control, Game> gameByCard = new Dictionary<Control, Game>();
+    private readonly Dictionary<int, Control> cardByGameId = new Dictionary<int, Control>();
+    private readonly HashSet<Control> cardsWithLoadedCover = new HashSet<Control>();
     private readonly Dictionary<string, Texture2D> platformIconsBySlug = new Dictionary<string, Texture2D>();
     private Texture2D currentSystemControllerIcon;
 
@@ -619,25 +618,45 @@ public partial class MainSceneGameListHandler
 
         GameCard card = mainScene.gameListEntryScene.Instantiate<GameCard>();
         card.FocusMode = Control.FocusModeEnum.All;
+        card.MouseFilter = Control.MouseFilterEnum.Pass;
         return card;
+    }
+
+    private Control CreateGridCard()
+    {
+        Control card = CreateGameCard();
+
+        if (card is GameCard gameCard)
+        {
+            GameGridView.ConfigureCard(gameCard);
+        }
+
+        return card;
+    }
+
+    private Control CreateGameRow()
+    {
+        return new GameListRow();
     }
 
     private void OnCarouselItemBound(Control boundControl, int itemIndex)
     {
-        if (boundControl is not GameCard card || currentlyShownGames == null || itemIndex < 0 || itemIndex >= currentlyShownGames.Count)
+        if (boundControl is not IGameListItem || currentlyShownGames == null || itemIndex < 0 || itemIndex >= currentlyShownGames.Count)
         {
             return;
         }
 
-        BindCardToGame(card, currentlyShownGames[itemIndex]);
+        BindCardToGame(boundControl, currentlyShownGames[itemIndex]);
     }
 
     private void OnCarouselItemReleased(Control releasedControl)
     {
-        if (releasedControl is not GameCard card)
+        if (releasedControl is not IGameListItem item)
         {
             return;
         }
+
+        Control card = releasedControl;
 
         pendingImageLoads.Remove(card);
 
@@ -645,7 +664,7 @@ public partial class MainSceneGameListHandler
         {
             appInstance.assetManager.CancelGameAssets(game.Id);
 
-            if (cardByGameId.TryGetValue(game.Id, out GameCard mappedCard) && mappedCard == card)
+            if (cardByGameId.TryGetValue(game.Id, out Control mappedCard) && mappedCard == card)
             {
                 cardByGameId.Remove(game.Id);
             }
@@ -653,28 +672,29 @@ public partial class MainSceneGameListHandler
 
         if (cardsWithLoadedCover.Remove(card))
         {
-            card.SetCover(mainScene.placeholderTexture, true);
+            item.SetCover(mainScene.placeholderTexture, true);
         }
     }
 
-    private void BindCardToGame(GameCard card, Game game)
+    private void BindCardToGame(Control card, Game game)
     {
+        var item = (IGameListItem)card;
         gameByCard[card] = game;
         cardByGameId[game.Id] = card;
         cardsWithLoadedCover.Remove(card);
 
-        card.Title = game.Name;
-        card.Selected = currentlySelectedGame != null && currentlySelectedGame.Id == game.Id;
-        card.SetCover(mainScene.placeholderTexture, true);
-        card.SetInstalledIcon(null);
-        card.ResetReveal();
+        item.Title = game.Name;
+        item.Selected = currentlySelectedGame != null && currentlySelectedGame.Id == game.Id;
+        item.SetCover(mainScene.placeholderTexture, true);
+        item.SetInstalledIcon(null);
+        item.ResetReveal();
 
         RequestImageLoad(card);
     }
 
-    private void LoadCoverForCard(GameCard card)
+    private void LoadCoverForCard(Control card)
     {
-        if (!GodotObject.IsInstanceValid(card) || cardsWithLoadedCover.Contains(card))
+        if (!GodotObject.IsInstanceValid(card) || cardsWithLoadedCover.Contains(card) || card is not IGameListItem item)
         {
             return;
         }
@@ -684,23 +704,30 @@ public partial class MainSceneGameListHandler
             return;
         }
 
-        card.SetInstalledIcon(CheckIfGameIsDownloaded(game) ? currentSystemControllerIcon : null);
+        item.SetInstalledIcon(CheckIfGameIsDownloaded(game) ? currentSystemControllerIcon : null);
+
+        if (!item.ShowsCover)
+        {
+            cardsWithLoadedCover.Add(card);
+            item.Reveal();
+            return;
+        }
 
         string coverPath = ResolveExistingCoverPath(game.Id);
 
         if (coverPath == null)
         {
             appInstance.assetManager.RequestGameAssets(game);
-            card.Reveal();
+            item.Reveal();
             return;
         }
 
         RequestAssetTexture(coverPath, CoverMaximumWidth, coverTexture => ApplyCoverToCard(card, game, coverTexture));
     }
 
-    private void ApplyCoverToCard(GameCard card, Game game, ImageTexture coverTexture)
+    private void ApplyCoverToCard(Control card, Game game, ImageTexture coverTexture)
     {
-        if (!GodotObject.IsInstanceValid(card) || !gameByCard.TryGetValue(card, out Game boundGame) || boundGame.Id != game.Id)
+        if (!GodotObject.IsInstanceValid(card) || card is not IGameListItem item || !gameByCard.TryGetValue(card, out Game boundGame) || boundGame.Id != game.Id)
         {
             return;
         }
@@ -708,17 +735,17 @@ public partial class MainSceneGameListHandler
         if (coverTexture == null)
         {
             appInstance.assetManager.RequestGameAssets(game);
-            card.Reveal();
+            item.Reveal();
             return;
         }
 
-        card.SetCover(coverTexture, false);
+        item.SetCover(coverTexture, false);
         cardsWithLoadedCover.Add(card);
-        card.Reveal();
+        item.Reveal();
 
-        if (mainScene.gameList is VerticalCarousel gameCarousel && !gameCarousel.IsAnimating)
+        if (mainScene.ActiveGameList is GameListView activeView && !activeView.IsAnimating)
         {
-            gameCarousel.CallDeferred(VerticalCarousel.MethodName.UpdateLayout, false);
+            Callable.From(() => activeView.UpdateLayout(false)).CallDeferred();
         }
     }
 
@@ -751,7 +778,7 @@ public partial class MainSceneGameListHandler
         {
             if (GodotObject.IsInstanceValid(boundCard.Key))
             {
-                boundCard.Key.Selected = currentlySelectedGame != null && boundCard.Value.Id == currentlySelectedGame.Id;
+                ((IGameListItem)boundCard.Key).Selected = currentlySelectedGame != null && boundCard.Value.Id == currentlySelectedGame.Id;
             }
         }
     }
@@ -1408,12 +1435,12 @@ public partial class MainSceneGameListHandler
 
     public void OnJumpSectionRequested(int direction)
     {
-        if (currentlyShownGames == null || currentlyShownGames.Count == 0 || mainScene.gameList == null)
+        if (currentlyShownGames == null || currentlyShownGames.Count == 0 || mainScene.ActiveGameList == null)
         {
             return;
         }
 
-        int currentIndex = (int)mainScene.gameList.Get("SelectedIndex");
+        int currentIndex = mainScene.ActiveGameList.SelectedIndex;
 
         if (currentIndex < 0 || currentIndex >= currentlyShownGames.Count)
         {
@@ -1489,8 +1516,7 @@ public partial class MainSceneGameListHandler
 
         if (targetIndex != currentIndex)
         {
-            mainScene.gameList.Set("SelectedIndex", targetIndex);
-            mainScene.gameList.Call("UpdateLayout", true);
+            mainScene.ActiveGameList.SelectIndex(targetIndex, true);
             OnGameSelected(targetIndex);
         }
     }

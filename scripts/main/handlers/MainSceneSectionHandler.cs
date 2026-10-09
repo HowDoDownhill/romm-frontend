@@ -189,7 +189,7 @@ public class MainSceneSectionHandler
         if (target == Section.GameList && mainScene.gameList != null)
         {
             mainScene.gameList.GrabFocus();
-            mainScene.GameListHandler.OnGameSelected((long)mainScene.gameList.Get("SelectedIndex"));
+            mainScene.GameListHandler.OnGameSelected(mainScene.ActiveGameList?.SelectedIndex ?? 0);
         }
     }
 }

@@ -64,7 +64,7 @@ public partial class UiBenchmark : Node
 
     private string DescribeState()
     {
-        int gameIndex = (mainScene.gameList as VerticalCarousel)?.SelectedIndex ?? -1;
+        int gameIndex = mainScene.ActiveGameList?.SelectedIndex ?? -1;
         int gameCount = mainScene.gameList?.GetChildCount() ?? 0;
         return $"game {gameIndex}/{gameCount}, system {mainScene.systemCarousel?.SelectedIndex}";
     }

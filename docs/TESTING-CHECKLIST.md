@@ -48,6 +48,10 @@ Delete (or move aside) `config.cfg`, `games.cache`, `systems.cache`, `emulators/
 - [ ] Cover art, marquees and screenshots download in the background and appear without a restart.
 - [ ] "Hide games without box art" and "Show all systems" both take effect.
 - [ ] Fuzzy search filters; an empty buffer does not filter.
+- [ ] Game View (Carousel, Grid, List) switches immediately, keeps the selected game, and persists
+      across a restart. In each view: d-pad and mouse wheel move the selection, clicking selects,
+      double-clicking plays or downloads, and switching systems and the Installed filter rebind it.
+      Grid cells fit both square (Dreamcast) and tall (PlayStation 2) boxes.
 - [ ] Cache rebuild (delete cache files, re-fetch from the loading screen) works.
 - [ ] Startup from a warm cache: the `[Startup]` log line shows `auth done` under a second after
       `auth start` on both OSes (5 s there means the IPv6 lookup stall is back), and

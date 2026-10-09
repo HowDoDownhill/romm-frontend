@@ -537,10 +537,9 @@ public class MainScenePopupHandler
             int randomIndex = new Random().Next(mainScene.GameListHandler.currentlyShownGames.Count);
             mainScene.GameListHandler.OnGameSelected(randomIndex);
 
-            if (mainScene.gameList != null && mainScene.gameList.HasMethod("Refresh"))
+            if (mainScene.ActiveGameList != null)
             {
-                mainScene.gameList.Set("SelectedIndex", randomIndex);
-                mainScene.gameList.Call("Refresh");
+                mainScene.ActiveGameList.SelectIndex(randomIndex, false);
             }
 
             mainScene.startMenuPanel?.Close();

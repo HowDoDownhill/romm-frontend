@@ -1,6 +1,6 @@
 using Godot;
 
-public partial class GameCard : Control, ICarouselItem
+public partial class GameCard : Control, ICarouselItem, IGameListItem
 {
     private const float CardPadding = 12.0f;
     private const float RevealDuration = 0.18f;
@@ -28,13 +28,17 @@ public partial class GameCard : Control, ICarouselItem
 
     public bool HasRealCover { get; private set; }
 
+    public bool ShowsCover => true;
+
+    public bool CaptionEnabled { get; set; } = true;
+
     public void SetCover(Texture2D texture, bool isPlaceholder)
     {
         HasRealCover = !isPlaceholder && texture != null;
         CoverRect.Texture = texture;
 
         TitleLabel.Visible = !HasRealCover;
-        CaptionLabel.Visible = HasRealCover;
+        CaptionLabel.Visible = HasRealCover && CaptionEnabled;
     }
 
     public void Reveal()

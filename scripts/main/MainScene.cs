@@ -13,6 +13,9 @@ public partial class MainScene : Control
     [Export] public Control gameList;
     [Export] public PackedScene gameListEntryScene;
 
+    public readonly List<GameListView> gameListViews = new List<GameListView>();
+    public GameListView ActiveGameList => gameList as GameListView;
+
     private const float ControllerLayerOfferDelaySeconds = 1.5f;
 
     public Button assignControllersButton => startMenuPanel?.assignControllersButton;
@@ -123,7 +126,9 @@ public partial class MainScene : Control
         margin.AddChild(fuzzySearchLabel);
         fuzzySearchPopup.ContentRoot.AddChild(margin);
 
+        CreateGameListViews();
         GameListHandler = new MainSceneGameListHandler(this, appInstance);
+        SetGameListView(System.Array.IndexOf(ConfigManager.GameListViews, appInstance.configManager.GameListView));
         DownloadHandler = new MainSceneDownloadHandler(this, appInstance);
         NetplayHandler = new MainSceneNetplayHandler(this, appInstance);
         NetplayHandler.Initialise();
@@ -210,11 +215,12 @@ public partial class MainScene : Control
 
         GameListHandler.SelectSystemByIndex(0);
 
-        if (gameList != null)
+        foreach (GameListView view in gameListViews)
         {
-            gameList.Connect("ItemSelected", Callable.From<long>(GameListHandler.OnGameSelected));
-            gameList.Connect("ItemFocused", Callable.From<long>(GameListHandler.OnGameSelected));
-            gameList.Connect("JumpSectionRequested", Callable.From<int>(GameListHandler.OnJumpSectionRequested));
+            view.ItemSelected += GameListHandler.OnGameSelected;
+            view.ItemFocused += GameListHandler.OnGameSelected;
+            view.ItemActivated += index => OnPlayDownloadButtonPressed();
+            view.JumpSectionRequested += GameListHandler.OnJumpSectionRequested;
         }
 
         DownloadHandler.SetupDownloadsList();
@@ -246,7 +252,7 @@ public partial class MainScene : Control
 
         ApplyCaptureWindowSize(userArguments);
 
-        while (gameList is not VerticalCarousel benchCarousel || benchCarousel.ItemCount == 0)
+        while (ActiveGameList == null || ActiveGameList.ItemCount == 0)
         {
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         }
@@ -300,6 +306,8 @@ public partial class MainScene : Control
             case "downloads": SectionHandler.ShowSection(MainSceneSectionHandler.Section.Downloads, false); break;
             case "start": ToggleStartMenu(); break;
             case "jump": OpenSystemJumpPopup(); break;
+            case "grid": CaptureGameListView(1, 5); break;
+            case "list": CaptureGameListView(2, 6); break;
         }
 
         await ToSignal(GetTree().CreateTimer(LayoutCaptureSettleSeconds - LayoutCaptureViewDelaySeconds), SceneTreeTimer.SignalName.Timeout);
@@ -310,6 +318,13 @@ public partial class MainScene : Control
         string openPanel = panelStack.TopPanel?.Name ?? "none";
         GD.Print($"[Layout] captured {capturedFrame.GetWidth()}x{capturedFrame.GetHeight()} (canvas {GetViewportRect().Size}, carousel {gameList?.Size}, details {detailsPanel?.Size}, open panel {openPanel}, section {SectionHandler?.CurrentSection}) to {capturePath}: {saveResult}");
         GetTree().Quit();
+    }
+
+    private void CaptureGameListView(int viewIndex, int selectedIndex)
+    {
+        SetGameListView(viewIndex);
+        ActiveGameList?.GrabFocus();
+        ActiveGameList?.SelectIndex(selectedIndex, true);
     }
 
     public override void _ExitTree()
@@ -652,6 +667,56 @@ public partial class MainScene : Control
         GameListHandler.ApplyFiltersWithFade();
     }
 
+    private void CreateGameListViews()
+    {
+        if (gameList is not GameListView carouselView)
+        {
+            return;
+        }
+
+        gameListViews.Add(carouselView);
+
+        foreach (GameListView extraView in new GameListView[] { new GameGridView { Name = "GameGrid" }, new GameTextListView { Name = "GameTextList" } })
+        {
+            extraView.SizeFlagsHorizontal = carouselView.SizeFlagsHorizontal;
+            extraView.SizeFlagsVertical = carouselView.SizeFlagsVertical;
+            extraView.Visible = false;
+            carouselView.AddSibling(extraView);
+            gameListViews.Add(extraView);
+        }
+    }
+
+    public void SetGameListView(int viewIndex)
+    {
+        if (viewIndex < 0 || viewIndex >= gameListViews.Count || gameListViews[viewIndex] == gameList)
+        {
+            return;
+        }
+
+        GameListView previousView = ActiveGameList;
+        bool hadFocus = previousView != null && previousView.HasFocus();
+
+        if (previousView != null)
+        {
+            previousView.ReloadItems(0, 0);
+            previousView.Visible = false;
+        }
+
+        GameListView nextView = gameListViews[viewIndex];
+        nextView.Visible = true;
+        gameList = nextView;
+
+        if (GameListHandler.currentlyShownGames != null)
+        {
+            GameListHandler.RefreshGameList();
+        }
+
+        if (hadFocus)
+        {
+            nextView.GrabFocus();
+        }
+    }
+
     private void OnPlayDownloadButtonPressed()
     {
         if (NetplayHandler != null && NetplayHandler.HandleGameConfirmedInLobby())
@@ -775,10 +840,9 @@ public partial class MainScene : Control
         if (@event is InputEventMouseButton wheelEvent && wheelEvent.Pressed
             && (wheelEvent.ButtonIndex == MouseButton.WheelUp || wheelEvent.ButtonIndex == MouseButton.WheelDown)
             && IsMouseOverGameList()
-            && gameList is VerticalCarousel gameCarousel)
+            && ActiveGameList is GameListView wheelView)
         {
-            if (wheelEvent.ButtonIndex == MouseButton.WheelDown) gameCarousel.SelectNext();
-            else gameCarousel.SelectPrevious();
+            wheelView.ScrollStep(wheelEvent.ButtonIndex == MouseButton.WheelDown ? 1 : -1);
             GetViewport().SetInputAsHandled();
             return;
         }
@@ -1161,10 +1225,9 @@ public partial class MainScene : Control
                     if (matchIndex != -1)
                     {
                         GameListHandler.OnGameSelected(matchIndex);
-                        if (gameList != null && gameList.HasMethod("Refresh"))
+                        if (ActiveGameList != null)
                         {
-                            gameList.Set("SelectedIndex", matchIndex);
-                            gameList.Call("Refresh");
+                            ActiveGameList.SelectIndex(matchIndex, false);
                         }
                     }
                 }

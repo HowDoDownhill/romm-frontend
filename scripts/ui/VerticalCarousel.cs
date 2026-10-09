@@ -1,8 +1,7 @@
 using Godot;
-using System;
 using System.Collections.Generic;
 
-public partial class VerticalCarousel : Control
+public partial class VerticalCarousel : GameListView
 {
     [Export] public float itemSpacing = 160.0f;
     [Export] public float depthOffset = 80.0f;
@@ -21,140 +20,8 @@ public partial class VerticalCarousel : Control
     [Export] public Vector2 referenceCanvasSize = new Vector2(1920, 1080);
     [Export] public Vector2 referenceCarouselSize = new Vector2(945, 873);
 
-    public int SelectedIndex = 0;
-    public int ItemCount { get; private set; }
     private Tween tween;
-    public bool IsAnimating => tween != null && tween.IsValid() && tween.IsRunning();
-
-    public Func<Control> ItemFactory;
-    public event Action<Control, int> ItemBound;
-    public event Action<Control> ItemReleased;
-
-    private readonly Dictionary<int, Control> cardsByItemIndex = new Dictionary<int, Control>();
-    private readonly Stack<Control> idleCards = new Stack<Control>();
-
-    public IReadOnlyDictionary<int, Control> BoundCards => cardsByItemIndex;
-
-    [Signal]
-    public delegate void ItemSelectedEventHandler(long index);
-
-    [Signal]
-    public delegate void ItemFocusedEventHandler(long index);
-
-    [Signal]
-    public delegate void JumpSectionRequestedEventHandler(int direction);
-
-    public override void _Ready()
-    {
-        FocusMode = FocusModeEnum.All;
-        ClipContents = true;
-    }
-
-    public override void _GuiInput(InputEvent @event)
-    {
-        if (ItemCount == 0)
-        {
-            return;
-        }
-
-        if (@event.IsActionPressed("ui_down", true))
-        {
-            SelectNext();
-            AcceptEvent();
-        }
-
-        else if (@event.IsActionPressed("ui_up", true))
-        {
-            SelectPrevious();
-            AcceptEvent();
-        }
-
-        else if (@event.IsActionPressed("ui_accept"))
-        {
-            EmitSignal(SignalName.ItemSelected, SelectedIndex);
-            AcceptEvent();
-        }
-
-        else if (@event.IsActionPressed("ui_right", true))
-        {
-            EmitSignal(SignalName.JumpSectionRequested, 1);
-            AcceptEvent();
-        }
-
-        else if (@event.IsActionPressed("ui_left", true))
-        {
-            EmitSignal(SignalName.JumpSectionRequested, -1);
-            AcceptEvent();
-        }
-    }
-
-    public void SelectNext()
-    {
-        if (ItemCount == 0) return;
-        SelectedIndex = (SelectedIndex + 1) % ItemCount;
-        UpdateLayout(true);
-    }
-
-    public void SelectPrevious()
-    {
-        if (ItemCount == 0) return;
-        SelectedIndex = (SelectedIndex - 1 + ItemCount) % ItemCount;
-        UpdateLayout(true);
-    }
-
-    public void ReloadItems(int itemCount, int selectedIndex)
-    {
-        foreach (int itemIndex in new List<int>(cardsByItemIndex.Keys))
-        {
-            ReleaseCard(itemIndex);
-        }
-
-        ItemCount = Math.Max(0, itemCount);
-        SelectedIndex = ItemCount == 0 ? 0 : Math.Clamp(selectedIndex, 0, ItemCount - 1);
-        UpdateLayout(false);
-    }
-
-    public void Refresh()
-    {
-        if (SelectedIndex >= ItemCount && ItemCount > 0)
-        {
-            SelectedIndex = ItemCount - 1;
-        }
-
-        UpdateLayout(false);
-    }
-
-    private void ReleaseCard(int itemIndex)
-    {
-        if (!cardsByItemIndex.Remove(itemIndex, out Control card))
-        {
-            return;
-        }
-
-        card.Visible = false;
-        ItemReleased?.Invoke(card);
-        idleCards.Push(card);
-    }
-
-    private Control AcquireCard(int itemIndex)
-    {
-        Control card = idleCards.Count > 0 ? idleCards.Pop() : ItemFactory?.Invoke();
-
-        if (card == null)
-        {
-            return null;
-        }
-
-        if (card.GetParent() == null)
-        {
-            AddChild(card);
-        }
-
-        cardsByItemIndex[itemIndex] = card;
-        card.Visible = true;
-        ItemBound?.Invoke(card, itemIndex);
-        return card;
-    }
+    public override bool IsAnimating => tween != null && tween.IsValid() && tween.IsRunning();
 
     private Vector2 ResolveEffectiveCanvasSize()
     {
@@ -223,7 +90,7 @@ public partial class VerticalCarousel : Control
         return window;
     }
 
-    public void UpdateLayout(bool animated = true)
+    public override void UpdateLayout(bool animated = true)
     {
         if (tween != null && tween.IsValid())
         {
@@ -232,11 +99,7 @@ public partial class VerticalCarousel : Control
 
         if (ItemCount == 0)
         {
-            foreach (int itemIndex in new List<int>(cardsByItemIndex.Keys))
-            {
-                ReleaseCard(itemIndex);
-            }
-
+            ReleaseAllCards();
             return;
         }
 
@@ -248,13 +111,7 @@ public partial class VerticalCarousel : Control
             itemsInWindow.Add(entry.ItemIndex);
         }
 
-        foreach (int itemIndex in new List<int>(cardsByItemIndex.Keys))
-        {
-            if (!itemsInWindow.Contains(itemIndex))
-            {
-                ReleaseCard(itemIndex);
-            }
-        }
+        ReleaseCardsOutside(itemsInWindow);
 
         if (animated)
         {
@@ -273,16 +130,9 @@ public partial class VerticalCarousel : Control
 
         foreach (var (itemIndex, offset) in window)
         {
-            bool isNewlyBound = !cardsByItemIndex.TryGetValue(itemIndex, out Control child);
-
-            if (isNewlyBound)
+            if (!TryGetOrAcquireCard(itemIndex, out Control child, out bool isNewlyBound))
             {
-                child = AcquireCard(itemIndex);
-
-                if (child == null)
-                {
-                    continue;
-                }
+                continue;
             }
 
             if (scaleItemsToWindow)
@@ -343,13 +193,5 @@ public partial class VerticalCarousel : Control
         }
 
         EmitSignal(SignalName.ItemFocused, SelectedIndex);
-    }
-
-    public override void _Notification(int what)
-    {
-        if (what == NotificationResized)
-        {
-            UpdateLayout(false);
-        }
     }
 }

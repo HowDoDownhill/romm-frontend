@@ -1476,6 +1476,37 @@ its target directly, which is what the old hidden-then-shown card did too. `Relo
 changed path; `Refresh` and `UpdateLayout` keep existing bindings. Wraparound is unchanged: with fewer
 items than the window, each item takes its wrapped offset as before.
 
+### Three game views share one pool
+The game list can be a carousel, an art grid or a text list (Game List Settings > Game View, stored
+as `UI/GameListView`). The pool, selection, signals and default input moved from `VerticalCarousel`
+into `GameListView`; each view only lays out its window. `MainScene` builds the grid and list views at
+startup as hidden siblings of the scene's carousel node, and `SetGameListView` empties the old view,
+shows the new one and points `gameList` at it, so the handler's existing `RefreshGameList` rebinds it
+around the current game. Callers select through `SelectIndex(index, animated)`; the old string
+`Set("SelectedIndex")` and `Call("UpdateLayout")` calls are gone.
+
+The handler binds `IGameListItem`, which `GameCard` and `GameListRow` implement. A row reports
+`ShowsCover = false`, so the text list never decodes covers or requests cover downloads for the rows
+it shows; it still gets the installed icon.
+
+`ScrollingGameListView` holds what the grid and list share: cards live in a content node that moves
+by the scroll offset, the offset eases toward its target (rate 16), and the selection highlight is a
+`SelectionIndicator` hosted in that content node. Scrolling moves highlight and cards together, and
+the highlight glides only between items. A jump further than two screens (fuzzy search, random game,
+wrapping) snaps the scroll.
+
+Grid: about 2.6 rows fit the view, which gives four columns at 1080p (3 to 8 allowed). Cells start at
+1.4 tall per wide and then take the tallest loaded card in the current system, clamped to 0.6-1.6, so
+square Dreamcast boxes and wide SNES boxes both fill their cells; the tallest-seen value resets on each
+reload so cells never shrink mid-browse. Grid cards hide the caption (the details panel shows the
+name); a card with no cover still shows its title. The d-pad moves in two dimensions, so the A-Z
+letter jump on left/right is only in the carousel and the list.
+
+List: rows are sized from the theme's body font, and the selection stays three rows from either edge.
+
+Mouse: clicking a game selects it in every view, and double-clicking the selected game runs the same
+action as the play button (`ItemActivated`). Game cards pass mouse events up to the view for this.
+
 ### Image decoding runs on worker threads
 Covers, the details banner and cover, and screenshot thumbnails were decoded on the main thread
 (PNG/JPEG/WebP from buffer), about 5-8 ms each, and a single large cover overran the per-frame budget
