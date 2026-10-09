@@ -1149,6 +1149,17 @@ on each step: `SystemCarousel.PulseArrow` in the header, `CarouselButton.Step` i
 
 Settings rows and sidebar entries share `FocusHighlight`: a 12% white fill with a 16% hairline edge
 and 10-unit radius, faded in 0.12 s. The previous 50% white block left white text at poor contrast.
+The start menu and its BIOS list use the `ListButton` theme variation, the same look as static theme
+styleboxes (transparent at rest, 6% on hover, 18% pressed, the 12% + hairline edge on focus), in place
+of a dark slab behind every item with Godot's outline focus box.
+
+Progress bars are styled once in the theme: a 12-unit rounded track at 10% white and a rounded fill
+with a soft glow (`shadow_size` 6 at 35%). The percentage text Godot draws inside the bar is off on
+every bar; the surrounding labels already state progress. `MainScene.ApplyProgressBarAccent` tints
+the fill from the app theme: the hue of whichever of `primary` / `secondary` is more vivid
+(saturation x value), at saturation 0.5 and full value. Lightening the theme colour toward white
+instead turned every dark theme into the same washed-out grey-blue. The loading screen runs before
+any theme is applied and shows the theme file's default fill.
 
 Larger text needed two layout changes. The settings sidebar scrolled sideways once names outgrew it;
 horizontal scrolling is off and labels end in an ellipsis. Footer buttons had a 300-unit minimum

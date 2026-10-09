@@ -37,4 +37,5 @@ layout_mode = 2
 
 [node name="ProgressBar" type="ProgressBar" parent="Panel/VBoxContainer" unique_id=67073736]
 layout_mode = 2
+show_percentage = false
 

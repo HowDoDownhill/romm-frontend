@@ -74,4 +74,5 @@ theme_override_constants/margin_bottom = 5
 
 [node name="ProgressBar" type="ProgressBar" parent="Panel/MarginContainer/VBoxContainer/ProgressContainer"]
 layout_mode = 2
+show_percentage = false
 size_flags_vertical = 8

@@ -423,6 +423,7 @@ public class MainScenePopupHandler
                 Button btn = new Button();
                 btn.Text = fileName;
                 btn.Alignment = HorizontalAlignment.Left;
+                btn.ThemeTypeVariation = "ListButton";
                 btn.Pressed += () =>
                 {
                     system.PrefferedFirmware = firmwareDir.PathJoin(fileName);

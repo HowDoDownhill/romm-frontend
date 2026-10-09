@@ -370,7 +370,26 @@ public partial class MainScene : Control
 
             systemJumpPopup?.ApplyTheme(colors.Secondary);
             releasePickerPopup?.ApplyTheme(colors.Secondary);
+            ApplyProgressBarAccent(colors.Primary, colors.Secondary);
         }
+    }
+
+    private const float ProgressAccentSaturation = 0.5f;
+    private const float ProgressAccentValue = 1.0f;
+    private const float ProgressGlowAlpha = 0.35f;
+
+    private static void ApplyProgressBarAccent(Color primary, Color secondary)
+    {
+        if (ThemeDB.GetProjectTheme()?.GetStylebox("fill", "ProgressBar") is not StyleBoxFlat fill)
+        {
+            return;
+        }
+
+        Color source = primary.S * primary.V >= secondary.S * secondary.V ? primary : secondary;
+        Color accent = Color.FromHsv(source.H, ProgressAccentSaturation, ProgressAccentValue);
+
+        fill.BgColor = accent;
+        fill.ShadowColor = new Color(accent, ProgressGlowAlpha);
     }
 
     private bool TryResolveThemeColors(out (Color Bg, Color Primary, Color Secondary, Color Panel) colors)

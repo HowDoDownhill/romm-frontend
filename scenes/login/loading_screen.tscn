@@ -53,3 +53,4 @@ text = "Fetching Game List..."
 
 [node name="ProgressBar" type="ProgressBar" parent="TextureRect/Panel/MarginContainer/VBoxContainer" unique_id=1954517853]
 layout_mode = 2
+show_percentage = false

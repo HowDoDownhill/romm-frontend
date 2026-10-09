@@ -79,55 +79,68 @@ layout_mode = 2
 theme_override_constants/separation = 5
 
 [node name="LaunchEmulatorButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+theme_type_variation = &"ListButton"
 layout_mode = 2
 text = "Launch Current Emulator"
 
 [node name="UpdateEmulatorButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+theme_type_variation = &"ListButton"
 layout_mode = 2
 text = "Update Current Emulator"
 
 [node name="UninstallEmulatorButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+theme_type_variation = &"ListButton"
 layout_mode = 2
 text = "Uninstall Current Emulator"
 
 [node name="SelectBiosButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+theme_type_variation = &"ListButton"
 layout_mode = 2
 text = "Select Bios For Emulator"
 
 [node name="FavoriteGameButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+theme_type_variation = &"ListButton"
 layout_mode = 2
 text = "Add to Favorites"
 
 [node name="HostNetplayButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+theme_type_variation = &"ListButton"
 layout_mode = 2
 text = "Host Session"
 
 [node name="JoinNetplayButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+theme_type_variation = &"ListButton"
 layout_mode = 2
 text = "Join Session"
 
 [node name="AssignControllersButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+theme_type_variation = &"ListButton"
 layout_mode = 2
 text = "Assign Controllers"
 
 [node name="SettingsButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+theme_type_variation = &"ListButton"
 layout_mode = 2
 text = "Settings"
 
 [node name="RandomGameButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+theme_type_variation = &"ListButton"
 layout_mode = 2
 text = "Jump to Random Game"
 
 [node name="RefreshAllGamesButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+theme_type_variation = &"ListButton"
 layout_mode = 2
 text = "Refresh All Games"
 
 [node name="RefreshCurrentSystemsGamesButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+theme_type_variation = &"ListButton"
 layout_mode = 2
 text = "Refresh Current System
 "
 
 [node name="QuitButton" type="Button" parent="Panel/StartMenuContainer/StartMenu"]
+theme_type_variation = &"ListButton"
 layout_mode = 2
 text = "Quit"
 

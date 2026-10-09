@@ -339,6 +339,7 @@ theme_override_constants/margin_bottom = 5
 
 [node name="ProgressBar" type="ProgressBar" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/DetailsPanel/DownloadProgressContainer" unique_id=728023740]
 layout_mode = 2
+show_percentage = false
 
 [node name="DownloadsPageContainer" type="Control" parent="Background/VBoxContainer" unique_id=1554522468 node_paths=PackedStringArray("ContentRoot")]
 visible = false
