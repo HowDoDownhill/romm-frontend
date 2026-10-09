@@ -1149,9 +1149,22 @@ on each step: `SystemCarousel.PulseArrow` in the header, `CarouselButton.Step` i
 
 Settings rows and sidebar entries share `FocusHighlight`: a 12% white fill with a 16% hairline edge
 and 10-unit radius, faded in 0.12 s. The previous 50% white block left white text at poor contrast.
-The start menu and its BIOS list use the `ListButton` theme variation, the same look as static theme
-styleboxes (transparent at rest, 6% on hover, 18% pressed, the 12% + hairline edge on focus), in place
-of a dark slab behind every item with Godot's outline focus box.
+Every other selectable list item uses the same look. Download entries use `FocusHighlight` with
+16x10 padding (their text sits directly in the highlighted panel). Buttons use the `ListButton` theme
+variation, the same look as static theme styleboxes: transparent at rest and on hover, 18% pressed,
+the 12% fill and hairline edge on focus. That covers the start menu and BIOS list, the release picker,
+the system-jump tiles, the netplay lobby buttons, the login button, and the controller-mapping and
+close-hotkey value buttons; `TitleButton` (changelog and confirmation buttons) carries the same
+styles. The popups used to fill the selection with the theme accent at 65%, and the rest drew Godot's
+grey box with an outline.
+
+Hover is transparent on purpose. `MainScene.UpdateMouseFocus` moves focus to whatever the pointer is
+over, so a hovered button is already focused, and a hover fill only stacked on top of the focus fill
+(about 18%), the washed-out look this replaced. It also no longer moves focus onto disabled buttons.
+
+Changing the base `Button` styles instead was rejected: theme lookup checks the project theme for
+`Button` before Godot's default theme for `CheckButton` and `OptionButton`, so those controls would
+have picked up list styling too.
 
 Progress bars are styled once in the theme: a 12-unit rounded track at 10% white and a rounded fill
 with a soft glow (`shadow_size` 6 at 35%). The percentage text Godot draws inside the bar is off on

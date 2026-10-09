@@ -6,7 +6,6 @@ public partial class SystemJumpPopup : UiPanel
     private GridContainer gridContainer;
     private List<GameSystem> systems;
 
-    private Color focusColor = new Color(1, 1, 1, 0.6f);
 
     [Signal]
     public delegate void SystemSelectedEventHandler(int index);
@@ -53,7 +52,7 @@ public partial class SystemJumpPopup : UiPanel
 
             var entryBtn = new Button();
             entryBtn.CustomMinimumSize = new Vector2(150, 180);
-            StyleEntryButton(entryBtn);
+            entryBtn.ThemeTypeVariation = "ListButton";
 
             var vbox = new VBoxContainer();
             vbox.SetAnchorsPreset(LayoutPreset.FullRect);
@@ -83,30 +82,6 @@ public partial class SystemJumpPopup : UiPanel
         }
     }
 
-    private void StyleEntryButton(Button entryBtn)
-    {
-        var btnStyle = new StyleBoxFlat { BgColor = new Color(0, 0, 0, 0), CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8, CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8 };
-        var focusStyle = new StyleBoxFlat { BgColor = focusColor, CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8, CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8 };
-
-        entryBtn.AddThemeStyleboxOverride("normal", btnStyle);
-        entryBtn.AddThemeStyleboxOverride("hover", focusStyle);
-        entryBtn.AddThemeStyleboxOverride("focus", focusStyle);
-        entryBtn.AddThemeStyleboxOverride("pressed", focusStyle);
-    }
-
-    public void ApplyTheme(Color accentColor)
-    {
-        accentColor.A = 0.65f;
-        focusColor = accentColor;
-
-        if (gridContainer != null)
-        {
-            foreach (Node child in gridContainer.GetChildren())
-            {
-                if (child is Button btn) StyleEntryButton(btn);
-            }
-        }
-    }
 
     private Texture2D FindPlatformIcon(string stub, string basePath, string[] extensions)
     {

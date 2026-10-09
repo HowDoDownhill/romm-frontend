@@ -125,6 +125,7 @@ placeholder_text = "Get this from RomM."
 secret = true
 
 [node name="Login Button" type="Button" parent="TextureRect/Background/PanelContainer/MarginContainer/VBoxContainer" unique_id=1202995306]
+theme_type_variation = &"ListButton"
 layout_mode = 2
 size_flags_horizontal = 4
 size_flags_vertical = 4

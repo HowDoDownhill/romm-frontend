@@ -7,7 +7,7 @@ public static class FocusHighlight
     private const int CornerRadius = 10;
     private const float FadeSeconds = 0.12f;
 
-    public static StyleBoxFlat CreateStyle()
+    public static StyleBoxFlat CreateStyle(float horizontalPadding = -1, float verticalPadding = -1)
     {
         var style = new StyleBoxFlat
         {
@@ -19,6 +19,19 @@ public static class FocusHighlight
 
         style.SetBorderWidthAll(1);
         style.SetCornerRadiusAll(CornerRadius);
+
+        if (horizontalPadding >= 0)
+        {
+            style.ContentMarginLeft = horizontalPadding;
+            style.ContentMarginRight = horizontalPadding;
+        }
+
+        if (verticalPadding >= 0)
+        {
+            style.ContentMarginTop = verticalPadding;
+            style.ContentMarginBottom = verticalPadding;
+        }
+
         return style;
     }
 

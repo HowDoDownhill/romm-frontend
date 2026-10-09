@@ -541,6 +541,7 @@ public class MainSceneSettingsHandler
         vbox.AddChild(holdEntry);
 
         mainScene.emulatorCloseHotkeysBtn = new Button();
+        mainScene.emulatorCloseHotkeysBtn.ThemeTypeVariation = "ListButton";
         mainScene.InputHandler.UpdateEmulatorCloseHotkeysBtnText();
 
         mainScene.emulatorCloseHotkeysBtn.Pressed += () =>

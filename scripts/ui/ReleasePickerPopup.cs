@@ -8,7 +8,6 @@ public partial class ReleasePickerPopup : UiPanel
     private VBoxContainer releaseListContainer;
     private ScrollContainer scrollContainer;
 
-    private Color focusColor = new Color(1, 1, 1, 0.6f);
 
     public string EmulatorName { get; private set; }
     public List<ReleaseOption> Releases { get; private set; } = new List<ReleaseOption>();
@@ -100,7 +99,7 @@ public partial class ReleasePickerPopup : UiPanel
                 CustomMinimumSize = new Vector2(400, 44)
             };
             entryBtn.Text = BuildEntryText(release, installedVersion);
-            StyleEntryButton(entryBtn);
+            entryBtn.ThemeTypeVariation = "ListButton";
 
             if (EmulatorVersions.IsDowngrade(release.VersionLabel, installedVersion))
             {
@@ -159,31 +158,6 @@ public partial class ReleasePickerPopup : UiPanel
     {
         float height = Mathf.Clamp(entryCount * 48, 0, 480);
         scrollContainer.CustomMinimumSize = new Vector2(420, height);
-    }
-
-    private void StyleEntryButton(Button entryBtn)
-    {
-        var btnStyle = new StyleBoxFlat { BgColor = new Color(0, 0, 0, 0), CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8, CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8 };
-        var focusStyle = new StyleBoxFlat { BgColor = focusColor, CornerRadiusTopLeft = 8, CornerRadiusTopRight = 8, CornerRadiusBottomLeft = 8, CornerRadiusBottomRight = 8 };
-
-        entryBtn.AddThemeStyleboxOverride("normal", btnStyle);
-        entryBtn.AddThemeStyleboxOverride("hover", focusStyle);
-        entryBtn.AddThemeStyleboxOverride("focus", focusStyle);
-        entryBtn.AddThemeStyleboxOverride("pressed", focusStyle);
-    }
-
-    public void ApplyTheme(Color accentColor)
-    {
-        accentColor.A = 0.65f;
-        focusColor = accentColor;
-
-        if (releaseListContainer != null)
-        {
-            foreach (Node child in releaseListContainer.GetChildren())
-            {
-                if (child is Button btn) StyleEntryButton(btn);
-            }
-        }
     }
 
     public override bool HandleInput(InputEvent @event)

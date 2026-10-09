@@ -245,6 +245,7 @@ theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
 [node name="LobbyActionButton" type="Button" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel/MarginContainer" unique_id=212534476]
+theme_type_variation = &"ListButton"
 layout_mode = 2
 theme_override_fonts/font = ExtResource("11_lobbybold")
 text = "Ready"
@@ -257,6 +258,7 @@ theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
 [node name="LobbyCopyCodeButton" type="Button" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel/MarginContainer6" unique_id=1548354050]
+theme_type_variation = &"ListButton"
 layout_mode = 2
 theme_override_fonts/font = ExtResource("11_lobbybold")
 text = "Copy Code"
@@ -269,6 +271,7 @@ theme_override_constants/margin_right = 5
 theme_override_constants/margin_bottom = 5
 
 [node name="LobbyLeaveButton" type="Button" parent="Background/VBoxContainer/GamesListContainer/HBoxContainer/Panel/LobbyPanel/MarginContainer2" unique_id=2097618163]
+theme_type_variation = &"ListButton"
 layout_mode = 2
 theme_override_fonts/font = ExtResource("11_lobbybold")
 text = "Leave Lobby"

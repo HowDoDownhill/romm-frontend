@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=14 format=3]
+[gd_resource type="Theme" load_steps=12 format=3]
 
 [ext_resource type="FontFile" uid="uid://citl36dpeahws" path="res://assets/fonts/InterVariable.woff2" id="1_inter"]
 
@@ -33,18 +33,6 @@ content_margin_top = 8.0
 content_margin_right = 18.0
 content_margin_bottom = 8.0
 bg_color = Color(1, 1, 1, 0)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-anti_aliasing = true
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_list_hover"]
-content_margin_left = 18.0
-content_margin_top = 8.0
-content_margin_right = 18.0
-content_margin_bottom = 8.0
-bg_color = Color(1, 1, 1, 0.06)
 corner_radius_top_left = 10
 corner_radius_top_right = 10
 corner_radius_bottom_right = 10
@@ -123,7 +111,7 @@ LineEdit/colors/font_color = Color(0.929, 0.937, 0.961, 1)
 ListButton/base_type = &"Button"
 ListButton/styles/disabled = SubResource("StyleBoxFlat_list_normal")
 ListButton/styles/focus = SubResource("StyleBoxFlat_list_focus")
-ListButton/styles/hover = SubResource("StyleBoxFlat_list_hover")
+ListButton/styles/hover = SubResource("StyleBoxFlat_list_normal")
 ListButton/styles/hover_pressed = SubResource("StyleBoxFlat_list_pressed")
 ListButton/styles/normal = SubResource("StyleBoxFlat_list_normal")
 ListButton/styles/pressed = SubResource("StyleBoxFlat_list_pressed")
@@ -131,6 +119,12 @@ ProgressBar/styles/background = SubResource("StyleBoxFlat_progress_track")
 ProgressBar/styles/fill = SubResource("StyleBoxFlat_progress_fill")
 RichTextLabel/colors/default_color = Color(0.851, 0.863, 0.898, 1)
 TitleButton/base_type = &"Button"
+TitleButton/styles/disabled = SubResource("StyleBoxFlat_list_normal")
+TitleButton/styles/focus = SubResource("StyleBoxFlat_list_focus")
+TitleButton/styles/hover = SubResource("StyleBoxFlat_list_normal")
+TitleButton/styles/hover_pressed = SubResource("StyleBoxFlat_list_pressed")
+TitleButton/styles/normal = SubResource("StyleBoxFlat_list_normal")
+TitleButton/styles/pressed = SubResource("StyleBoxFlat_list_pressed")
 TitleButton/font_sizes/font_size = 32
 TitleButton/fonts/font = SubResource("FontVariation_medium")
 TitleLabel/base_type = &"Label"

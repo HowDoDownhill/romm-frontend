@@ -368,8 +368,6 @@ public partial class MainScene : Control
                 panelMaterial.SetShaderParameter("luminosity_floor", panelLuminosityFloor);
             }
 
-            systemJumpPopup?.ApplyTheme(colors.Secondary);
-            releasePickerPopup?.ApplyTheme(colors.Secondary);
             ApplyProgressBarAccent(colors.Primary, colors.Secondary);
         }
     }
@@ -1076,6 +1074,8 @@ public partial class MainScene : Control
         }
 
         if (focusable == null || !focusable.IsVisibleInTree()) return;
+
+        if (focusable is BaseButton { Disabled: true }) return;
 
         if (gameList != null && (focusable == gameList || gameList.IsAncestorOf(focusable)))
         {

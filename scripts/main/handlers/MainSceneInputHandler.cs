@@ -410,6 +410,7 @@ public class MainSceneInputHandler
                 row.AddChild(lbl);
 
                 Button mappingBtn = new Button();
+                mappingBtn.ThemeTypeVariation = "ListButton";
                 string mappedInput = currentMappings.ContainsKey(buttonName) ? currentMappings[buttonName] : defaultSdl;
                 mappingBtn.Text = string.IsNullOrEmpty(mappedInput) ? "Unmapped" : mappedInput;
 
