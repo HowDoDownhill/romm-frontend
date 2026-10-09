@@ -7,5 +7,5 @@ shader_type canvas_item;
 #include "res://assets/shaders/backgrounds/bg_common.gdshaderinc"
 
 void fragment() {
-    COLOR = vec4(bg_color.rgb, 1.0);
+    COLOR = vec4(finish(bg_color.rgb, UV, FRAGCOORD.xy, TIME), 1.0);
 }

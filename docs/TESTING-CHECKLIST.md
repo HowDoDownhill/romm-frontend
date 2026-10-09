@@ -150,7 +150,8 @@ This is the section with the worst platform divergence. Do not skip it on either
 - [ ] Preferred emulator and preferred core per system persist and take effect.
 - [ ] BIOS/firmware selection per system persists.
 - [ ] Panel open/close, section transitions, and the panel stack behave with both mouse and controller.
-- [ ] Theme and background changes apply.
+- [ ] Theme and background changes apply. Mesh, Silk and Horizon animate smoothly at the
+      display's native resolution (4K on the laptop) with no banding in the dark areas.
 - [ ] Text follows the four styles: settings, descriptions, start menu and card titles are the same
       Body size; no new `font_size` override in scenes or code (`grep -rn "theme_override_font_sizes\|AddThemeFontSizeOverride"`).
 - [ ] Interface Size: each value applies immediately and persists; at 130% and 150% on a 1280×800

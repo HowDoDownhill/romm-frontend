@@ -42,6 +42,9 @@ public partial class ConfigManager : Node
     public static readonly (string Name, string ShaderPath)[] BackgroundStyles = new (string, string)[]
     {
         ("Flow", "res://assets/shaders/backgrounds/bg_flow.gdshader"),
+        ("Mesh", "res://assets/shaders/backgrounds/bg_mesh.gdshader"),
+        ("Silk", "res://assets/shaders/backgrounds/bg_silk.gdshader"),
+        ("Horizon", "res://assets/shaders/backgrounds/bg_horizon.gdshader"),
         ("Blobs", "res://assets/shaders/backgrounds/bg_blobs.gdshader"),
         ("Waves", "res://assets/shaders/backgrounds/bg_waves.gdshader"),
         ("Aurora", "res://assets/shaders/backgrounds/bg_aurora.gdshader"),
@@ -71,6 +74,13 @@ public partial class ConfigManager : Node
     private static readonly System.Collections.Generic.Dictionary<string, (Color Bg, Color Primary, Color Secondary, Color Panel)> BuiltInThemes = new System.Collections.Generic.Dictionary<string, (Color Bg, Color Primary, Color Secondary, Color Panel)>
     {
         { "Default", (new Color("#0a0713"), new Color("#341052"), new Color("#123a63"), new Color("#100c1a8c")) },
+        { "Midnight", (new Color("#04060d"), new Color("#13215a"), new Color("#0a4a6e"), new Color("#080c1a8c")) },
+        { "Obsidian", (new Color("#0a0908"), new Color("#523312"), new Color("#7a5f22"), new Color("#13110e8c")) },
+        { "Amethyst", (new Color("#0b0612"), new Color("#3a1a66"), new Color("#6e1c52"), new Color("#140c1f8c")) },
+        { "Glacier", (new Color("#070c12"), new Color("#1d4159"), new Color("#4a7186"), new Color("#0d151d8c")) },
+        { "Bordeaux", (new Color("#0d0508"), new Color("#4c0e22"), new Color("#7c3f23"), new Color("#170b0f8c")) },
+        { "Jade", (new Color("#040c0a"), new Color("#0b3d32"), new Color("#3f6230"), new Color("#0a16138c")) },
+        { "Graphite", (new Color("#0b0c0f"), new Color("#22262e"), new Color("#3a5577"), new Color("#14161b8c")) },
         { "Rose-pine", (new Color("#16141f"), new Color("#4a3663"), new Color("#8a3f59"), new Color("#1f1d2e8c")) },
         { "Gruvbox", (new Color("#1d2021"), new Color("#7a2f24"), new Color("#2f5f57"), new Color("#2828288c")) },
         { "catppuccin", (new Color("#181825"), new Color("#4c3a6b"), new Color("#33517f"), new Color("#1e1e2e8c")) },

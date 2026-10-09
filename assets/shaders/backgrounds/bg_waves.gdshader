@@ -31,5 +31,5 @@ void fragment() {
         col = elevate(col, crest - p.y, (crest - SHADOW_RISE) - p.y, fill, EDGE);
     }
 
-    COLOR = vec4(col, 1.0);
+    COLOR = vec4(finish(col, UV, FRAGCOORD.xy, TIME), 1.0);
 }

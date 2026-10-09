@@ -30,5 +30,5 @@ void fragment() {
     // Lift the background very slightly inside the pool so the light reads as area, not just lines.
     col = mix(col, col + secondary_color.rgb * 0.10, glow);
 
-    COLOR = vec4(col, 1.0);
+    COLOR = vec4(finish(col, UV, FRAGCOORD.xy, TIME), 1.0);
 }

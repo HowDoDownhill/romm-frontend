@@ -1295,6 +1295,30 @@ so applying a theme swaps the shader on the shared material and then re-applies 
 parameters. Swap the shader *before* setting parameters, or the values land on a shader that isn't
 going to render them.
 
+Every style ends with `finish()` from the include: a vignette (`vignette_amount`, 0.7) and an
+animated triangular dither of about 1.6 8-bit steps (`grain_amount`). The dither is what removes
+banding from slow dark gradients, which was the most visible cheap-looking artefact; it changes 30
+times a second so it reads as film grain. The frosted panels blur it away.
+
+Mesh, Silk and Horizon were added for a calmer, more premium look:
+- Mesh: five large colour lights averaged by inverse-quartic weight over the base, so the field is
+  one continuous gradient with no visible shapes. The accents are lifted 1.35-1.6x so it glows.
+- Silk: one family of long folds, warped sideways, shaded from the surface normal with a specular
+  sheen. An earlier version crossed two fold families and read as an egg crate; another ran at a
+  quarter of the frequency and read as blur.
+- Horizon: an elliptical glow under the bottom edge lighting three octaves of sideways-stretched
+  fog. The fog noise is rotated about 16 degrees per octave so the value-noise grid does not show
+  as horizontal blocks.
+All three cost a few sines or noise lookups per pixel and no loops beyond Mesh's five lights.
+
+The Midnight, Obsidian, Amethyst, Glacier, Bordeaux, Jade and Graphite palettes pair a near-black
+tinted base with two jewel-tone accents. Their accents sit at about the same luminance as Default's,
+so the older styles (Flow mixes towards Primary hard) do not turn into a flat saturated wash; the new
+styles lift the accents themselves.
+
+`--ui-capture-theme=` and `--ui-capture-background=` override the saved choices for one capture run
+without writing the config.
+
 ### Palettes are hand-tuned, not derived
 Palette entries are hand-tuned rather than produced by a blanket `.Darkened()` pass: the shader mixes
 Primary and Secondary over Bg aggressively, and uniformly darkening every palette collapsed them all

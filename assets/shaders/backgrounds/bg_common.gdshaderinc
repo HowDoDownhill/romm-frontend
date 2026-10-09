@@ -25,3 +25,25 @@ vec3 elevate(vec3 dst, float body_dist, float shadow_dist, vec3 fill, float edge
 vec2 aspect_corrected_uv(vec2 uv, float aspect) {
     return vec2(uv.x * aspect, uv.y);
 }
+
+uniform float grain_amount : hint_range(0.0, 8.0) = 1.6;
+uniform float vignette_amount : hint_range(0.0, 2.0) = 0.7;
+
+float finish_hash(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+}
+
+// Shared last step for every style. The vignette pulls the corners down so the eye settles on
+// the content. The grain is a triangular-distributed dither of about one 8-bit step, which breaks
+// up the banding that slow dark gradients otherwise show; it changes every frame so it reads as
+// film grain rather than a fixed texture.
+vec3 finish(vec3 col, vec2 uv, vec2 frag_coord, float time) {
+    vec2 centred = uv - 0.5;
+    col *= clamp(1.0 - dot(centred, centred) * vignette_amount, 0.0, 1.0);
+
+    float frame = floor(time * 30.0);
+    float n = finish_hash(frag_coord + frame * 1.618) + finish_hash(frag_coord.yx + frame * 2.414) - 1.0;
+    return col + n * grain_amount / 255.0;
+}

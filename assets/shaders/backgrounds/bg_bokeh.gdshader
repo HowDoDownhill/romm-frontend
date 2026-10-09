@@ -37,5 +37,5 @@ void fragment() {
         col += accent * disc * 0.45;
     }
 
-    COLOR = vec4(col, 1.0);
+    COLOR = vec4(finish(col, UV, FRAGCOORD.xy, TIME), 1.0);
 }

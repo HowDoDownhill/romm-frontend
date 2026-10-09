@@ -282,6 +282,18 @@ public partial class MainScene : Control
     private const string LayoutCaptureSizeArgumentPrefix = "--ui-capture-size=";
     private const string LayoutCaptureViewArgumentPrefix = "--ui-capture-view=";
     private const string LayoutCaptureSystemArgumentPrefix = "--ui-capture-system=";
+    private const string LayoutCaptureThemeArgumentPrefix = "--ui-capture-theme=";
+    private const string LayoutCaptureBackgroundArgumentPrefix = "--ui-capture-background=";
+
+    private string ActiveThemeName => CaptureArgument(LayoutCaptureThemeArgumentPrefix) ?? appInstance.configManager.AppTheme;
+
+    private string ActiveBackgroundName => CaptureArgument(LayoutCaptureBackgroundArgumentPrefix) ?? appInstance.configManager.AppBackground;
+
+    private static string CaptureArgument(string prefix)
+    {
+        string argument = OS.GetCmdlineUserArgs().FirstOrDefault(candidate => candidate.StartsWith(prefix));
+        return argument?.Substring(prefix.Length);
+    }
     private const double LayoutCaptureSettleSeconds = 8.0;
     private const double LayoutCaptureViewDelaySeconds = 4.0;
 
@@ -378,7 +390,7 @@ public partial class MainScene : Control
             var bgMaterial = GD.Load<ShaderMaterial>("res://assets/materials/moving_background.tres");
             if (bgMaterial != null)
             {
-                var bgShader = GD.Load<Shader>(ConfigManager.BackgroundShaderPath(appInstance.configManager.AppBackground));
+                var bgShader = GD.Load<Shader>(ConfigManager.BackgroundShaderPath(ActiveBackgroundName));
                 if (bgShader != null && bgMaterial.Shader != bgShader)
                 {
                     bgMaterial.Shader = bgShader;
@@ -422,7 +434,7 @@ public partial class MainScene : Control
 
     private bool TryResolveThemeColors(out (Color Bg, Color Primary, Color Secondary, Color Panel) colors)
     {
-        string currentTheme = appInstance.configManager.AppTheme;
+        string currentTheme = ActiveThemeName;
 
         if (ConfigManager.IsSystemTheme(currentTheme))
         {

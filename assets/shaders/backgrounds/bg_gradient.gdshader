@@ -16,5 +16,5 @@ void fragment() {
     vec3 col = mix(bg_color.rgb, primary_color.rgb, smoothstep(0.0, 0.65, t));
     col = mix(col, secondary_color.rgb, smoothstep(0.45, 1.0, t));
 
-    COLOR = vec4(col, 1.0);
+    COLOR = vec4(finish(col, UV, FRAGCOORD.xy, TIME), 1.0);
 }
