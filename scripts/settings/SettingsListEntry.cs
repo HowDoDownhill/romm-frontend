@@ -3,6 +3,7 @@ using Godot;
 public partial class SettingsListEntry : MarginContainer
 {
     private StyleBoxFlat backgroundStyle;
+    private PanelContainer highlightPanel;
     private Control interactableWidget;
 
     public override void _Ready()
@@ -11,10 +12,10 @@ public partial class SettingsListEntry : MarginContainer
 
         backgroundStyle = FocusHighlight.CreateStyle();
 
-        var panel = GetNodeOrNull<PanelContainer>("PanelContainer");
-        if (panel != null)
+        highlightPanel = GetNodeOrNull<PanelContainer>("PanelContainer");
+        if (highlightPanel != null)
         {
-            panel.AddThemeStyleboxOverride("panel", backgroundStyle);
+            highlightPanel.AddThemeStyleboxOverride("panel", backgroundStyle);
         }
 
         GuiInput += OnGuiInput;
@@ -126,11 +127,11 @@ public partial class SettingsListEntry : MarginContainer
 
     public void Highlight()
     {
-        FocusHighlight.Set(this, backgroundStyle, true);
+        FocusHighlight.Set(this, highlightPanel, true);
     }
 
     public void Unhighlight()
     {
-        FocusHighlight.Set(this, backgroundStyle, false);
+        FocusHighlight.Set(this, highlightPanel, false);
     }
 }

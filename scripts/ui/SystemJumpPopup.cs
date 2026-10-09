@@ -31,9 +31,12 @@ public partial class SystemJumpPopup : UiPanel
         gridContainer = new GridContainer();
         gridContainer.Columns = 5;
         gridContainer.AddThemeConstantOverride("h_separation", 20);
-        gridContainer.AddThemeConstantOverride("v_separation", 20);
+        gridContainer.AddThemeConstantOverride("v_separation", 12);
         margin.AddChild(gridContainer);
     }
+
+    private static readonly Vector2 TileSize = new Vector2(180, 200);
+    private const int TileInset = 16;
 
     public void Populate(List<GameSystem> systems, int currentIndex = 0)
     {
@@ -51,11 +54,11 @@ public partial class SystemJumpPopup : UiPanel
             int index = i;
 
             var entryBtn = new Button();
-            entryBtn.CustomMinimumSize = new Vector2(150, 180);
+            entryBtn.CustomMinimumSize = TileSize;
             entryBtn.ThemeTypeVariation = "ListButton";
 
             var vbox = new VBoxContainer();
-            vbox.SetAnchorsPreset(LayoutPreset.FullRect);
+            vbox.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect, LayoutPresetMode.Minsize, TileInset);
             vbox.Alignment = BoxContainer.AlignmentMode.Center;
             entryBtn.AddChild(vbox);
 
@@ -69,7 +72,7 @@ public partial class SystemJumpPopup : UiPanel
                 vbox.AddChild(icon);
             }
 
-            var label = new Label { Text = system.Name, HorizontalAlignment = HorizontalAlignment.Center, AutowrapMode = TextServer.AutowrapMode.WordSmart, CustomMinimumSize = new Vector2(140, 0), MaxLinesVisible = 3, TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis };
+            var label = new Label { Text = system.Name, HorizontalAlignment = HorizontalAlignment.Center, AutowrapMode = TextServer.AutowrapMode.WordSmart, CustomMinimumSize = new Vector2(TileSize.X - TileInset * 2, 0), MaxLinesVisible = 3, TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis };
             label.ThemeTypeVariation = "CaptionLabel";
             vbox.AddChild(label);
 

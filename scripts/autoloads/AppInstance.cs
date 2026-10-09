@@ -26,6 +26,7 @@ public partial class AppInstance : Node
         downloadManager = GetNode<DownloadManager>("/root/DownloadManager");
         cacheManager = GetNode<CacheManager>("/root/CacheManager");
         emulatorManager = GetNode<EmulatorManager>("/root/EmulatorManager");
+        SelectionHighlighter.Attach(GetViewport());
         dataBus = GetNode<DataBus>("/root/DataBus");
         controllerManager = GetNode<ControllerManager>("/root/ControllerManager");
         Callable.From(ApplyDiscreteGpuPreference).CallDeferred();

@@ -5,7 +5,6 @@ public static class FocusHighlight
     private static readonly Color FocusedFill = new Color(1f, 1f, 1f, 0.12f);
     private static readonly Color FocusedEdge = new Color(1f, 1f, 1f, 0.16f);
     private const int CornerRadius = 10;
-    private const float FadeSeconds = 0.12f;
 
     public static StyleBoxFlat CreateStyle(float horizontalPadding = -1, float verticalPadding = -1)
     {
@@ -13,7 +12,7 @@ public static class FocusHighlight
         {
             BgColor = new Color(FocusedFill, 0f),
             BorderColor = new Color(FocusedEdge, 0f),
-            DrawCenter = true,
+            DrawCenter = false,
             AntiAliasing = true
         };
 
@@ -35,25 +34,23 @@ public static class FocusHighlight
         return style;
     }
 
-    public static void Set(Node owner, StyleBoxFlat style, bool focused)
+    public static StyleBoxFlat CreateIndicatorStyle()
     {
-        if (style == null)
+        var style = new StyleBoxFlat
         {
-            return;
-        }
+            BgColor = FocusedFill,
+            BorderColor = FocusedEdge,
+            DrawCenter = true,
+            AntiAliasing = true
+        };
 
-        Color targetFill = focused ? FocusedFill : new Color(FocusedFill, 0f);
-        Color targetEdge = focused ? FocusedEdge : new Color(FocusedEdge, 0f);
+        style.SetBorderWidthAll(1);
+        style.SetCornerRadiusAll(CornerRadius);
+        return style;
+    }
 
-        if (owner == null || !owner.IsInsideTree())
-        {
-            style.BgColor = targetFill;
-            style.BorderColor = targetEdge;
-            return;
-        }
-
-        Tween fade = owner.CreateTween().SetParallel(true).SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
-        fade.TweenProperty(style, "bg_color", targetFill, FadeSeconds);
-        fade.TweenProperty(style, "border_color", targetEdge, FadeSeconds);
+    public static void Set(Control item, Control area, bool focused)
+    {
+        SelectionHighlighter.Set(item, area, focused);
     }
 }

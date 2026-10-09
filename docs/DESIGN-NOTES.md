@@ -1162,6 +1162,21 @@ Hover is transparent on purpose. `MainScene.UpdateMouseFocus` moves focus to wha
 over, so a hovered button is already focused, and a hover fill only stacked on top of the focus fill
 (about 18%), the washed-out look this replaced. It also no longer moves focus onto disabled buttons.
 
+The highlight moves between items. `SelectionHighlighter` keeps one `SelectionIndicator` per list
+container: a rendering-server canvas item parented to the container and drawn first among its
+children (draw index -1), so it sits above any container background and under the items. Each frame
+it eases its rectangle toward the selected item (exponential, rate 22, about 0.1 s to settle) and
+fades in or out (rate 18) when a list gains or loses the selection. Items still call `Highlight` and
+`Unhighlight`; their own panel styles are invisible, and list buttons draw an empty focus style while
+the viewport's focus-changed signal moves the indicator. A rendering-server item was chosen over a
+child node so the indicator never shows up as a container child: containers would lay a `Control`
+out like an item, and a `Node2D` child left some popups drawing nothing. Separate lists each have
+their own indicator, so moving between settings columns fades one out and the other in.
+
+System-jump tiles are 180x200 with their logo and name inset 16 on every side, so the highlight
+frames the content with room around it. Row spacing dropped from 20 to 12 to keep four rows on a
+1080p screen.
+
 Changing the base `Button` styles instead was rejected: theme lookup checks the project theme for
 `Button` before Godot's default theme for `CheckButton` and `OptionButton`, so those controls would
 have picked up list styling too.

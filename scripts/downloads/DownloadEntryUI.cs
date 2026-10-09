@@ -117,11 +117,11 @@ public partial class DownloadEntryUI : MarginContainer
 
     public void Highlight()
     {
-        FocusHighlight.Set(this, backgroundStyle, true);
+        FocusHighlight.Set(this, backgroundPanel, true);
     }
 
     public void Unhighlight()
     {
-        FocusHighlight.Set(this, backgroundStyle, false);
+        FocusHighlight.Set(this, backgroundPanel, false);
     }
 }

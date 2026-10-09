@@ -151,6 +151,9 @@ This is the section with the worst platform divergence. Do not skip it on either
 - [ ] Interface Size: each value applies immediately and persists; at 130% and 150% on a 1280×800
       window the button bar, settings sidebar and start menu still fit. Auto logs its choice as
       `[UI] interface size` and picks 130% on a Steam Deck or other screen 900 px or less tall.
+- [ ] The selection highlight glides between items with keyboard, controller and mouse in settings
+      (both columns), the start menu, the downloads page and the system-jump popup, and fades out
+      when a list loses focus. System-jump tiles leave clear space around the logo and name.
 - [ ] The UI fills the screen with no black bars at 16:9, 16:10, 21:9 and 4:3. Capture each with
       `-- --ui-capture=<png> --ui-capture-size=WxH` (add `--ui-capture-view=settings|downloads|start`
       for the other screens): carousel cards keep their size, the details banner fits its row, and

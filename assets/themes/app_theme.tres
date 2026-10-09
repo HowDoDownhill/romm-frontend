@@ -51,19 +51,6 @@ corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
 anti_aliasing = true
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_list_focus"]
-bg_color = Color(1, 1, 1, 0.12)
-border_width_left = 1
-border_width_top = 1
-border_width_right = 1
-border_width_bottom = 1
-border_color = Color(1, 1, 1, 0.16)
-corner_radius_top_left = 10
-corner_radius_top_right = 10
-corner_radius_bottom_right = 10
-corner_radius_bottom_left = 10
-anti_aliasing = true
-
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_progress_track"]
 content_margin_top = 6.0
 content_margin_bottom = 6.0
@@ -83,6 +70,8 @@ corner_radius_bottom_left = 6
 shadow_color = Color(0.78, 0.84, 0.97, 0.35)
 shadow_size = 6
 anti_aliasing = true
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_list_focus"]
 
 [resource]
 default_font = SubResource("FontVariation_regular")
@@ -110,7 +99,7 @@ Label/colors/font_color = Color(0.929, 0.937, 0.961, 1)
 LineEdit/colors/font_color = Color(0.929, 0.937, 0.961, 1)
 ListButton/base_type = &"Button"
 ListButton/styles/disabled = SubResource("StyleBoxFlat_list_normal")
-ListButton/styles/focus = SubResource("StyleBoxFlat_list_focus")
+ListButton/styles/focus = SubResource("StyleBoxEmpty_list_focus")
 ListButton/styles/hover = SubResource("StyleBoxFlat_list_normal")
 ListButton/styles/hover_pressed = SubResource("StyleBoxFlat_list_pressed")
 ListButton/styles/normal = SubResource("StyleBoxFlat_list_normal")
@@ -120,7 +109,7 @@ ProgressBar/styles/fill = SubResource("StyleBoxFlat_progress_fill")
 RichTextLabel/colors/default_color = Color(0.851, 0.863, 0.898, 1)
 TitleButton/base_type = &"Button"
 TitleButton/styles/disabled = SubResource("StyleBoxFlat_list_normal")
-TitleButton/styles/focus = SubResource("StyleBoxFlat_list_focus")
+TitleButton/styles/focus = SubResource("StyleBoxEmpty_list_focus")
 TitleButton/styles/hover = SubResource("StyleBoxFlat_list_normal")
 TitleButton/styles/hover_pressed = SubResource("StyleBoxFlat_list_pressed")
 TitleButton/styles/normal = SubResource("StyleBoxFlat_list_normal")
