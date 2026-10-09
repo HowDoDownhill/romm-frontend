@@ -281,6 +281,7 @@ public partial class MainScene : Control
     private const string LayoutCaptureArgumentPrefix = "--ui-capture=";
     private const string LayoutCaptureSizeArgumentPrefix = "--ui-capture-size=";
     private const string LayoutCaptureViewArgumentPrefix = "--ui-capture-view=";
+    private const string LayoutCaptureSystemArgumentPrefix = "--ui-capture-system=";
     private const double LayoutCaptureSettleSeconds = 8.0;
     private const double LayoutCaptureViewDelaySeconds = 4.0;
 
@@ -298,7 +299,20 @@ public partial class MainScene : Control
 
         string capturePath = captureArgument.Substring(LayoutCaptureArgumentPrefix.Length);
         string viewArgument = userArguments.FirstOrDefault(argument => argument.StartsWith(LayoutCaptureViewArgumentPrefix));
+        string systemArgument = userArguments.FirstOrDefault(argument => argument.StartsWith(LayoutCaptureSystemArgumentPrefix));
         await ToSignal(GetTree().CreateTimer(LayoutCaptureViewDelaySeconds), SceneTreeTimer.SignalName.Timeout);
+
+        if (systemArgument != null)
+        {
+            string systemSlug = systemArgument.Substring(LayoutCaptureSystemArgumentPrefix.Length);
+            int systemIndex = GameListHandler.gameSystems.FindIndex(system => system.Slug == systemSlug);
+
+            if (systemIndex >= 0)
+            {
+                GameListHandler.SelectSystemByIndex(systemIndex);
+                await ToSignal(GetTree().CreateTimer(1.0), SceneTreeTimer.SignalName.Timeout);
+            }
+        }
 
         switch (viewArgument?.Substring(LayoutCaptureViewArgumentPrefix.Length))
         {
@@ -306,6 +320,7 @@ public partial class MainScene : Control
             case "downloads": SectionHandler.ShowSection(MainSceneSectionHandler.Section.Downloads, false); break;
             case "start": ToggleStartMenu(); break;
             case "jump": OpenSystemJumpPopup(); break;
+            case "carousel": CaptureGameListView(0, 3); break;
             case "grid": CaptureGameListView(1, 5); break;
             case "list": CaptureGameListView(2, 6); break;
         }

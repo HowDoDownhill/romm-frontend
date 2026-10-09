@@ -14,17 +14,12 @@ public partial class GameGridView : ScrollingGameListView
 
     private int columns = MinimumColumns;
     private Vector2 cellSize;
-    private float observedCardAspect;
 
     public static void ConfigureCard(GameCard card)
     {
         card.CaptionEnabled = false;
     }
 
-    protected override void OnItemsReloaded()
-    {
-        observedCardAspect = 0.0f;
-    }
 
     private int RowCount => (ItemCount + columns - 1) / columns;
     private float RowPitch => cellSize.Y + CellGap;
@@ -92,18 +87,20 @@ public partial class GameGridView : ScrollingGameListView
 
         float cellWidth = Mathf.Max(1.0f, (Size.X - CellGap * (columns + 1)) / columns);
 
+        SampleCoverAspects();
+        float cellAspect = DefaultCellAspect;
+
         foreach (Control card in BoundCards.Values)
         {
-            if (card is GameCard gameCard && gameCard.HasRealCover)
+            if (UniformCoverAspect > 0.0f && card is GameCard gameCard)
             {
+                ApplyUniformFrame(card);
                 card.CustomMinimumSize = new Vector2(cellWidth, 0.0f);
-                observedCardAspect = Mathf.Max(observedCardAspect, gameCard.CoverAspectRatio);
+                cellAspect = Mathf.Clamp(gameCard.CoverAspectRatio, MinimumCellAspect, MaximumCellAspect);
+                break;
             }
         }
 
-        float cellAspect = observedCardAspect > 0.0f
-            ? Mathf.Clamp(observedCardAspect, MinimumCellAspect, MaximumCellAspect)
-            : DefaultCellAspect;
         cellSize = new Vector2(cellWidth, cellWidth * cellAspect);
     }
 
@@ -142,6 +139,7 @@ public partial class GameGridView : ScrollingGameListView
 
     private Vector2 FitCard(Control card)
     {
+        ApplyUniformFrame(card);
         card.CustomMinimumSize = new Vector2(cellSize.X, 0.0f);
         float aspect = CardAspect(card);
         float cardHeight = cellSize.X * aspect;

@@ -154,6 +154,7 @@ public abstract partial class GameListView : Control
         ReleaseAllCards();
         ItemCount = Math.Max(0, itemCount);
         SelectedIndex = ItemCount == 0 ? 0 : Math.Clamp(selectedIndex, 0, ItemCount - 1);
+        ResetCoverAspectSamples();
         OnItemsReloaded();
         UpdateLayout(false);
     }
@@ -169,6 +170,61 @@ public abstract partial class GameListView : Control
     }
 
     public abstract void UpdateLayout(bool animated = true);
+
+    private const int CoverAspectSampleTarget = 6;
+    private const float MinimumCoverAspect = 0.5f;
+    private const float MaximumCoverAspect = 1.6f;
+
+    private readonly List<float> coverAspectSamples = new List<float>();
+    private readonly HashSet<int> sampledItems = new HashSet<int>();
+    private bool coverAspectLocked;
+
+    protected float UniformCoverAspect { get; private set; }
+
+    protected void SampleCoverAspects()
+    {
+        if (coverAspectLocked)
+        {
+            return;
+        }
+
+        bool sampled = false;
+
+        foreach (var entry in cardsByItemIndex)
+        {
+            if (entry.Value is GameCard card && card.HasRealCover && card.TextureAspect > 0.0f && sampledItems.Add(entry.Key))
+            {
+                coverAspectSamples.Add(card.TextureAspect);
+                sampled = true;
+            }
+        }
+
+        if (!sampled)
+        {
+            return;
+        }
+
+        var sortedSamples = new List<float>(coverAspectSamples);
+        sortedSamples.Sort();
+        UniformCoverAspect = Mathf.Clamp(sortedSamples[sortedSamples.Count / 2], MinimumCoverAspect, MaximumCoverAspect);
+        coverAspectLocked = coverAspectSamples.Count >= Math.Min(CoverAspectSampleTarget, ItemCount);
+    }
+
+    protected void ApplyUniformFrame(Control card)
+    {
+        if (card is GameCard gameCard)
+        {
+            gameCard.FrameCoverAspect = UniformCoverAspect;
+        }
+    }
+
+    private void ResetCoverAspectSamples()
+    {
+        coverAspectSamples.Clear();
+        sampledItems.Clear();
+        coverAspectLocked = false;
+        UniformCoverAspect = 0.0f;
+    }
 
     protected virtual void OnItemsReloaded()
     {

@@ -32,6 +32,17 @@ public partial class GameCard : Control, ICarouselItem, IGameListItem
 
     public bool CaptionEnabled { get; set; } = true;
 
+    public float FrameCoverAspect { get; set; }
+
+    public float TextureAspect
+    {
+        get
+        {
+            Texture2D texture = CoverRect.Texture;
+            return texture != null && texture.GetSize().X > 0 ? texture.GetSize().Y / texture.GetSize().X : 0.0f;
+        }
+    }
+
     public void SetCover(Texture2D texture, bool isPlaceholder)
     {
         HasRealCover = !isPlaceholder && texture != null;
@@ -114,13 +125,13 @@ public partial class GameCard : Control, ICarouselItem, IGameListItem
     {
         get
         {
-            Texture2D texture = CoverRect.Texture;
-            if (texture == null || texture.GetSize().X <= 0)
+            float coverAspect = FrameCoverAspect > 0.0f ? FrameCoverAspect : TextureAspect;
+
+            if (coverAspect <= 0.0f)
             {
                 return 0.0f;
             }
 
-            float coverAspect = texture.GetSize().Y / texture.GetSize().X;
             float cardWidth = CustomMinimumSize.X;
 
             if (cardWidth <= 0.0f)
@@ -129,7 +140,7 @@ public partial class GameCard : Control, ICarouselItem, IGameListItem
             }
 
             float innerWidth = Mathf.Max(cardWidth - (2.0f * CardPadding), 1.0f);
-            float captionHeight = CaptionLabel.Visible
+            float captionHeight = CaptionEnabled
                 ? CaptionLabel.GetCombinedMinimumSize().Y + CaptionLabel.GetParent<BoxContainer>().GetThemeConstant("separation")
                 : 0.0f;
             float cardHeight = (innerWidth * coverAspect) + (2.0f * CardPadding) + captionHeight;

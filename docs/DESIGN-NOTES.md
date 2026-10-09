@@ -1495,11 +1495,19 @@ by the scroll offset, the offset eases toward its target (rate 16), and the sele
 the highlight glides only between items. A jump further than two screens (fuzzy search, random game,
 wrapping) snaps the scroll.
 
-Grid: about 2.6 rows fit the view, which gives four columns at 1080p (3 to 8 allowed). Cells start at
-1.4 tall per wide and then take the tallest loaded card in the current system, clamped to 0.6-1.6, so
-square Dreamcast boxes and wide SNES boxes both fill their cells; the tallest-seen value resets on each
-reload so cells never shrink mid-browse. Grid cards hide the caption (the details panel shows the
-name); a card with no cover still shows its title. The d-pad moves in two dimensions, so the A-Z
+Cards are one size per system in the carousel and the grid. `GameListView.SampleCoverAspects` takes
+the median shape of the first six real covers bound after a reload (clamped to 0.5-1.6 tall per wide)
+and then locks it, so cards settle once on entering a system and never resize while browsing. Each
+`GameCard` sizes itself from that frame (`FrameCoverAspect`) and the cover keeps its own shape centred
+inside, so a landscape box in a portrait system sits letterboxed in a card the same size as its
+neighbours. The carousel caption is a single line with an ellipsis, because a wrapped title made that
+card taller; the details panel shows the full name. A card's caption space is reserved whether or not
+the caption shows, so a card without a cover is the same size too.
+
+Grid: about 2.6 rows fit the view, which gives four columns at 1080p (3 to 8 allowed). Cells follow
+the system's card frame, so square Dreamcast boxes and wide SNES boxes both fill their cells. Grid
+cards hide the caption (the details panel shows the name); a card with no cover still shows its
+title. The d-pad moves in two dimensions, so the A-Z
 letter jump on left/right is only in the carousel and the list.
 
 List: rows are sized from the theme's body font, and the selection stays three rows from either edge.

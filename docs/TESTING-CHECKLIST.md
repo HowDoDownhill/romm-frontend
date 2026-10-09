@@ -51,7 +51,8 @@ Delete (or move aside) `config.cfg`, `games.cache`, `systems.cache`, `emulators/
 - [ ] Game View (Carousel, Grid, List) switches immediately, keeps the selected game, and persists
       across a restart. In each view: d-pad and mouse wheel move the selection, clicking selects,
       double-clicking plays or downloads, and switching systems and the Installed filter rebind it.
-      Grid cells fit both square (Dreamcast) and tall (PlayStation 2) boxes.
+      In the carousel and grid every card in a system is the same size, including N64 and SNES
+      where box shapes are mixed; odd-shaped covers sit inside the frame.
 - [ ] Cache rebuild (delete cache files, re-fetch from the loading screen) works.
 - [ ] Startup from a warm cache: the `[Startup]` log line shows `auth done` under a second after
       `auth start` on both OSes (5 s there means the IPv6 lookup stall is back), and

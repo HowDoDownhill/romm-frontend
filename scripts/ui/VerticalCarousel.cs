@@ -103,6 +103,7 @@ public partial class VerticalCarousel : GameListView
             return;
         }
 
+        SampleCoverAspects();
         List<(int ItemIndex, int Offset)> window = ResolveWindow();
         var itemsInWindow = new HashSet<int>();
 
@@ -134,6 +135,8 @@ public partial class VerticalCarousel : GameListView
             {
                 continue;
             }
+
+            ApplyUniformFrame(child);
 
             if (scaleItemsToWindow)
             {
