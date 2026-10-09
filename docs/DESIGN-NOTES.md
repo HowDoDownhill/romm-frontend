@@ -1120,16 +1120,35 @@ reads most was the smallest.
 Body, so any text with no style is Body, and four sizes cover the app at the 1080-unit reference
 canvas:
 
-| Style | Size | Used by |
-|---|---|---|
-| Display (`DisplayLabel`, `DisplayButton`) | 48 | header system name and its arrows |
-| Title (`TitleLabel`, `TitleButton`, `FlatButton`) | 32 | button bars, panel and popup titles, lobby code |
-| Body (theme default) | 26 | settings labels and values, descriptions, start menu, card titles, lists, login |
-| Caption (`CaptionLabel`) | 20 | download status, settings group headers, system-jump names, netplay info |
+| Style | Size | Weight | Colour | Used by |
+|---|---|---|---|---|
+| Display (`DisplayLabel`, `DisplayButton`) | 48 | 600, tracking -1 | primary | header system name (when no logo) |
+| Title (`TitleLabel`, `TitleButton`, `FlatButton`) | 32 | 500 | button colours | button bars, panel and popup titles, lobby code |
+| Body (theme default) | 26 | 400 | primary; descriptions slightly softer | settings labels and values, descriptions, start menu, card titles, lists, login |
+| Caption (`CaptionLabel`) | 20 | 500 | secondary | download status, settings group headers, system-jump names, netplay info |
 
 Nothing in scenes or code sets a font size directly any more; use a variation. `FlatButton` was
 already referenced by every footer button but defined nowhere, so it silently meant "Button"; the
-theme now defines it with only a font size, which leaves its look unchanged.
+theme now defines it.
+
+Weights come from one variable font, `InterVariable.woff2` (Inter 4.1, SIL OFL,
+`assets/fonts/Inter-LICENSE.txt`), through `FontVariation`s with a `wght` axis value (OpenType tag
+`wght` = 2003265652 in `variation_opentype`). Size alone used to carry the hierarchy, which made
+everything read as one flat voice. Captions are Medium because small text in a secondary colour
+otherwise thins out on glass. The font is imported with hinting off: at 4K and under Interface Size
+scaling, hinting snapped stems to pixel rows and made weights uneven.
+
+Text colours are tokens in the theme: primary #EDEFF5 (pure white glares on the dark glass),
+secondary #A2A8BB for captions and arrows, disabled at 38% of primary, and descriptions at #D9DCE5
+for long-form reading. Buttons keep a slightly dimmer resting colour that brightens on focus.
+
+The navigation arrows were the characters `<` and `>`. They are `assets/icons/chevron_left.svg` /
+`chevron_right.svg`, rounded 2.25-unit strokes imported at 2x so they stay sharp at 4K, tinted with the
+secondary colour. The arrow on the side being moved toward pulses (brighten and 1.2x, 0.2 s ease-out)
+on each step: `SystemCarousel.PulseArrow` in the header, `CarouselButton.Step` in settings.
+
+Settings rows and sidebar entries share `FocusHighlight`: a 12% white fill with a 16% hairline edge
+and 10-unit radius, faded in 0.12 s. The previous 50% white block left white text at poor contrast.
 
 Larger text needed two layout changes. The settings sidebar scrolled sideways once names outgrew it;
 horizontal scrolling is off and labels end in an ellipsis. Footer buttons had a 300-unit minimum

@@ -1,16 +1,60 @@
-[gd_resource type="Theme" format=3]
+[gd_resource type="Theme" load_steps=6 format=3]
+
+[ext_resource type="FontFile" uid="uid://citl36dpeahws" path="res://assets/fonts/InterVariable.woff2" id="1_inter"]
+
+[sub_resource type="FontVariation" id="FontVariation_regular"]
+base_font = ExtResource("1_inter")
+variation_opentype = {
+2003265652: 400
+}
+
+[sub_resource type="FontVariation" id="FontVariation_medium"]
+base_font = ExtResource("1_inter")
+variation_opentype = {
+2003265652: 500
+}
+
+[sub_resource type="FontVariation" id="FontVariation_display"]
+base_font = ExtResource("1_inter")
+variation_opentype = {
+2003265652: 600
+}
+spacing_glyph = -1
+
+[sub_resource type="FontVariation" id="FontVariation_caption"]
+base_font = ExtResource("1_inter")
+variation_opentype = {
+2003265652: 500
+}
 
 [resource]
+default_font = SubResource("FontVariation_regular")
 default_font_size = 26
+Button/colors/font_color = Color(0.882, 0.894, 0.925, 1)
+Button/colors/font_disabled_color = Color(0.929, 0.937, 0.961, 0.38)
+Button/colors/font_focus_color = Color(0.961, 0.965, 0.98, 1)
+Button/colors/font_hover_color = Color(0.961, 0.965, 0.98, 1)
+Button/colors/font_hover_pressed_color = Color(0.961, 0.965, 0.98, 1)
+Button/colors/font_pressed_color = Color(0.961, 0.965, 0.98, 1)
 CaptionLabel/base_type = &"Label"
+CaptionLabel/colors/font_color = Color(0.635, 0.659, 0.733, 1)
 CaptionLabel/font_sizes/font_size = 20
+CaptionLabel/fonts/font = SubResource("FontVariation_caption")
 DisplayButton/base_type = &"Button"
 DisplayButton/font_sizes/font_size = 48
+DisplayButton/fonts/font = SubResource("FontVariation_display")
 DisplayLabel/base_type = &"Label"
 DisplayLabel/font_sizes/font_size = 48
+DisplayLabel/fonts/font = SubResource("FontVariation_display")
 FlatButton/base_type = &"Button"
 FlatButton/font_sizes/font_size = 32
+FlatButton/fonts/font = SubResource("FontVariation_medium")
+Label/colors/font_color = Color(0.929, 0.937, 0.961, 1)
+LineEdit/colors/font_color = Color(0.929, 0.937, 0.961, 1)
+RichTextLabel/colors/default_color = Color(0.851, 0.863, 0.898, 1)
 TitleButton/base_type = &"Button"
 TitleButton/font_sizes/font_size = 32
+TitleButton/fonts/font = SubResource("FontVariation_medium")
 TitleLabel/base_type = &"Label"
 TitleLabel/font_sizes/font_size = 32
+TitleLabel/fonts/font = SubResource("FontVariation_medium")

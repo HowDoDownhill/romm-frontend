@@ -59,7 +59,7 @@ enabled=PackedStringArray("res://addons/SmoothScroll/plugin.cfg", "res://addons/
 [gui]
 
 theme/custom="res://assets/themes/app_theme.tres"
-theme/custom_font="res://assets/fonts/Inter-Regular.woff2"
+theme/custom_font="res://assets/fonts/InterVariable.woff2"
 
 [input]
 

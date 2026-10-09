@@ -1,6 +1,8 @@
-[gd_scene load_steps=2 format=3 uid="uid://system_carousel_uid"]
+[gd_scene load_steps=4 format=3 uid="uid://system_carousel_uid"]
 
 [ext_resource type="Script" path="res://scripts/ui/SystemCarousel.cs" id="1_sys_car"]
+[ext_resource type="Texture2D" uid="uid://druinhaiqxjfs" path="res://assets/icons/chevron_left.svg" id="2_chev_l"]
+[ext_resource type="Texture2D" uid="uid://7akjyhdfg6hc" path="res://assets/icons/chevron_right.svg" id="3_chev_r"]
 
 [node name="SystemCarousel" type="HBoxContainer" node_paths=PackedStringArray("leftArrow", "systemIcon", "systemLabel", "rightArrow", "debounceTimer", "slider")]
 size_flags_horizontal = 3
@@ -13,12 +15,13 @@ rightArrow = NodePath("RightArrow")
 debounceTimer = NodePath("DebounceTimer")
 slider = NodePath("IconViewport/Slider")
 
-[node name="LeftArrow" type="Label" parent="."]
+[node name="LeftArrow" type="TextureRect" parent="."]
+self_modulate = Color(0.635, 0.659, 0.733, 0.85)
+custom_minimum_size = Vector2(56, 0)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
-theme_type_variation = &"DisplayLabel"
-text = "< "
-vertical_alignment = 1
+texture = ExtResource("2_chev_l")
+expand_mode = 1
+stretch_mode = 5
 
 [node name="IconViewport" type="Control" parent="."]
 custom_minimum_size = Vector2(64, 64)
@@ -58,12 +61,13 @@ theme_type_variation = &"DisplayLabel"
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="RightArrow" type="Label" parent="."]
+[node name="RightArrow" type="TextureRect" parent="."]
+self_modulate = Color(0.635, 0.659, 0.733, 0.85)
+custom_minimum_size = Vector2(56, 0)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.5, 0.5, 0.5, 1)
-theme_type_variation = &"DisplayLabel"
-text = " >"
-vertical_alignment = 1
+texture = ExtResource("3_chev_r")
+expand_mode = 1
+stretch_mode = 5
 
 [node name="DebounceTimer" type="Timer" parent="."]
 wait_time = 0.5

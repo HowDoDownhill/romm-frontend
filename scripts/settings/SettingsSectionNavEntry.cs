@@ -19,9 +19,7 @@ public partial class SettingsSectionNavEntry : MarginContainer
         sectionNameLabel = GetNode<Label>("PanelContainer/MarginContainer/Label");
         if (!string.IsNullOrEmpty(SectionName)) sectionNameLabel.Text = SectionName;
 
-        backgroundStyle = new StyleBoxFlat();
-        backgroundStyle.BgColor = new Color(0, 0, 0, 0);
-        backgroundStyle.DrawCenter = false;
+        backgroundStyle = FocusHighlight.CreateStyle();
         backgroundPanel.AddThemeStyleboxOverride("panel", backgroundStyle);
 
         GuiInput += OnGuiInput;
@@ -58,19 +56,11 @@ public partial class SettingsSectionNavEntry : MarginContainer
 
     public void Highlight()
     {
-        if (backgroundStyle != null)
-        {
-            backgroundStyle.BgColor = new Color(1f, 1f, 1f, 0.5f);
-            backgroundStyle.DrawCenter = true;
-        }
+        FocusHighlight.Set(this, backgroundStyle, true);
     }
 
     public void Unhighlight()
     {
-        if (backgroundStyle != null)
-        {
-            backgroundStyle.BgColor = new Color(0, 0, 0, 0);
-            backgroundStyle.DrawCenter = false;
-        }
+        FocusHighlight.Set(this, backgroundStyle, false);
     }
 }

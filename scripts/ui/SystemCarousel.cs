@@ -3,10 +3,10 @@ using System.Collections.Generic;
 
 public partial class SystemCarousel : HBoxContainer
 {
-    [Export] private Label leftArrow;
+    [Export] private Control leftArrow;
     [Export] private TextureRect systemIcon;
     [Export] private Label systemLabel;
-    [Export] private Label rightArrow;
+    [Export] private Control rightArrow;
     [Export] private Timer debounceTimer;
     [Export] private Control slider;
 
@@ -88,6 +88,7 @@ public partial class SystemCarousel : HBoxContainer
         int newIndex = SelectedIndex + 1;
         if (newIndex >= Systems.Count) newIndex = 0;
         SetSelectionWithTimer(newIndex, 1);
+        PulseArrow(rightArrow);
         return true;
     }
 
@@ -97,7 +98,27 @@ public partial class SystemCarousel : HBoxContainer
         int newIndex = SelectedIndex - 1;
         if (newIndex < 0) newIndex = Systems.Count - 1;
         SetSelectionWithTimer(newIndex, -1);
+        PulseArrow(leftArrow);
         return true;
+    }
+
+    private const float ArrowPulseSeconds = 0.22f;
+    private static readonly Color ArrowRestingTint = new Color(0.635f, 0.659f, 0.733f, 0.85f);
+    private static readonly Color ArrowActiveTint = new Color(0.961f, 0.965f, 0.98f, 1.0f);
+
+    private const float ArrowPulseScale = 1.18f;
+
+    private void PulseArrow(Control arrow)
+    {
+        if (arrow == null || !arrow.Visible) return;
+
+        arrow.PivotOffset = arrow.Size / 2.0f;
+        arrow.SelfModulate = ArrowActiveTint;
+        arrow.Scale = new Vector2(ArrowPulseScale, ArrowPulseScale);
+
+        var arrowTween = arrow.CreateTween().SetParallel(true).SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
+        arrowTween.TweenProperty(arrow, "self_modulate", ArrowRestingTint, ArrowPulseSeconds);
+        arrowTween.TweenProperty(arrow, "scale", Vector2.One, ArrowPulseSeconds);
     }
 
     private void SlideInFrom(int direction)

@@ -27,9 +27,7 @@ public partial class CarouselButton : HBoxContainer
     {
         SizeFlagsHorizontal = SizeFlags.ExpandFill;
         
-        var leftArrow = new Label();
-        leftArrow.Text = "< ";
-        leftArrow.AddThemeColorOverride("font_color", new Color(0.5f, 0.5f, 0.5f, 1f));
+        leftArrow = CreateArrow(LeftChevron);
         AddChild(leftArrow);
 
         valueLabel = new Label();
@@ -37,9 +35,7 @@ public partial class CarouselButton : HBoxContainer
         valueLabel.HorizontalAlignment = HorizontalAlignment.Center;
         AddChild(valueLabel);
 
-        var rightArrow = new Label();
-        rightArrow.Text = " >";
-        rightArrow.AddThemeColorOverride("font_color", new Color(0.5f, 0.5f, 0.5f, 1f));
+        rightArrow = CreateArrow(RightChevron);
         AddChild(rightArrow);
 
         if (Selected != -1)
@@ -75,6 +71,52 @@ public partial class CarouselButton : HBoxContainer
     {
         if (index >= 0 && index < Options.Count) return Options[index].Key;
         return "";
+    }
+
+    private static readonly Texture2D LeftChevron = GD.Load<Texture2D>("res://assets/icons/chevron_left.svg");
+    private static readonly Texture2D RightChevron = GD.Load<Texture2D>("res://assets/icons/chevron_right.svg");
+    private static readonly Color ArrowRestingTint = new Color(0.635f, 0.659f, 0.733f, 0.85f);
+    private static readonly Color ArrowActiveTint = new Color(0.961f, 0.965f, 0.98f, 1.0f);
+    private const float ArrowSize = 28.0f;
+    private const float ArrowPulseScale = 1.25f;
+    private const float ArrowPulseSeconds = 0.2f;
+
+    private TextureRect leftArrow;
+    private TextureRect rightArrow;
+
+    private static TextureRect CreateArrow(Texture2D chevron)
+    {
+        return new TextureRect
+        {
+            Texture = chevron,
+            ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize,
+            StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
+            CustomMinimumSize = new Vector2(ArrowSize, ArrowSize),
+            SelfModulate = ArrowRestingTint
+        };
+    }
+
+    public void Step(int direction)
+    {
+        if (ItemCount == 0 || Disabled) return;
+
+        int newIndex = ((Selected + direction) % ItemCount + ItemCount) % ItemCount;
+        Select(newIndex);
+        PulseArrow(direction < 0 ? leftArrow : rightArrow);
+        EmitSignal(SignalName.ItemSelected, newIndex);
+    }
+
+    private static void PulseArrow(TextureRect arrow)
+    {
+        if (arrow == null) return;
+
+        arrow.PivotOffset = arrow.Size / 2.0f;
+        arrow.SelfModulate = ArrowActiveTint;
+        arrow.Scale = new Vector2(ArrowPulseScale, ArrowPulseScale);
+
+        var arrowTween = arrow.CreateTween().SetParallel(true).SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
+        arrowTween.TweenProperty(arrow, "self_modulate", ArrowRestingTint, ArrowPulseSeconds);
+        arrowTween.TweenProperty(arrow, "scale", Vector2.One, ArrowPulseSeconds);
     }
 
     public void Select(int index)

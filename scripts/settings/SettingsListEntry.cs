@@ -9,9 +9,7 @@ public partial class SettingsListEntry : MarginContainer
     {
         FocusMode = FocusModeEnum.All;
 
-        backgroundStyle = new StyleBoxFlat();
-        backgroundStyle.BgColor = new Color(0, 0, 0, 0);
-        backgroundStyle.DrawCenter = false;
+        backgroundStyle = FocusHighlight.CreateStyle();
 
         var panel = GetNodeOrNull<PanelContainer>("PanelContainer");
         if (panel != null)
@@ -65,12 +63,7 @@ public partial class SettingsListEntry : MarginContainer
 
         if (interactableWidget is CarouselButton carBtn)
         {
-            if (carBtn.ItemCount == 0 || carBtn.Disabled) return;
-            int newIdx = carBtn.Selected + direction;
-            if (newIdx < 0) newIdx = carBtn.ItemCount - 1;
-            if (newIdx >= carBtn.ItemCount) newIdx = 0;
-            carBtn.Select(newIdx);
-            carBtn.EmitSignal(CarouselButton.SignalName.ItemSelected, newIdx);
+            carBtn.Step(direction);
         }
         else if (interactableWidget is OptionButton optBtn)
         {
@@ -133,19 +126,11 @@ public partial class SettingsListEntry : MarginContainer
 
     public void Highlight()
     {
-        if (backgroundStyle != null)
-        {
-            backgroundStyle.BgColor = new Color(1f, 1f, 1f, 0.5f);
-            backgroundStyle.DrawCenter = true;
-        }
+        FocusHighlight.Set(this, backgroundStyle, true);
     }
 
     public void Unhighlight()
     {
-        if (backgroundStyle != null)
-        {
-            backgroundStyle.BgColor = new Color(0, 0, 0, 0);
-            backgroundStyle.DrawCenter = false;
-        }
+        FocusHighlight.Set(this, backgroundStyle, false);
     }
 }
