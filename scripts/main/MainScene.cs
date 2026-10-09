@@ -321,6 +321,7 @@ public partial class MainScene : Control
 
             if (systemIndex >= 0)
             {
+                systemCarousel?.SetSelectionSilently(systemIndex);
                 GameListHandler.SelectSystemByIndex(systemIndex);
                 await ToSignal(GetTree().CreateTimer(1.0), SceneTreeTimer.SignalName.Timeout);
             }
@@ -333,7 +334,7 @@ public partial class MainScene : Control
             case "start": ToggleStartMenu(); break;
             case "jump": OpenSystemJumpPopup(); break;
             case "carousel": CaptureGameListView(0, 3); break;
-            case "grid": CaptureGameListView(1, 5); break;
+            case "grid": CaptureGameListView(1, 9); break;
             case "list": CaptureGameListView(2, 6); break;
         }
 

@@ -1,3 +1,39 @@
+RomM Frontend - Version 1.1.0 Changelog
+
+This release covers everything since 1.0.13, including the netplay and Linux work that shipped in preview form as 1.0.14 to 1.0.16.
+
+✨ New Features
+
+    Three Game Views: Choose Carousel, Grid or List in Settings > Game List Settings > Game View. Grid shows a wall of covers; List shows one game per line and loads fastest.
+    Netplay: Host a session from the start menu and share its code, or join one. The lobby picks the game, checks everyone has the ROM and the right emulator, and launches everyone together. Works across the internet through UPnP on RetroArch systems and Flycast (Dreamcast, with GGPO rollback).
+    Controller Layer (Windows): Every emulator now sees the same virtual controller, whatever pad is in your hands, so bindings stop breaking when you swap controllers. Set player order by pressing a button on each pad. The app offers to install the driver it needs, once.
+    New Looks: Three new backgrounds (Mesh, Silk, Horizon) and seven new themes (Midnight, Obsidian, Amethyst, Glacier, Bordeaux, Jade, Graphite). Every background now has fine grain that removes colour banding.
+    Interface Size: Scale all text and controls from 85% to 150%. Auto picks a larger size on small screens such as the Steam Deck.
+    RetroArch Controls: Choose which controller button opens the RetroArch menu, and which video driver it uses (Vulkan by default on Linux).
+
+💄 Quality of Life Improvements
+
+    Visual Refresh: A new type system with consistent sizes and weights, frosted panels, drawn navigation arrows and rounded progress bars. Selections share one highlight everywhere, and it glides between items instead of jumping.
+    Even Game Cards: Every card in a system is now the same size, with covers fitted inside.
+    Any Screen Shape: The interface fills ultrawide, 16:10 and handheld screens instead of letterboxing, and runs borderless fullscreen.
+    Faster: Startup on Linux dropped from 9.5 s to 1.8 s, and scrolling and system switching no longer stutter on large libraries.
+    Linux: Runs natively on Wayland, and stops drawing behind a running emulator to free up the GPU.
+    Mouse Support: Click a game to select it and double-click to play it in any view.
+    Tidier Details: Emulators show their proper names, game summaries no longer show HTML codes, and the API key field is masked.
+
+🐛 Bug Fixes
+
+    Duplicate Devices in RomM: Linux installs registered a new device with RomM on every launch.
+    Emulator Close Hotkey on Linux: Holding the close combination did nothing on Linux.
+    Broken Downloads: Cover art and screenshots could download twice at once or end up truncated.
+    Stale Saves Returning: An old save without an emulator tag could be downloaded again next to the current one.
+    Lost Firmware Path: A moved or deleted BIOS file was still treated as present.
+    Launching Twice: Pressing play repeatedly could start a game more than once.
+    Raw Markup in Prompts: Some on-screen prompts showed formatting tags instead of formatted text.
+    Release Packages: Release zips now contain only the app's own files.
+
+---
+
 RomM Frontend - Version 1.0.13 Changelog
 
 ✨ New Features
