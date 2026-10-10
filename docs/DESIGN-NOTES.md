@@ -3351,5 +3351,15 @@ build-tools 36.1.0 and platform 36, matching Godot 4.7's template. The preset ex
   Discrete GPU. The controller-icons addon asks the display server to translate physical key codes,
   which Android does not support, so on Android it uses the physical code directly.
 - The cover placeholder is transparent. It was white, which hid the white title on cards with no art.
-- Not done yet: launching emulators (installed Android apps started by intent), ROM storage that
-  emulators can read, and save sync.
+- Emulators install as APKs. `AndroidApps` uses Godot's Java bridge (`JavaClassWrapper` and the
+  `AndroidRuntime` singleton), so no Java plugin or gradle build is needed. It hands a downloaded APK
+  to the system installer through the template's own FileProvider
+  (`<package>.fileprovider`, which already shares the app's `files` folder), checks a package with
+  `getLaunchIntentForPackage`, and opens the system uninstaller. The first install shows Android's
+  "install unknown apps" prompt; every install shows the system confirm screen. Verified with
+  Flycast 2.7 from its GitHub release on a Galaxy S25 Ultra, Android 16.
+- `REQUEST_INSTALL_PACKAGES` and `QUERY_ALL_PACKAGES` are declared through
+  `permissions/custom_permissions`; Godot's named options for them did not reach the manifest.
+  Without `QUERY_ALL_PACKAGES`, Android 11+ hides other apps and every emulator reads as missing.
+- Not done yet: Android install recipes in each emulator's `meta.json`, launching emulators by
+  intent, ROM storage that emulators can read, and save sync.
