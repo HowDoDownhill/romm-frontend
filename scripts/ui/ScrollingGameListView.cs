@@ -47,7 +47,7 @@ public abstract partial class ScrollingGameListView : GameListView
 
             if (ItemCount > 0)
             {
-                EmitSignal(SignalName.ItemFocused, SelectedIndex);
+                NotifyItemFocused();
             }
 
             return;
@@ -86,7 +86,7 @@ public abstract partial class ScrollingGameListView : GameListView
             SelectionHighlighter.Set(selectedCard, selectedCard, true, SelectionHighlightGrow);
         }
 
-        EmitSignal(SignalName.ItemFocused, SelectedIndex);
+        NotifyItemFocused();
     }
 
     public override void _Process(double delta)
@@ -94,13 +94,20 @@ public abstract partial class ScrollingGameListView : GameListView
         float glide = 1.0f - Mathf.Exp(-ScrollRate * (float)delta);
         scrollOffset = Mathf.Lerp(scrollOffset, targetScrollOffset, glide);
 
-        if (!IsAnimating)
+        bool settled = !IsAnimating;
+
+        if (settled)
         {
             scrollOffset = targetScrollOffset;
             SetProcess(false);
         }
 
         content.Position = new Vector2(0.0f, -scrollOffset);
+
+        if (settled)
+        {
+            OnAnimationSettled();
+        }
     }
 
     protected static float KeepInView(float currentScroll, float itemTop, float itemBottom, float viewHeight, float margin)

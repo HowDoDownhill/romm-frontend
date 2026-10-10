@@ -743,10 +743,7 @@ public partial class MainSceneGameListHandler
         cardsWithLoadedCover.Add(card);
         item.Reveal();
 
-        if (mainScene.ActiveGameList is GameListView activeView && !activeView.IsAnimating)
-        {
-            Callable.From(() => activeView.UpdateLayout(false)).CallDeferred();
-        }
+        mainScene.ActiveGameList?.RequestCardRefresh();
     }
 
     public bool CheckIfGameIsDownloaded(Game game)

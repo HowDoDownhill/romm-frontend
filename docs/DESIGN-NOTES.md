@@ -1549,6 +1549,16 @@ neighbours. The carousel caption is a single line with an ellipsis, because a wr
 card taller; the details panel shows the full name. A card's caption space is reserved whether or not
 the caption shows, so a card without a cover is the same size too.
 
+Each loaded cover asks for a card refresh (`RequestCardRefresh`), coalesced to one per frame. A
+refresh used to be skipped outright while the list was animating, and a system switch always
+animates: the reload is followed by a 0.25 s scroll to the starting game, which is exactly when the
+cached covers arrive. Every refresh was dropped and the cards kept their placeholder size (480x521
+where SNES should be 480x673) until the next move. A refresh that meets an animation now waits for
+it to settle (the carousel tween's `Finished`, or the scroll reaching its target). Refreshes also no
+longer emit `ItemFocused`, which had re-run the details panel update for every cover that loaded.
+`--ui-capture-game-view=` with the `next-system` capture view reproduces a real switch, and the
+capture log lists the distinct card sizes.
+
 Grid: about 2.6 rows fit the view, which gives four columns at 1080p (3 to 8 allowed). Cells follow
 the system's card frame, so square Dreamcast boxes and wide SNES boxes both fill their cells. Grid
 cards hide the caption (the details panel shows the name); a card with no cover still shows its

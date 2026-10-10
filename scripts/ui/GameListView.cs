@@ -171,6 +171,58 @@ public abstract partial class GameListView : Control
 
     public abstract void UpdateLayout(bool animated = true);
 
+    private bool cardRefreshQueued;
+    private bool cardRefreshWaitingForAnimation;
+    private bool refreshingCards;
+
+    public void RequestCardRefresh()
+    {
+        if (cardRefreshQueued)
+        {
+            return;
+        }
+
+        cardRefreshQueued = true;
+        Callable.From(RunQueuedCardRefresh).CallDeferred();
+    }
+
+    private void RunQueuedCardRefresh()
+    {
+        cardRefreshQueued = false;
+
+        if (IsAnimating)
+        {
+            cardRefreshWaitingForAnimation = true;
+            return;
+        }
+
+        RefreshCards();
+    }
+
+    protected void OnAnimationSettled()
+    {
+        if (cardRefreshWaitingForAnimation)
+        {
+            cardRefreshWaitingForAnimation = false;
+            RefreshCards();
+        }
+    }
+
+    private void RefreshCards()
+    {
+        refreshingCards = true;
+        UpdateLayout(false);
+        refreshingCards = false;
+    }
+
+    protected void NotifyItemFocused()
+    {
+        if (!refreshingCards)
+        {
+            EmitSignal(SignalName.ItemFocused, SelectedIndex);
+        }
+    }
+
     private const int CoverAspectSampleTarget = 6;
     private const float MinimumCoverAspect = 0.5f;
     private const float MaximumCoverAspect = 1.6f;

@@ -117,6 +117,7 @@ public partial class VerticalCarousel : GameListView
         if (animated)
         {
             tween = CreateTween().SetParallel(true).SetTrans(Tween.TransitionType.Cubic).SetEase(Tween.EaseType.Out);
+            tween.Finished += OnAnimationSettled;
         }
 
         Vector2 center = Size / 2.0f;
@@ -195,6 +196,6 @@ public partial class VerticalCarousel : GameListView
             tween = null;
         }
 
-        EmitSignal(SignalName.ItemFocused, SelectedIndex);
+        NotifyItemFocused();
     }
 }

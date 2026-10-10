@@ -294,6 +294,7 @@ public partial class MainScene : Control
     private const string LayoutCaptureSystemArgumentPrefix = "--ui-capture-system=";
     private const string LayoutCaptureThemeArgumentPrefix = "--ui-capture-theme=";
     private const string LayoutCaptureControllerArgument = "--ui-capture-controller";
+    private const string LayoutCaptureGameViewArgumentPrefix = "--ui-capture-game-view=";
     private const string LayoutCaptureBackgroundArgumentPrefix = "--ui-capture-background=";
 
     private string previewThemeName;
@@ -348,6 +349,16 @@ public partial class MainScene : Control
             }
         }
 
+        string gameViewName = CaptureArgument(LayoutCaptureGameViewArgumentPrefix);
+        int gameViewIndex = gameViewName == null ? -1 : Array.FindIndex(ConfigManager.GameListViews, view => view.Equals(gameViewName, StringComparison.OrdinalIgnoreCase));
+
+        if (gameViewIndex >= 0)
+        {
+            SetGameListView(gameViewIndex);
+            ActiveGameList?.GrabFocus();
+            await ToSignal(GetTree().CreateTimer(1.0), SceneTreeTimer.SignalName.Timeout);
+        }
+
         switch (viewArgument?.Substring(LayoutCaptureViewArgumentPrefix.Length))
         {
             case "settings": SectionHandler.ShowSection(MainSceneSectionHandler.Section.Settings, false); break;
@@ -356,6 +367,11 @@ public partial class MainScene : Control
             case "jump": OpenSystemJumpPopup(); break;
             case "carousel": CaptureGameListView(0, 3); break;
             case "glyphs": SimulateControllerInput(); break;
+            case "next-system":
+                Input.ParseInputEvent(new InputEventAction { Action = "CylceSystemUp", Pressed = true });
+                await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+                Input.ParseInputEvent(new InputEventAction { Action = "CylceSystemUp", Pressed = false });
+                break;
             case "grid": CaptureGameListView(1, 9); break;
             case "list": CaptureGameListView(2, 6); break;
         }
@@ -371,6 +387,8 @@ public partial class MainScene : Control
         Image capturedFrame = GetViewport().GetTexture().GetImage();
         Error saveResult = capturedFrame.SavePng(capturePath);
         string openPanel = panelStack.TopPanel?.Name ?? "none";
+        string cardSizes = ActiveGameList == null ? "none" : string.Join(" ", ActiveGameList.BoundCards.Values.Select(card => $"{card.Size.X:0}x{card.Size.Y:0}").Distinct());
+        GD.Print($"[Layout] card sizes {cardSizes}");
         GD.Print($"[Layout] captured {capturedFrame.GetWidth()}x{capturedFrame.GetHeight()} (canvas {GetViewportRect().Size}, carousel {gameList?.Size}, details {detailsPanel?.Size}, open panel {openPanel}, section {SectionHandler?.CurrentSection}) to {capturePath}: {saveResult}");
         GetTree().Quit();
     }

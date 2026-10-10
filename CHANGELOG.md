@@ -23,6 +23,7 @@ This release covers everything since 1.0.13, including the netplay and Linux wor
 
 🐛 Bug Fixes
 
+    Wrong Card Sizes After Switching Systems: Game cards could stay at the wrong size after switching systems until you moved to another game.
     Missing Button Prompts: The bottom bar and update dialog never showed which controller button does what. They now show A, B, X, Y and Start icons whenever a controller is in use.
     Duplicate Devices in RomM: Linux installs registered a new device with RomM on every launch.
     Emulator Close Hotkey on Linux: Holding the close combination did nothing on Linux.
