@@ -4,11 +4,11 @@ A couch-friendly client for [RomM](https://github.com/rommapp/romm). Browse your
 with a controller, download a game, and play it. The emulator is installed and set up for you,
 and your saves sync back to RomM.
 
-![Carousel view](docs/images/carousel.jpg)
+![Carousel view](docs/images/carousel-view.jpg)
 
 | Grid view | List view |
 |---|---|
-| ![Grid view](docs/images/grid.jpg) | ![List view](docs/images/list.jpg) |
+| ![Grid view](docs/images/grid-view.jpg) | ![List view](docs/images/list-view.jpg) |
 
 ## Contents
 
