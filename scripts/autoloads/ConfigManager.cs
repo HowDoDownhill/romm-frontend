@@ -37,6 +37,8 @@ public partial class ConfigManager : Node
 
     public static readonly string[] GameListViews = { "Carousel", "Grid", "List" };
 
+    public const string DefaultGameListView = "Grid";
+
     public static readonly string[] InterfaceSizes = { "Auto", "85%", "100%", "115%", "130%", "150%" };
 
     public static readonly (string Name, string ShaderPath)[] BackgroundStyles = new (string, string)[]
@@ -370,7 +372,7 @@ public partial class ConfigManager : Node
         AppTheme = (string)configurationFile.GetValue("UI", "AppTheme", "Default");
         AppBackground = (string)configurationFile.GetValue("UI", "AppBackground", "Flow");
         InterfaceSize = (string)configurationFile.GetValue("UI", "InterfaceSize", "Auto");
-        GameListView = (string)configurationFile.GetValue("UI", "GameListView", GameListViews[0]);
+        GameListView = (string)configurationFile.GetValue("UI", "GameListView", DefaultGameListView);
 
         EmulatorCloseHotkeyCount = (int)configurationFile.GetValue("Input", "EmulatorCloseHotkeyCount", DefaultEmulatorCloseHotkeyCount);
         var defaultHotkeyButtons = BuildDefaultEmulatorCloseHotkeys();
@@ -433,7 +435,7 @@ public partial class ConfigManager : Node
         AppTheme = "Default";
         AppBackground = "Flow";
         InterfaceSize = "Auto";
-        GameListView = GameListViews[0];
+        GameListView = DefaultGameListView;
 
         EmulatorCloseHotkeyCount = DefaultEmulatorCloseHotkeyCount;
         EmulatorCloseHotkeys = BuildDefaultEmulatorCloseHotkeys();

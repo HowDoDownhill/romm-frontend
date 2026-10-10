@@ -38,6 +38,21 @@ public abstract partial class GameListView : Control
         ClipContents = true;
     }
 
+    private const float DragStartDistance = 18.0f;
+    private const float FlingSeconds = 0.35f;
+    private const int MaximumFlingSteps = 12;
+
+    private bool pointerDown;
+    private bool dragging;
+    private Vector2 pointerPressPosition;
+    private int pointerPressIndex = -1;
+    private float dragTravel;
+    private float dragVelocity;
+
+    protected virtual float DragStepPixels => 120.0f;
+
+    protected virtual int DragStepItems => 1;
+
     public override void _GuiInput(InputEvent @event)
     {
         if (ItemCount == 0)
@@ -45,25 +60,25 @@ public abstract partial class GameListView : Control
             return;
         }
 
-        if (@event is InputEventMouseButton mouseButton && mouseButton.Pressed && mouseButton.ButtonIndex == MouseButton.Left)
+        if (@event is InputEventMouseButton mouseButton && mouseButton.ButtonIndex == MouseButton.Left)
         {
-            int clickedIndex = ItemIndexAt(mouseButton.GlobalPosition);
-
-            if (clickedIndex < 0)
+            if (mouseButton.Pressed)
             {
-                return;
+                BeginPointer(mouseButton);
             }
 
-            if (clickedIndex != SelectedIndex)
+            else
             {
-                SelectIndex(clickedIndex, true);
+                EndPointer();
             }
 
-            else if (mouseButton.DoubleClick)
-            {
-                EmitSignal(SignalName.ItemActivated, SelectedIndex);
-            }
+            AcceptEvent();
+            return;
+        }
 
+        if (@event is InputEventMouseMotion motion && pointerDown && (motion.ButtonMask & MouseButtonMask.Left) != 0)
+        {
+            TrackDrag(motion);
             AcceptEvent();
             return;
         }
@@ -71,6 +86,71 @@ public abstract partial class GameListView : Control
         if (HandleNavigation(@event))
         {
             AcceptEvent();
+        }
+    }
+
+    private void BeginPointer(InputEventMouseButton press)
+    {
+        pointerPressIndex = ItemIndexAt(press.GlobalPosition);
+
+        if (press.DoubleClick && pointerPressIndex >= 0 && pointerPressIndex == SelectedIndex)
+        {
+            pointerDown = false;
+            EmitSignal(SignalName.ItemActivated, SelectedIndex);
+            return;
+        }
+
+        pointerDown = true;
+        dragging = false;
+        pointerPressPosition = press.Position;
+        dragTravel = 0.0f;
+        dragVelocity = 0.0f;
+    }
+
+    private void TrackDrag(InputEventMouseMotion motion)
+    {
+        if (!dragging && motion.Position.DistanceTo(pointerPressPosition) < DragStartDistance)
+        {
+            return;
+        }
+
+        dragging = true;
+        dragTravel -= motion.Relative.Y;
+        dragVelocity = -motion.Velocity.Y;
+        float step = Mathf.Max(1.0f, DragStepPixels);
+
+        while (Mathf.Abs(dragTravel) >= step)
+        {
+            int direction = Math.Sign(dragTravel);
+            MoveSelection(direction * DragStepItems, false);
+            dragTravel -= direction * step;
+        }
+    }
+
+    private void EndPointer()
+    {
+        if (!pointerDown)
+        {
+            return;
+        }
+
+        pointerDown = false;
+
+        if (dragging)
+        {
+            int flingSteps = Math.Clamp((int)(dragVelocity * FlingSeconds / Mathf.Max(1.0f, DragStepPixels)), -MaximumFlingSteps, MaximumFlingSteps);
+
+            if (flingSteps != 0)
+            {
+                MoveSelection(flingSteps * DragStepItems, false);
+            }
+
+            return;
+        }
+
+        if (pointerPressIndex >= 0 && pointerPressIndex != SelectedIndex)
+        {
+            SelectIndex(pointerPressIndex, true);
         }
     }
 

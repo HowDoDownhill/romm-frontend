@@ -25,19 +25,10 @@ public partial class CacheManager : Node
 
     public void InitializeCacheFilePaths()
     {
-        if (OS.HasFeature("editor"))
-        {
-            systemsCacheFilePath = ProjectSettings.GlobalizePath("res://systems.cache");
-            gamesCacheFilePath = ProjectSettings.GlobalizePath("res://games.cache");
-            romHashCacheFilePath = ProjectSettings.GlobalizePath("res://romhashes.cache");
-        }
-
-        else
-        {
-            systemsCacheFilePath = OS.GetExecutablePath().GetBaseDir() + "/systems.cache";
-            gamesCacheFilePath = OS.GetExecutablePath().GetBaseDir() + "/games.cache";
-            romHashCacheFilePath = OS.GetExecutablePath().GetBaseDir() + "/romhashes.cache";
-        }
+        string applicationRootDirectory = GetNode<ConfigManager>("/root/ConfigManager").ApplicationRootDirectory;
+        systemsCacheFilePath = applicationRootDirectory + "/systems.cache";
+        gamesCacheFilePath = applicationRootDirectory + "/games.cache";
+        romHashCacheFilePath = applicationRootDirectory + "/romhashes.cache";
     }
 
     public string GetStoredRomHash(string romFilePath)

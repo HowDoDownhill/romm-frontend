@@ -173,6 +173,11 @@ public class MainSceneInputHandler
             return;
         }
 
+        if (OS.HasFeature("android"))
+        {
+            return;
+        }
+
         if (mainScene.changelogPanel == null || mainScene.panelStack.HasOpenPanel)
         {
             return;

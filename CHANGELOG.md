@@ -4,7 +4,7 @@ This release covers everything since 1.0.13, including the netplay and Linux wor
 
 ✨ New Features
 
-    Three Game Views: Choose Carousel, Grid or List in Settings > Game List Settings > Game View. Grid shows a wall of covers; List shows one game per line and loads fastest.
+    Three Game Views: Choose Carousel, Grid or List in Settings > Game List Settings > Game View. Grid, now the default, shows a wall of covers; List shows one game per line and loads fastest.
     Netplay: Host a session from the start menu and share its code, or join one. The lobby picks the game, checks everyone has the ROM and the right emulator, and launches everyone together. Works across the internet through UPnP on RetroArch systems and Flycast (Dreamcast, with GGPO rollback).
     Controller Layer (Windows): Every emulator now sees the same virtual controller, whatever pad is in your hands, so bindings stop breaking when you swap controllers. Set player order by pressing a button on each pad. The app offers to install the driver it needs, once.
     New Looks: Three new backgrounds (Mesh, Silk, Horizon) and seven new themes (Midnight, Obsidian, Amethyst, Glacier, Bordeaux, Jade, Graphite). Every background now has fine grain that removes colour banding.
@@ -18,12 +18,14 @@ This release covers everything since 1.0.13, including the netplay and Linux wor
     Any Screen Shape: The interface fills ultrawide, 16:10 and handheld screens instead of letterboxing, and runs borderless fullscreen.
     Faster: Startup on Linux dropped from 9.5 s to 1.8 s, and scrolling and system switching no longer stutter on large libraries.
     Linux: Runs natively on Wayland, and stops drawing behind a running emulator to free up the GPU.
-    Mouse Support: Click a game to select it and double-click to play it in any view.
+    Mouse Support: Click a game to select it, double-click to play it, and drag to scroll in any view.
     Tidier Details: Emulators show their proper names, game summaries no longer show HTML codes, and the API key field is masked.
 
 🐛 Bug Fixes
 
     Wrong Card Sizes After Switching Systems: Game cards could stay at the wrong size after switching systems until you moved to another game.
+    Settings Buttons: The Back and Select buttons at the bottom of the settings screen did nothing when clicked.
+    Unreadable Titles Without Cover Art: Games without cover art showed a white card that hid their title.
     Missing Button Prompts: The bottom bar and update dialog never showed which controller button does what. They now show A, B, X, Y and Start icons whenever a controller is in use.
     Duplicate Devices in RomM: Linux installs registered a new device with RomM on every launch.
     Emulator Close Hotkey on Linux: Holding the close combination did nothing on Linux.

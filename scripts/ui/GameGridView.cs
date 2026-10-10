@@ -24,6 +24,10 @@ public partial class GameGridView : ScrollingGameListView
     private int RowCount => (ItemCount + columns - 1) / columns;
     private float RowPitch => cellSize.Y + CellGap;
 
+    protected override float DragStepPixels => RowPitch;
+
+    protected override int DragStepItems => columns;
+
     protected override float ContentHeight => RowCount * RowPitch + CellGap;
 
     protected override float SelectionHighlightGrow => CellGap * 0.5f;

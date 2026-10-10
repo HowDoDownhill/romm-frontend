@@ -3330,3 +3330,26 @@ exceeds the number of physical pads, so the two sections cannot collide on an in
 Flycast also did **not** persist a port change made in its own UI — `emu.cfg` still held only the
 shipped entry afterwards. Hand-fixing the ports is therefore not a workaround available to users, and
 writing them at launch is the only reliable route.
+
+### Android
+Building needs the .NET 9 SDK (the project targets net9.0 for Android) and the Android SDK with
+build-tools 36.1.0 and platform 36, matching Godot 4.7's template. The preset exports arm64 only.
+
+- The application root is `OS.GetUserDataDir()` (the app's private `files` folder), because the
+  executable's folder is read-only. `CacheManager` builds its cache paths from that root too: it used
+  the executable's folder, so on Android the cache write failed and every launch re-downloaded the
+  whole library (93 s for 14,232 games; 2 s from the cache).
+- Touch: Godot turns touches into mouse events, so `GameListView` handles a press, drag and release.
+  A drag steps the selection one item (carousel, list) or one row (grid) per item or row of finger
+  travel, which keeps content moving with the finger; release speed adds up to 12 more steps as a
+  fling. Selection happens on release without a drag, so starting a drag on a card does not jump to
+  it; a double tap on the selected game activates it.
+- `quit_on_go_back` is off and `MainScene` turns the back gesture into the `Back` action, so it
+  closes whatever is open and does nothing on the game list. The settings Back and Select buttons
+  had no handlers on any platform; Back now closes settings and Select sends `Select`.
+- Windows-only features are hidden: the controller-mapping offer and its setting, and Prefer
+  Discrete GPU. The controller-icons addon asks the display server to translate physical key codes,
+  which Android does not support, so on Android it uses the physical code directly.
+- The cover placeholder is transparent. It was white, which hid the white title on cards with no art.
+- Not done yet: launching emulators (installed Android apps started by intent), ROM storage that
+  emulators can read, and save sync.

@@ -17,6 +17,7 @@ boot_splash/bg_color=Color(0.039, 0.027, 0.075, 1)
 boot_splash/show_image=false
 config/icon="uid://dtq34b0wgwvct"
 config/windows_native_icon="res://assets/icons/isotipo.ico"
+config/quit_on_go_back=false
 
 [autoload]
 

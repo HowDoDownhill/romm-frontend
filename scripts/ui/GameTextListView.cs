@@ -12,6 +12,8 @@ public partial class GameTextListView : ScrollingGameListView
 
     private float RowPitch => rowHeight + RowGap;
 
+    protected override float DragStepPixels => RowPitch;
+
     protected override float ContentHeight => ItemCount * RowPitch + SidePadding * 2.0f;
 
     protected override float SelectionHighlightGrow => 0.0f;

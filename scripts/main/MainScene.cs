@@ -105,9 +105,9 @@ public partial class MainScene : Control
 
     public override void _Ready()
     {
-        var whiteImage = Image.CreateEmpty(1, 1, false, Image.Format.Rgba8);
-        whiteImage.Fill(Colors.White);
-        placeholderTexture = ImageTexture.CreateFromImage(whiteImage);
+        var placeholderImage = Image.CreateEmpty(1, 1, false, Image.Format.Rgba8);
+        placeholderImage.Fill(Colors.Transparent);
+        placeholderTexture = ImageTexture.CreateFromImage(placeholderImage);
         appInstance = GetNode<AppInstance>("/root/AppInstance");
 
         SettingsHandler = new MainSceneSettingsHandler(this, appInstance);
@@ -391,6 +391,20 @@ public partial class MainScene : Control
         GD.Print($"[Layout] card sizes {cardSizes}");
         GD.Print($"[Layout] captured {capturedFrame.GetWidth()}x{capturedFrame.GetHeight()} (canvas {GetViewportRect().Size}, carousel {gameList?.Size}, details {detailsPanel?.Size}, open panel {openPanel}, section {SectionHandler?.CurrentSection}) to {capturePath}: {saveResult}");
         GetTree().Quit();
+    }
+
+    private static void SimulateAction(string action)
+    {
+        Input.ParseInputEvent(new InputEventAction { Action = action, Pressed = true });
+        Input.ParseInputEvent(new InputEventAction { Action = action, Pressed = false });
+    }
+
+    public override void _Notification(int what)
+    {
+        if (what == NotificationWMGoBackRequest)
+        {
+            SimulateAction("Back");
+        }
     }
 
     private static void SimulateControllerInput()
@@ -678,7 +692,10 @@ public partial class MainScene : Control
         if (deleteBtn != null) deleteBtn.Pressed += OnDeleteButtonPressed;
 
         SetupButton(settingsSelectBtn, "Select", "Select");
+        if (settingsSelectBtn != null) settingsSelectBtn.Pressed += () => SimulateAction("Select");
+
         SetupButton(settingsBackBtn, "Back", "Back");
+        if (settingsBackBtn != null) settingsBackBtn.Pressed += SettingsHandler.ToggleSettingsMenu;
 
         SetupButton(optionsBtn, "ToggleSettings", "Options");
         if (optionsBtn != null) optionsBtn.Pressed += ToggleStartMenu;

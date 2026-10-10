@@ -349,6 +349,7 @@ public class MainSceneSettingsHandler
         discreteGpuFieldBox.AddChild(discreteGpuCheckbox);
         var discreteGpuEntry = settingsListEntryScene.Instantiate<SettingsListEntry>();
         discreteGpuEntry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(discreteGpuFieldBox);
+        discreteGpuEntry.Visible = OS.HasFeature("windows");
         vbox.AddChild(discreteGpuEntry);
     }
 
@@ -524,6 +525,7 @@ public class MainSceneSettingsHandler
         automaticMappingBox.AddChild(automaticMappingCheckbox);
         var automaticMappingEntry = settingsListEntryScene.Instantiate<SettingsListEntry>();
         automaticMappingEntry.GetNode<MarginContainer>("PanelContainer/ContentMargin").AddChild(automaticMappingBox);
+        automaticMappingEntry.Visible = !OS.HasFeature("android");
         vbox.AddChild(automaticMappingEntry);
 
         HBoxContainer countBox = new HBoxContainer();

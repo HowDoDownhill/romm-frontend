@@ -660,6 +660,11 @@ public partial class ControllerIcons : Node
 			// If this is a physical key, convert to localized scancode
 			if( keyEvent.Keycode == 0 )
             {
+                if( OS.HasFeature("android") )
+                {
+                    return ConvertKeyToPath(keyEvent.PhysicalKeycode);
+                }
+
                 return ConvertKeyToPath(DisplayServer.KeyboardGetKeycodeFromPhysical(keyEvent.PhysicalKeycode));
             }
 

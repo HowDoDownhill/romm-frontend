@@ -21,6 +21,9 @@ public partial class VerticalCarousel : GameListView
     [Export] public Vector2 referenceCarouselSize = new Vector2(945, 873);
 
     private Tween tween;
+    private float lastItemSpacing = 120.0f;
+
+    protected override float DragStepPixels => lastItemSpacing;
     public override bool IsAnimating => tween != null && tween.IsValid() && tween.IsRunning();
 
     private Vector2 ResolveEffectiveCanvasSize()
@@ -125,6 +128,7 @@ public partial class VerticalCarousel : GameListView
         float viewportWidth = effectiveCanvasSize.X;
         float targetWidth = viewportWidth * windowWidthRatio;
         float currentItemSpacing = useScreenPercentageForOffsets ? effectiveCanvasSize.Y * itemSpacingRatio : itemSpacing;
+        lastItemSpacing = currentItemSpacing;
         float currentDepthOffset = useScreenPercentageForOffsets ? viewportWidth * depthOffsetRatio : depthOffset;
         float currentXOffset = useScreenPercentageForOffsets ? viewportWidth * xOffsetRatio : xOffset;
 

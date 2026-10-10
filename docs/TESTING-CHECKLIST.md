@@ -232,3 +232,15 @@ lobby from the command line, so one side can be the Linux test box (`docs/LINUX-
 - [ ] Unplugging and re-plugging a pad mid-game does not reorder players.
 - [ ] Layer off: emulators fall back to the physical pads and nothing in their config still points at
       a virtual pad.
+
+## 12. Android
+
+- [ ] Fresh install: the login screen appears, logging in loads the library, and the second launch
+      reaches the library from the cache in a few seconds (`files/games.cache` exists).
+- [ ] Grid is the default view on a fresh install, on every platform.
+- [ ] Swiping up and down moves through games in all three views; a flick carries further; a tap
+      selects; a double tap on the selected game plays it.
+- [ ] Settings: the Back button and the system back gesture both return to the game list; the back
+      gesture on the game list leaves the app open.
+- [ ] No controller-mapping offer, and no Automatic Controller Mapping or Prefer Discrete GPU rows.
+- [ ] Games without cover art show a dark card with a readable title.
