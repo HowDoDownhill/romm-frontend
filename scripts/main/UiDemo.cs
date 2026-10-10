@@ -24,6 +24,7 @@ public partial class UiDemo : Node
 
         At(0.0, () =>
         {
+            RegisterControllerInput();
             mainScene.PreviewAppearance("Midnight", "Horizon");
             mainScene.SetGameListView(0);
             mainScene.ActiveGameList?.GrabFocus();
@@ -144,12 +145,20 @@ public partial class UiDemo : Node
 
     private static void PressAndRelease(string action)
     {
+        RegisterControllerInput();
         Input.ParseInputEvent(new InputEventAction { Action = action, Pressed = true });
         Input.ParseInputEvent(new InputEventAction { Action = action, Pressed = false });
     }
 
+    private static void RegisterControllerInput()
+    {
+        Input.ParseInputEvent(new InputEventJoypadButton { ButtonIndex = JoyButton.Misc1, Pressed = true, Device = 0 });
+        Input.ParseInputEvent(new InputEventJoypadButton { ButtonIndex = JoyButton.Misc1, Pressed = false, Device = 0 });
+    }
+
     private void BeginNextSystemHold()
     {
+        RegisterControllerInput();
         Input.ParseInputEvent(new InputEventAction { Action = NextSystemAction, Pressed = true });
         holdingNextSystem = true;
         holdStartedAt = elapsedSeconds;
