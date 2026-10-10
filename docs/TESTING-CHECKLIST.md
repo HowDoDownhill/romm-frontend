@@ -133,6 +133,11 @@ This is the section with the worst platform divergence. Do not skip it on either
 - [ ] Controller is detected at startup and after hot-plug.
 - [ ] Navigation, select, back, settings, downloads page, delete, cancel all respond.
 - [ ] Controller icons render for the connected pad.
+- [ ] Button prompts match the controller in use. With a PlayStation pad they show Cross, Circle,
+      Square and Triangle; with a Switch Pro pad, Nintendo letters in swapped positions (the bottom
+      button reads B); with an Xbox pad, Xbox letters. With two different pads connected, pressing a
+      button on each switches the prompts to that pad. On Windows with Automatic Controller Mapping
+      on, the first press on a non-Xbox pad replaces the virtual pad's Xbox prompts.
 - [ ] Emulator controller config is written only when a controller is actually detected, and an
       existing device line is never overwritten.
 - [ ] Face buttons map positionally (South/East/West/North), not by Xbox letter.
