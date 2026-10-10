@@ -890,19 +890,56 @@ public partial class MainScene : Control
         "On the next screen, open Documents, select the RomM folder, then tap Use This Folder and Allow. You only need to do this once.";
 
     private Game gameWaitingForFolderAccess;
+    private Game gameWaitingForCoreSetup;
+    private string coreWaitingForSetup;
 
     private void LaunchSelectedGame()
     {
         Game selectedGame = GameListHandler.currentlySelectedGame;
 
-        if (AndroidApps.IsAvailable && !AndroidStorage.HasAccessTo(appInstance.configManager.RomsPath))
+        if (appInstance.emulatorManager.LaunchNeedsFolderAccess(selectedGame) && !AndroidStorage.HasAccessTo(appInstance.configManager.RomsPath))
         {
             gameWaitingForFolderAccess = selectedGame;
             changelogPanel?.ShowPrompt(ChangelogPanel.PromptSubject.GameFolderAccess, GameFolderAccessBody, "Choose Folder", "Not Now");
             return;
         }
 
+        string coreNeedingSetup = appInstance.emulatorManager.FindAndroidCoreNeedingSetup(selectedGame, out string coreDisplayName);
+
+        if (coreNeedingSetup != null)
+        {
+            gameWaitingForCoreSetup = selectedGame;
+            coreWaitingForSetup = coreNeedingSetup;
+            changelogPanel?.ShowPrompt(ChangelogPanel.PromptSubject.AndroidCoreSetup, BuildCoreSetupBody(coreDisplayName), "Open RetroArch", "Not Now");
+            return;
+        }
+
         appInstance.emulatorManager.LaunchEmulatorWithGame(selectedGame);
+    }
+
+    private static string BuildCoreSetupBody(string coreDisplayName)
+    {
+        return $"[b]Install the {coreDisplayName} core[/b]\n\n" +
+            "RetroArch downloads its own cores, and Android does not let other apps add them for it.\n\n" +
+            $"In RetroArch, open Main Menu, then Online Updater, then Core Downloader, and choose {coreDisplayName}. " +
+            "The first time RetroArch opens it asks for All files access; allow it so it can read your games.\n\n" +
+            "After that, Play starts the game directly.";
+    }
+
+    private void OpenRetroArchForCoreSetup()
+    {
+        if (coreWaitingForSetup != null)
+        {
+            appInstance.configManager.SaveAndroidCoreSetUp(coreWaitingForSetup);
+        }
+
+        if (gameWaitingForCoreSetup?.System != null)
+        {
+            appInstance.emulatorManager.OpenEmulatorAppForSystem(gameWaitingForCoreSetup.System.Slug);
+        }
+
+        gameWaitingForCoreSetup = null;
+        coreWaitingForSetup = null;
     }
 
     private void RequestGameFolderAccess()
@@ -928,6 +965,13 @@ public partial class MainScene : Control
             return;
         }
 
+        if (changelogPanel.ActiveSubject == ChangelogPanel.PromptSubject.AndroidCoreSetup)
+        {
+            changelogPanel.Close();
+            OpenRetroArchForCoreSetup();
+            return;
+        }
+
         if (changelogPanel.ActiveSubject == ChangelogPanel.PromptSubject.ControllerLayer)
         {
             changelogPanel.Close();
@@ -944,6 +988,14 @@ public partial class MainScene : Control
         {
             changelogPanel.Close();
             gameWaitingForFolderAccess = null;
+            return;
+        }
+
+        if (changelogPanel.ActiveSubject == ChangelogPanel.PromptSubject.AndroidCoreSetup)
+        {
+            changelogPanel.Close();
+            gameWaitingForCoreSetup = null;
+            coreWaitingForSetup = null;
             return;
         }
 

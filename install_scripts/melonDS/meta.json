@@ -1,5 +1,11 @@
 {
   "name": "melonDS",
+  "android_package": "me.magnum.melonds",
+  "android_play_store": true,
+  "android_launch": {
+    "activity": "me.magnum.melonds.ui.emulator.EmulatorActivity",
+    "game": "document_extra:uri"
+  },
   "executable_name": {
     "windows": "melonDS.exe",
     "macos": "melonDS"
@@ -10,7 +16,8 @@
   "emulator_dir_name": {
     "windows": "melonDS",
     "linux": "melonDS",
-    "macos": "melonDS"
+    "macos": "melonDS",
+    "android": "melonDS"
   },
   "launch_args_with_game": "\"{rom_path}\"",
   "launch_args_without_game": "",
@@ -28,6 +35,12 @@
       "type": "github_release",
       "repo": "pkgforge-dev/melonDS-AppImage-Enhanced",
       "asset_regex": "melonDS-.*-anylinux-x86_64\\.AppImage$",
+      "extract": false
+    },
+    "android": {
+      "type": "github_release",
+      "repo": "rafaelvcaetano/melonDS-android",
+      "asset_regex": ".*\\.apk$",
       "extract": false
     }
   },

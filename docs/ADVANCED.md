@@ -124,7 +124,10 @@ Each emulator is a folder under `install_scripts/` with a `meta.json`, and optio
 | `name` | Name shown in the app |
 | `executable_name` | Executable per OS. Use `executable_regex` when the name contains a version. |
 | `android_package` | The emulator's Android package name, such as `com.flycast.emulator`. On Android the app is installed from an APK and detected by this name; give it an `android` entry in `emulator_dir_name` and `install_recipe` too. |
-| `android_activity` | The activity that opens a game, such as `com.flycast.emulator.MainActivity`. The game is passed as a document link with read access. Without it, games for this emulator cannot be launched on Android. |
+| `android_play_store` | Install and update through the emulator's Google Play listing when Play is available. |
+| `android_alternate_packages` | Other package names for the same emulator, such as a GitHub build that differs from the Play one. |
+| `android_launch` | How a game is opened: `activity`, optional `action`, `game` (`document`, `document_extra:<name>` or `extra:<name>`), `extras` and `restart_task`. Without it, games for this emulator cannot be launched on Android. |
+| `android_fallback` | Use this emulator on Android only when a system has no other Android emulator (RetroArch). |
 | `emulator_dir_name` | Install folder per OS, under `emulators/` |
 | `emulator_bios_path` | Where the chosen BIOS is copied inside the install |
 | `relative_save_path` | Save folder inside the install, per system slug or `default`. A string or an array; `{system_slug}` is replaced. |

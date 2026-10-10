@@ -1,5 +1,14 @@
 {
   "name": "Azahar",
+  "android_package": "io.github.lime3ds.android",
+  "android_alternate_packages": [
+    "org.azahar_emu.azahar"
+  ],
+  "android_play_store": true,
+  "android_launch": {
+    "activity": "org.citra.citra_emu.activities.EmulationActivity",
+    "game": "document"
+  },
   "executable_name": {
     "windows": "azahar.exe"
   },
@@ -9,7 +18,8 @@
   "emulator_dir_name": {
     "windows": "azahar",
     "linux": "azahar",
-    "macos": "azahar"
+    "macos": "azahar",
+    "android": "azahar"
   },
   "relative_save_path": {
     "new-nintendo-3ds": [
@@ -75,6 +85,12 @@
       "type": "github_release",
       "repo": "pkgforge-dev/Azahar-AppImage-Enhanced",
       "asset_regex": "Azahar-.*-anylinux-x86_64\\.AppImage$",
+      "extract": false
+    },
+    "android": {
+      "type": "github_release",
+      "repo": "azahar-emu/azahar",
+      "asset_regex": "azahar-android-vanilla-.*\\.apk$",
       "extract": false
     }
   },

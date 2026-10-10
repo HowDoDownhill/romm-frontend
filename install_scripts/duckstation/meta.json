@@ -1,5 +1,12 @@
 {
   "name": "DuckStation",
+  "android_package": "com.github.stenzek.duckstation",
+  "android_play_store": true,
+  "android_launch": {
+    "activity": "com.github.stenzek.duckstation.EmulationActivity",
+    "action": "android.intent.action.MAIN",
+    "game": "document_extra:bootPath"
+  },
   "executable_name": {
     "windows": "duckstation-qt-x64-ReleaseLTCG.exe",
     "linux": "DuckStation-x64.AppImage",
@@ -8,7 +15,8 @@
   "emulator_dir_name": {
     "windows": "duckstation",
     "linux": "duckstation",
-    "macos": "duckstation"
+    "macos": "duckstation",
+    "android": "duckstation"
   },
   "emulator_bios_path": {
     "windows": "bios",

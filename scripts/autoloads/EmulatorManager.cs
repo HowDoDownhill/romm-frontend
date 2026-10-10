@@ -442,6 +442,30 @@ public class BmlConfigurationUpdater : IConfigurationUpdater
     }
 }
 
+public class AndroidLaunchSpec
+{
+    [JsonPropertyName("activity")]
+    public string Activity { get; set; }
+
+    [JsonPropertyName("action")]
+    public string Action { get; set; }
+
+    [JsonPropertyName("game")]
+    public string Game { get; set; }
+
+    [JsonPropertyName("extras")]
+    public Dictionary<string, string> Extras { get; set; }
+
+    [JsonPropertyName("restart_task")]
+    public bool RestartTask { get; set; }
+
+    public const string DocumentGame = "document";
+    public const string ExtraGamePrefix = "extra:";
+    public const string DocumentExtraGamePrefix = "document_extra:";
+
+    public bool PassesGameAsDocument => Game == DocumentGame || (Game?.StartsWith(DocumentExtraGamePrefix) ?? false);
+}
+
 public class EmulatorMeta
 {
     [JsonPropertyName("name")]
@@ -456,8 +480,23 @@ public class EmulatorMeta
     [JsonPropertyName("android_package")]
     public string AndroidPackage { get; set; }
 
-    [JsonPropertyName("android_activity")]
-    public string AndroidActivity { get; set; }
+    [JsonPropertyName("android_play_store")]
+    public bool AndroidPlayStore { get; set; }
+
+    [JsonPropertyName("android_alternate_packages")]
+    public List<string> AndroidAlternatePackages { get; set; }
+
+    [JsonPropertyName("android_fallback")]
+    public bool AndroidFallback { get; set; }
+
+    [JsonPropertyName("core_display_names")]
+    public Dictionary<string, string> CoreDisplayNames { get; set; }
+
+    [JsonPropertyName("android_launch")]
+    public AndroidLaunchSpec AndroidLaunch { get; set; }
+
+    [JsonPropertyName("android_core_aliases")]
+    public Dictionary<string, string> AndroidCoreAliases { get; set; }
 
     [JsonPropertyName("emulator_dir_name")]
     public Dictionary<string, string> EmulatorDirName { get; set; }
@@ -1320,7 +1359,8 @@ public partial class EmulatorManager : Node
         if (appInstance.configManager.PreferredEmulators.ContainsKey(systemSlug))
         {
             string preferred = appInstance.configManager.PreferredEmulators[systemSlug];
-            if (systemToEmulatorMap.ContainsKey(systemSlug) && systemToEmulatorMap[systemSlug].Contains(preferred))
+            if (systemToEmulatorMap.ContainsKey(systemSlug) && systemToEmulatorMap[systemSlug].Contains(preferred)
+                && (!AndroidApps.IsAvailable || HasAndroidBuild(preferred)))
             {
                 return preferred;
             }
@@ -1328,10 +1368,23 @@ public partial class EmulatorManager : Node
 
         if (systemToEmulatorMap.ContainsKey(systemSlug) && systemToEmulatorMap[systemSlug].Count > 0)
         {
+            if (AndroidApps.IsAvailable)
+            {
+                var androidCapable = systemToEmulatorMap[systemSlug].Where(HasAndroidBuild).ToList();
+                return androidCapable.FirstOrDefault(candidate => !LoadEmulatorMetadataFromDisk(candidate).AndroidFallback)
+                    ?? androidCapable.FirstOrDefault()
+                    ?? systemToEmulatorMap[systemSlug][0];
+            }
+
             return systemToEmulatorMap[systemSlug][0];
         }
 
         return null;
+    }
+
+    private bool HasAndroidBuild(string emulatorName)
+    {
+        return !string.IsNullOrEmpty(LoadEmulatorMetadataFromDisk(emulatorName)?.AndroidPackage);
     }
 
     public List<string> GetSupportedEmulators(string systemSlug)
@@ -1678,7 +1731,7 @@ public partial class EmulatorManager : Node
 
         if (AndroidApps.IsAvailable)
         {
-            return AndroidApps.IsInstalled(emulatorMetadata.AndroidPackage);
+            return ResolveInstalledAndroidPackage(emulatorMetadata) != null;
         }
 
         string currentOperatingSystem = OS.GetName().ToLower();
@@ -1852,6 +1905,14 @@ public partial class EmulatorManager : Node
         }
 
         string currentOperatingSystem = OS.GetName().ToLower();
+
+        if (AndroidApps.IsAvailable && emulatorMetadata.AndroidPlayStore && AndroidApps.OpenStoreListing(emulatorMetadata.AndroidPackage))
+        {
+            GD.Print($"[Android] opened the Play Store listing for {emulatorMetadata.Name}.");
+            installingEmulators.Remove(emulatorName);
+            EmitSignal(SignalName.EmulatorInstallationCompleted, emulatorName, true);
+            return;
+        }
 
         try
         {
@@ -2220,7 +2281,13 @@ public partial class EmulatorManager : Node
             return true;
         }
 
-        return !string.IsNullOrEmpty(LoadEmulatorMetadataFromDisk(emulatorName)?.AndroidActivity);
+        return !string.IsNullOrEmpty(LoadEmulatorMetadataFromDisk(emulatorName)?.AndroidLaunch?.Activity);
+    }
+
+    public bool LaunchNeedsFolderAccess(Game game)
+    {
+        string mappedEmulatorName = GetMappedEmulator(game?.System?.Slug);
+        return AndroidApps.IsAvailable && LoadEmulatorMetadataFromDisk(mappedEmulatorName)?.AndroidLaunch?.PassesGameAsDocument == true;
     }
 
     public string ResolveGamePath(Game game)
@@ -2233,11 +2300,91 @@ public partial class EmulatorManager : Node
         return Path.GetFullPath(Path.Combine(appInstance.configManager.RomsPath, game.System.Slug, game.Files[0].FileName));
     }
 
+    public static string ResolveInstalledAndroidPackage(EmulatorMeta emulatorMetadata)
+    {
+        if (emulatorMetadata == null)
+        {
+            return null;
+        }
+
+        if (AndroidApps.IsInstalled(emulatorMetadata.AndroidPackage))
+        {
+            return emulatorMetadata.AndroidPackage;
+        }
+
+        return emulatorMetadata.AndroidAlternatePackages?.FirstOrDefault(AndroidApps.IsInstalled);
+    }
+
+    public string FindAndroidCoreNeedingSetup(Game game, out string coreDisplayName)
+    {
+        coreDisplayName = null;
+
+        if (!AndroidApps.IsAvailable || game?.System == null)
+        {
+            return null;
+        }
+
+        var emulatorMetadata = LoadEmulatorMetadataFromDisk(GetMappedEmulator(game.System.Slug));
+
+        if (emulatorMetadata?.CoreDisplayNames == null)
+        {
+            return null;
+        }
+
+        string selectedCore = ResolveSelectedCore(emulatorMetadata, game.System.Slug);
+
+        if (selectedCore == null || appInstance.configManager.IsAndroidCoreSetUp(selectedCore))
+        {
+            return null;
+        }
+
+        coreDisplayName = emulatorMetadata.CoreDisplayNames.TryGetValue(selectedCore, out string displayName) ? displayName : selectedCore;
+        return selectedCore;
+    }
+
+    public bool OpenEmulatorAppForSystem(string systemSlug)
+    {
+        string installedPackage = ResolveInstalledAndroidPackage(LoadEmulatorMetadataFromDisk(GetMappedEmulator(systemSlug)));
+        return installedPackage != null && AndroidApps.LaunchApp(installedPackage);
+    }
+
     private void LaunchOnAndroid(Game game, EmulatorMeta emulatorMetadata)
     {
+        string installedPackage = ResolveInstalledAndroidPackage(emulatorMetadata) ?? emulatorMetadata.AndroidPackage;
         string gamePath = ResolveGamePath(game);
-        bool opened = AndroidApps.OpenGameInApp(emulatorMetadata.AndroidPackage, emulatorMetadata.AndroidActivity, gamePath);
+        var resolvedExtras = new Dictionary<string, string>();
+
+        if (emulatorMetadata.AndroidLaunch.Extras != null)
+        {
+            string coreFileName = ResolveAndroidCoreFileName(emulatorMetadata, game.System.Slug);
+
+            foreach (var extra in emulatorMetadata.AndroidLaunch.Extras)
+            {
+                resolvedExtras[extra.Key] = extra.Value
+                    .Replace("{core_file}", coreFileName ?? "")
+                    .Replace("{package}", installedPackage);
+            }
+        }
+
+        bool opened = AndroidApps.OpenGameInApp(installedPackage, emulatorMetadata.AndroidLaunch, gamePath, resolvedExtras);
         GD.Print($"[Android] launch {game.Name} in {emulatorMetadata.Name}: {(opened ? "opened" : "failed")}");
+    }
+
+    private string ResolveAndroidCoreFileName(EmulatorMeta emulatorMetadata, string systemSlug)
+    {
+        string selectedCore = ResolveSelectedCore(emulatorMetadata, systemSlug);
+
+        if (selectedCore == null)
+        {
+            return null;
+        }
+
+        if (emulatorMetadata.AndroidCoreAliases != null && emulatorMetadata.AndroidCoreAliases.TryGetValue(selectedCore, out string androidCore))
+        {
+            selectedCore = androidCore;
+        }
+
+        return emulatorMetadata.ResolveCoreRelativePath(selectedCore, "android");
     }
 
     private async Task LaunchEmulatorWithGameInternal(Game game)
@@ -2534,7 +2681,7 @@ public partial class EmulatorManager : Node
 
         if (AndroidApps.IsAvailable)
         {
-            GD.Print($"[Android] open {emulatorMetadata.Name}: {AndroidApps.LaunchApp(emulatorMetadata.AndroidPackage)}");
+            GD.Print($"[Android] open {emulatorMetadata.Name}: {AndroidApps.LaunchApp(ResolveInstalledAndroidPackage(emulatorMetadata) ?? emulatorMetadata.AndroidPackage)}");
             return;
         }
 

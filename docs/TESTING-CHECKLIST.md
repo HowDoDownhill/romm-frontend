@@ -250,3 +250,9 @@ lobby from the command line, so one side can be the Linux test box (`docs/LINUX-
 - [ ] Downloading a Dreamcast game saves it to `Documents/RomM/roms/dc`; the button becomes Play.
       The first Play explains folder access and opens the picker; choosing `Documents/RomM` starts
       the game in Flycast, and later games start without asking.
+- [ ] Installing an emulator on a phone with Google Play opens its Play listing; returning after the
+      install shows Download or Play.
+- [ ] GameCube (Dolphin), PS1 (DuckStation), DS (melonDS), PSP (PPSSPP) and 3DS (Azahar) games
+      start in their standalone apps.
+- [ ] The first GBA, SNES or N64 Play explains which RetroArch core to install and opens RetroArch;
+      after installing it there, Play starts the game in RetroArch with that core.

@@ -428,6 +428,7 @@ public partial class ConfigManager : Node
         EmulatorCloseHotkeys = (Godot.Collections.Array)configurationFile.GetValue("Input", "EmulatorCloseHotkeys", defaultHotkeyButtons);
         EmulatorCloseHoldSeconds = (float)configurationFile.GetValue("Input", "EmulatorCloseHoldSeconds", DefaultEmulatorCloseHoldSeconds);
         ControllerMappingConsent = (string)configurationFile.GetValue("Input", "ControllerMappingConsent", ControllerMappingConsentUnasked);
+        androidCoresSetUp = new System.Collections.Generic.HashSet<string>(((string)configurationFile.GetValue("Android", "CoresSetUp", "")).Split(',', System.StringSplitOptions.RemoveEmptyEntries));
 
         if (configurationFile.HasSection("PreferredEmulators"))
         {
@@ -522,6 +523,7 @@ public partial class ConfigManager : Node
         configurationFile.SetValue("UI", "AppBackground", AppBackground);
         configurationFile.SetValue("UI", "InterfaceSize", InterfaceSize);
         configurationFile.SetValue("UI", "GameListView", GameListView);
+        configurationFile.SetValue("Android", "CoresSetUp", string.Join(",", androidCoresSetUp));
         configurationFile.SetValue("Input", "EmulatorCloseHotkeyCount", EmulatorCloseHotkeyCount);
         configurationFile.SetValue("Input", "EmulatorCloseHotkeys", EmulatorCloseHotkeys);
         configurationFile.SetValue("Input", "EmulatorCloseHoldSeconds", EmulatorCloseHoldSeconds);
@@ -608,6 +610,21 @@ public partial class ConfigManager : Node
     {
         AppBackground = backgroundStyle;
         SaveConfig();
+    }
+
+    private System.Collections.Generic.HashSet<string> androidCoresSetUp = new System.Collections.Generic.HashSet<string>();
+
+    public bool IsAndroidCoreSetUp(string coreName)
+    {
+        return androidCoresSetUp.Contains(coreName);
+    }
+
+    public void SaveAndroidCoreSetUp(string coreName)
+    {
+        if (androidCoresSetUp.Add(coreName))
+        {
+            SaveConfig();
+        }
     }
 
     public void SaveGameListView(string gameListView)

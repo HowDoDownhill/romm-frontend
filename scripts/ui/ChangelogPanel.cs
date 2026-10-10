@@ -39,7 +39,8 @@ public partial class ChangelogPanel : UiPanel
     {
         ApplicationUpdate,
         ControllerLayer,
-        GameFolderAccess
+        GameFolderAccess,
+        AndroidCoreSetup
     }
 
     public PromptSubject ActiveSubject { get; private set; } = PromptSubject.ApplicationUpdate;

@@ -5,6 +5,8 @@ public static class AndroidApps
     private const string ApkMimeType = "application/vnd.android.package-archive";
     private const int GrantReadUriPermission = 0x00000001;
     private const int NewTask = 0x10000000;
+    private const int ClearTask = 0x00008000;
+    private const int ClearTop = 0x04000000;
 
     public static bool IsAvailable => OS.HasFeature("android");
 
@@ -73,25 +75,69 @@ public static class AndroidApps
         return !ReportJavaException($"opening {packageName}");
     }
 
-    public static bool OpenGameInApp(string packageName, string activityName, string gamePath)
+    private const string PlayStorePackage = "com.android.vending";
+
+    public static bool OpenStoreListing(string packageName)
+    {
+        if (!IsAvailable || string.IsNullOrEmpty(packageName) || !IsInstalled(PlayStorePackage))
+        {
+            return false;
+        }
+
+        GodotObject listingUri = JavaClassWrapper.Wrap("android.net.Uri").Call("parse", "market://details?id=" + packageName).AsGodotObject();
+        GodotObject intent = JavaClassWrapper.Wrap("android.content.Intent").Call("Intent", "android.intent.action.VIEW", listingUri).AsGodotObject();
+        intent.Call("setPackage", PlayStorePackage);
+        intent.Call("addFlags", NewTask);
+        Activity.Call("startActivity", intent);
+        return !ReportJavaException($"opening the Play Store listing for {packageName}");
+    }
+
+    public static bool OpenGameInApp(string packageName, AndroidLaunchSpec launch, string gamePath, System.Collections.Generic.Dictionary<string, string> extras)
     {
         if (!IsAvailable)
         {
             return false;
         }
 
-        GodotObject documentUri = AndroidStorage.DocumentUriForPath(gamePath);
+        GodotObject intent = JavaClassWrapper.Wrap("android.content.Intent").Call("Intent", launch.Action ?? "android.intent.action.VIEW").AsGodotObject();
+        intent.Call("setClassName", packageName, launch.Activity);
+        int flags = NewTask;
 
-        if (documentUri == null)
+        if (launch.PassesGameAsDocument)
         {
-            GD.PrintErr($"[Android] no folder access covers {gamePath}.");
-            return false;
+            GodotObject documentUri = AndroidStorage.DocumentUriForPath(gamePath);
+
+            if (documentUri == null)
+            {
+                GD.PrintErr($"[Android] no folder access covers {gamePath}.");
+                return false;
+            }
+
+            intent.Call("setDataAndType", documentUri, "*/*");
+            flags |= GrantReadUriPermission;
+
+            if (launch.Game.StartsWith(AndroidLaunchSpec.DocumentExtraGamePrefix))
+            {
+                intent.Call("putExtra", launch.Game.Substring(AndroidLaunchSpec.DocumentExtraGamePrefix.Length), documentUri.Call("toString").AsString());
+            }
         }
 
-        GodotObject intent = JavaClassWrapper.Wrap("android.content.Intent").Call("Intent", "android.intent.action.VIEW").AsGodotObject();
-        intent.Call("setDataAndType", documentUri, "*/*");
-        intent.Call("setClassName", packageName, activityName);
-        intent.Call("addFlags", GrantReadUriPermission | NewTask);
+        else if (launch.Game != null && launch.Game.StartsWith(AndroidLaunchSpec.ExtraGamePrefix))
+        {
+            intent.Call("putExtra", launch.Game.Substring(AndroidLaunchSpec.ExtraGamePrefix.Length), gamePath);
+        }
+
+        foreach (var extra in extras)
+        {
+            intent.Call("putExtra", extra.Key, extra.Value);
+        }
+
+        if (launch.RestartTask)
+        {
+            flags |= ClearTask | ClearTop;
+        }
+
+        intent.Call("addFlags", flags);
         Activity.Call("startActivity", intent);
         return !ReportJavaException($"opening {gamePath} in {packageName}");
     }

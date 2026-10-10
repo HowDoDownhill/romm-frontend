@@ -3387,5 +3387,30 @@ build-tools 36.1.0 and platform 36, matching Godot 4.7's template. The preset ex
   with `System.IO.Compression`, taking the files under `roms/` as 7-Zip does on desktop.
 - Launching without a game opens the emulator's launcher activity.
 - Verified on a Galaxy S25 Ultra: 4 Wheel Thunder (571 MB CHD) downloaded, unzipped to
-  `Documents/RomM/roms/dc` and started in Flycast. Only Flycast has Android entries so far. Not done
-  yet: other emulators, multi-file games (a document URI names one file), and save sync.
+  `Documents/RomM/roms/dc` and started in Flycast.
+- Emulators come from Google Play when `android_play_store` is set: Install and Update open the Play
+  listing (`market://details?id=`), since an app cannot install from Play itself. The APK recipe is
+  the fallback on devices without Play. Play avoids the unknown-apps prompt, Play Protect warnings
+  (RetroArch's stable APK targets SDK 28 and Play Protect blocks it; the Android recipe uses the
+  nightly, which targets 36) and gives automatic updates. A Play build and a direct APK are usually
+  signed differently, so one cannot update the other.
+- `android_launch` describes the intent: `activity`, optional `action`, and `game` as `document`
+  (the document URI is the data, Flycast, PPSSPP, Azahar), `document_extra:<name>` (the URI is also
+  a string extra, Dolphin `AutoStartFile`, melonDS `uri`, DuckStation `bootPath`; the data carries
+  the read grant) or `extra:<name>` (a file path, RetroArch `ROM`). `extras` adds more, with
+  `{core_file}` and `{package}`; `restart_task` clears the emulator's task first.
+- `android_alternate_packages` covers emulators whose Play and direct builds differ (Azahar:
+  `io.github.lime3ds.android` on Play, `org.azahar_emu.azahar` on GitHub); whichever is installed is
+  used. Launch details for melonDS, PPSSPP and Azahar were checked against their APK manifests;
+  DuckStation's come from ES-DE, as it is Play-only.
+- On Android a system uses the first emulator in its list that has an Android build and is not
+  marked `android_fallback`; RetroArch is the fallback, so PS1, DS, PSP, 3DS, GameCube, Wii and
+  Dreamcast use standalone apps and older consoles use RetroArch.
+- RetroArch cores cannot be installed for the user: RetroArch loads cores only from its private
+  folder, other apps cannot write there, shared storage is mounted non-executable, and RetroArch
+  has no intent for downloading a core. The first Play of each core explains which core to fetch
+  in RetroArch's Online Updater (names from libretro's core info files, `core_display_names`) and
+  offers Open RetroArch; choosing it records the core under `[Android] CoresSetUp`, so later
+  launches go straight to the game. `LIBRETRO` is passed as the bare core file name, which both
+  the buildbot and Play builds resolve.
+- Not done yet: PS2 (ARMSX2, needs a BIOS), multi-file games, and save sync.

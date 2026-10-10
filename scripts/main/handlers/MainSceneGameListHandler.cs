@@ -1364,6 +1364,11 @@ public partial class MainSceneGameListHandler
             return new GameActionState { Kind = GameActionKind.Unavailable, Label = "Downloading...", Disabled = true };
         }
 
+        if (!appInstance.emulatorManager.CanLaunchGamesOnThisPlatform(mappedEmulator))
+        {
+            return new GameActionState { Kind = GameActionKind.Unavailable, Label = "Not on Android Yet", Disabled = true, EmulatorName = mappedEmulator };
+        }
+
         if (!appInstance.emulatorManager.IsEmulatorInstalled(mappedEmulator))
         {
             return new GameActionState { Kind = GameActionKind.InstallEmulator, Label = $"Install {emulatorDisplayName}", Disabled = false, EmulatorName = mappedEmulator };
@@ -1374,10 +1379,6 @@ public partial class MainSceneGameListHandler
             return new GameActionState { Kind = GameActionKind.DownloadGame, Label = "Download", Disabled = false, EmulatorName = mappedEmulator };
         }
 
-        if (!appInstance.emulatorManager.CanLaunchGamesOnThisPlatform(mappedEmulator))
-        {
-            return new GameActionState { Kind = GameActionKind.Unavailable, Label = "Can't Launch on Android Yet", Disabled = true, EmulatorName = mappedEmulator };
-        }
 
         if (!appInstance.emulatorManager.IsSelectedCoreInstalled(mappedEmulator, game.PlatformSlug))
         {

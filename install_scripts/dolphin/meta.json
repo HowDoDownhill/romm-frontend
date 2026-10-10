@@ -1,5 +1,12 @@
 {
   "name": "Dolphin",
+  "android_package": "org.dolphinemu.dolphinemu",
+  "android_play_store": true,
+  "android_launch": {
+    "activity": "org.dolphinemu.dolphinemu.ui.main.MainActivity",
+    "action": "android.intent.action.MAIN",
+    "game": "document_extra:AutoStartFile"
+  },
   "executable_name": {
     "windows": "Dolphin.exe",
     "macos": "Dolphin"
@@ -10,7 +17,8 @@
   "emulator_dir_name": {
     "windows": "dolphin",
     "linux": "dolphin",
-    "macos": "dolphin"
+    "macos": "dolphin",
+    "android": "dolphin"
   },
   "install_recipe": {
     "windows": {

@@ -1,5 +1,11 @@
 {
   "name": "PPSSPP",
+  "android_package": "org.ppsspp.ppsspp",
+  "android_play_store": true,
+  "android_launch": {
+    "activity": "org.ppsspp.ppsspp.PpssppActivity",
+    "game": "document"
+  },
   "executable_name": {
     "windows": "PPSSPPWindows64.exe"
   },
@@ -9,7 +15,8 @@
   "emulator_dir_name": {
     "windows": "ppsspp",
     "linux": "ppsspp",
-    "macos": "ppsspp"
+    "macos": "ppsspp",
+    "android": "ppsspp"
   },
   "launch_env": {
     "linux": {
@@ -35,6 +42,12 @@
       "type": "github_release",
       "repo": "hrydgard/ppsspp",
       "asset_regex": "PPSSPP-v.*-anylinux-x86_64\\.AppImage$",
+      "extract": false
+    },
+    "android": {
+      "type": "web_scrape",
+      "list_url": "https://www.ppsspp.org/download/",
+      "link_regex": "/files/[0-9_]+/ppsspp\\.apk",
       "extract": false
     }
   },
