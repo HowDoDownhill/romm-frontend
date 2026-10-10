@@ -1374,9 +1374,9 @@ public partial class MainSceneGameListHandler
             return new GameActionState { Kind = GameActionKind.DownloadGame, Label = "Download", Disabled = false, EmulatorName = mappedEmulator };
         }
 
-        if (AndroidApps.IsAvailable)
+        if (!appInstance.emulatorManager.CanLaunchGamesOnThisPlatform(mappedEmulator))
         {
-            return new GameActionState { Kind = GameActionKind.Unavailable, Label = "Downloaded", Disabled = true, EmulatorName = mappedEmulator };
+            return new GameActionState { Kind = GameActionKind.Unavailable, Label = "Can't Launch on Android Yet", Disabled = true, EmulatorName = mappedEmulator };
         }
 
         if (!appInstance.emulatorManager.IsSelectedCoreInstalled(mappedEmulator, game.PlatformSlug))

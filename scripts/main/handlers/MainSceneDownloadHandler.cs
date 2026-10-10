@@ -101,10 +101,37 @@ public class MainSceneDownloadHandler
         });
     }
 
+    private const string ArchiveRomsFolder = "roms/";
+
+    private static bool ExtractDownloadedRomWithoutTools(string globalTempZip, string globalFinalDir)
+    {
+        using var archive = System.IO.Compression.ZipFile.OpenRead(globalTempZip);
+        int extractedCount = 0;
+
+        foreach (var entry in archive.Entries)
+        {
+            if (string.IsNullOrEmpty(entry.Name) || !entry.FullName.StartsWith(ArchiveRomsFolder, System.StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            System.IO.Compression.ZipFileExtensions.ExtractToFile(entry, System.IO.Path.Combine(globalFinalDir, entry.Name), true);
+            extractedCount++;
+        }
+
+        GD.Print($"Extracted {extractedCount} files from {globalTempZip} to {globalFinalDir}");
+        return extractedCount > 0;
+    }
+
     private bool ExtractDownloadedRom(string sevenZipPath, string globalTempZip, string globalFinalDir, bool isLinux)
     {
         try
         {
+            if (OS.HasFeature("android"))
+            {
+                return ExtractDownloadedRomWithoutTools(globalTempZip, globalFinalDir);
+            }
+
             if (isLinux)
             {
                 RunProcessToCompletion("chmod", new string[] { "+x", sevenZipPath });

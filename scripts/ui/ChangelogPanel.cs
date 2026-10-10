@@ -38,7 +38,8 @@ public partial class ChangelogPanel : UiPanel
     public enum PromptSubject
     {
         ApplicationUpdate,
-        ControllerLayer
+        ControllerLayer,
+        GameFolderAccess
     }
 
     public PromptSubject ActiveSubject { get; private set; } = PromptSubject.ApplicationUpdate;
@@ -61,7 +62,12 @@ public partial class ChangelogPanel : UiPanel
 
     public void ShowControllerLayerOffer(string bodyText, string acceptText, string declineText)
     {
-        ActiveSubject = PromptSubject.ControllerLayer;
+        ShowPrompt(PromptSubject.ControllerLayer, bodyText, acceptText, declineText);
+    }
+
+    public void ShowPrompt(PromptSubject subject, string bodyText, string acceptText, string declineText)
+    {
+        ActiveSubject = subject;
 
         if (notesLabel != null)
         {

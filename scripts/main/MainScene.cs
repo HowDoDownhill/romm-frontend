@@ -843,7 +843,7 @@ public partial class MainScene : Control
                 return;
 
             case GameActionKind.LaunchGame:
-                appInstance.emulatorManager.LaunchEmulatorWithGame(GameListHandler.currentlySelectedGame);
+                LaunchSelectedGame();
                 return;
         }
     }
@@ -884,8 +884,50 @@ public partial class MainScene : Control
         }
     }
 
+    private const string GameFolderAccessBody =
+        "[b]Let emulators open your games[/b]\n\n" +
+        "Games are saved in Documents/RomM. Emulators can only open them once you allow access to that folder.\n\n" +
+        "On the next screen, open Documents, select the RomM folder, then tap Use This Folder and Allow. You only need to do this once.";
+
+    private Game gameWaitingForFolderAccess;
+
+    private void LaunchSelectedGame()
+    {
+        Game selectedGame = GameListHandler.currentlySelectedGame;
+
+        if (AndroidApps.IsAvailable && !AndroidStorage.HasAccessTo(appInstance.configManager.RomsPath))
+        {
+            gameWaitingForFolderAccess = selectedGame;
+            changelogPanel?.ShowPrompt(ChangelogPanel.PromptSubject.GameFolderAccess, GameFolderAccessBody, "Choose Folder", "Not Now");
+            return;
+        }
+
+        appInstance.emulatorManager.LaunchEmulatorWithGame(selectedGame);
+    }
+
+    private void RequestGameFolderAccess()
+    {
+        Game waitingGame = gameWaitingForFolderAccess;
+        gameWaitingForFolderAccess = null;
+
+        AndroidStorage.RequestAccessTo(AndroidStorage.GamesRoot, granted =>
+        {
+            if (granted && waitingGame != null)
+            {
+                appInstance.emulatorManager.LaunchEmulatorWithGame(waitingGame);
+            }
+        });
+    }
+
     private void OnChangelogPanelAccepted()
     {
+        if (changelogPanel.ActiveSubject == ChangelogPanel.PromptSubject.GameFolderAccess)
+        {
+            changelogPanel.Close();
+            RequestGameFolderAccess();
+            return;
+        }
+
         if (changelogPanel.ActiveSubject == ChangelogPanel.PromptSubject.ControllerLayer)
         {
             changelogPanel.Close();
@@ -898,6 +940,13 @@ public partial class MainScene : Control
 
     private void OnChangelogPanelDismissed()
     {
+        if (changelogPanel.ActiveSubject == ChangelogPanel.PromptSubject.GameFolderAccess)
+        {
+            changelogPanel.Close();
+            gameWaitingForFolderAccess = null;
+            return;
+        }
+
         if (changelogPanel.ActiveSubject == ChangelogPanel.PromptSubject.ControllerLayer)
         {
             changelogPanel.Close();

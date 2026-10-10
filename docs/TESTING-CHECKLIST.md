@@ -247,3 +247,6 @@ lobby from the command line, so one side can be the Linux test box (`docs/LINUX-
 - [ ] Installing an Android-ready emulator (Flycast) downloads its APK and opens the system
       installer; the first time, Android asks to allow installs from RomM Frontend. After installing
       and returning to the app, the button changes from "Install Flycast" to "Download".
+- [ ] Downloading a Dreamcast game saves it to `Documents/RomM/roms/dc`; the button becomes Play.
+      The first Play explains folder access and opens the picker; choosing `Documents/RomM` starts
+      the game in Flycast, and later games start without asking.

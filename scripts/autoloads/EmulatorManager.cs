@@ -456,6 +456,9 @@ public class EmulatorMeta
     [JsonPropertyName("android_package")]
     public string AndroidPackage { get; set; }
 
+    [JsonPropertyName("android_activity")]
+    public string AndroidActivity { get; set; }
+
     [JsonPropertyName("emulator_dir_name")]
     public Dictionary<string, string> EmulatorDirName { get; set; }
 
@@ -2210,6 +2213,33 @@ public partial class EmulatorManager : Node
         }
     }
 
+    public bool CanLaunchGamesOnThisPlatform(string emulatorName)
+    {
+        if (!AndroidApps.IsAvailable)
+        {
+            return true;
+        }
+
+        return !string.IsNullOrEmpty(LoadEmulatorMetadataFromDisk(emulatorName)?.AndroidActivity);
+    }
+
+    public string ResolveGamePath(Game game)
+    {
+        if (game?.System == null || game.Files == null || game.Files.Count == 0)
+        {
+            return null;
+        }
+
+        return Path.GetFullPath(Path.Combine(appInstance.configManager.RomsPath, game.System.Slug, game.Files[0].FileName));
+    }
+
+    private void LaunchOnAndroid(Game game, EmulatorMeta emulatorMetadata)
+    {
+        string gamePath = ResolveGamePath(game);
+        bool opened = AndroidApps.OpenGameInApp(emulatorMetadata.AndroidPackage, emulatorMetadata.AndroidActivity, gamePath);
+        GD.Print($"[Android] launch {game.Name} in {emulatorMetadata.Name}: {(opened ? "opened" : "failed")}");
+    }
+
     private async Task LaunchEmulatorWithGameInternal(Game game)
     {
 
@@ -2226,6 +2256,12 @@ public partial class EmulatorManager : Node
         if (emulatorMetadata == null)
         {
             GD.PrintErr($"Meta file not found for emulator: {mappedEmulatorName}");
+            return;
+        }
+
+        if (AndroidApps.IsAvailable)
+        {
+            LaunchOnAndroid(game, emulatorMetadata);
             return;
         }
 
@@ -2493,6 +2529,12 @@ public partial class EmulatorManager : Node
         if (emulatorMetadata == null)
         {
             GD.PrintErr($"Meta file not found for emulator: {emulatorName}");
+            return;
+        }
+
+        if (AndroidApps.IsAvailable)
+        {
+            GD.Print($"[Android] open {emulatorMetadata.Name}: {AndroidApps.LaunchApp(emulatorMetadata.AndroidPackage)}");
             return;
         }
 

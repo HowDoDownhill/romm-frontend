@@ -3370,5 +3370,22 @@ build-tools 36.1.0 and platform 36, matching Godot 4.7's template. The preset ex
 - `install_scripts` has a `.gdignore`, so Godot cannot pack it. The `android_bundle` editor plugin
   adds its files to Android exports with `EditorExportPlugin.AddFile`, and `ConfigManager` copies
   them to the app's `install_scripts` folder on every launch, so recipe changes ship with each APK.
-- Only Flycast has an Android recipe so far. Downloaded games show "Downloaded" until launching by
-  intent exists. Not done yet: launching, ROM storage that emulators can read, and save sync.
+- Games and BIOS live in `Documents/RomM` (`roms`, `bios`). Apps may write any file type into
+  `Documents` and `Download` with ordinary file IO, so no All Files Access permission is needed;
+  writing to a folder at the root of storage was denied. A stored path inside private storage is
+  ignored on Android so older configs move to the shared folder.
+- Emulators cannot read a file the frontend owns by path (Flycast has only legacy storage
+  permissions, which Android 13+ ignores for non-media files), and Flycast rejects FileProvider
+  links ("Storage access failed: Invalid URI"): its storage code accepts document URIs only. So
+  the frontend holds a persisted Storage Access Framework grant over `Documents/RomM`, builds a
+  document URI for the game inside that tree (`DocumentsContract.buildDocumentUriUsingTree`), and
+  passes it with `FLAG_GRANT_READ_URI_PERMISSION` to the emulator's activity (`android_activity`).
+  The first Play explains this and opens the folder picker; Godot's picker does not persist its
+  grant, so `AndroidStorage` calls `takePersistableUriPermission` in the callback. A grant on a
+  parent folder also counts.
+- RomM serves games as zips; the bundled 7-Zip cannot run on Android, so downloads are unzipped
+  with `System.IO.Compression`, taking the files under `roms/` as 7-Zip does on desktop.
+- Launching without a game opens the emulator's launcher activity.
+- Verified on a Galaxy S25 Ultra: 4 Wheel Thunder (571 MB CHD) downloaded, unzipped to
+  `Documents/RomM/roms/dc` and started in Flycast. Only Flycast has Android entries so far. Not done
+  yet: other emulators, multi-file games (a document URI names one file), and save sync.

@@ -349,13 +349,23 @@ public partial class ConfigManager : Node
 
     private string DeriveDefaultPath(string subdirectory) => $"{ApplicationRootDirectory}/{subdirectory}/";
 
+    private static readonly string[] SharedStorageSubdirectoriesOnAndroid = { "roms", "bios" };
+
     private string ResolveRelocatablePath(string key, string subdirectory)
     {
         string derivedDefault = DeriveDefaultPath(subdirectory);
+
+        if (OS.HasFeature("android") && System.Array.IndexOf(SharedStorageSubdirectoriesOnAndroid, subdirectory) >= 0)
+        {
+            derivedDefault = AndroidStorage.GamesRoot + "/" + subdirectory + "/";
+            DirAccess.MakeDirRecursiveAbsolute(derivedDefault);
+        }
+
         if (configurationFile.HasSectionKey("Paths", key))
         {
             string storedPath = (string)configurationFile.GetValue("Paths", key, derivedDefault);
-            if (!string.IsNullOrWhiteSpace(storedPath) && DirAccess.DirExistsAbsolute(storedPath))
+            bool storedInPrivateStorage = OS.HasFeature("android") && storedPath.StartsWith(ApplicationRootDirectory, System.StringComparison.Ordinal);
+            if (!string.IsNullOrWhiteSpace(storedPath) && !storedInPrivateStorage && DirAccess.DirExistsAbsolute(storedPath))
             {
                 return storedPath;
             }

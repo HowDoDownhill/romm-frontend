@@ -8,6 +8,7 @@
     "linux": "flycast-x86_64\\.AppImage$"
   },
   "android_package": "com.flycast.emulator",
+  "android_activity": "com.flycast.emulator.MainActivity",
   "emulator_dir_name": {
     "windows": "flycast",
     "linux": "flycast",

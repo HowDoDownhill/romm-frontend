@@ -38,12 +38,9 @@ public static class AndroidApps
             return false;
         }
 
-        GodotObject file = JavaClassWrapper.Wrap("java.io.File").Call("File", apkPath).AsGodotObject();
-        string authority = Activity.Call("getPackageName").AsString() + ".fileprovider";
-        GodotObject contentUri = JavaClassWrapper.Wrap("androidx.core.content.FileProvider")
-            .Call("getUriForFile", Activity, authority, file).AsGodotObject();
+        GodotObject contentUri = ContentUriForFile(apkPath);
 
-        if (ReportJavaException("resolving the APK's content URI"))
+        if (contentUri == null)
         {
             return false;
         }
@@ -53,6 +50,60 @@ public static class AndroidApps
         intent.Call("addFlags", GrantReadUriPermission | NewTask);
         Activity.Call("startActivity", intent);
         return !ReportJavaException("opening the installer");
+    }
+
+    public static bool LaunchApp(string packageName)
+    {
+        if (!IsAvailable)
+        {
+            return false;
+        }
+
+        Variant launchIntent = PackageManager.Call("getLaunchIntentForPackage", packageName);
+
+        if (launchIntent.VariantType == Variant.Type.Nil)
+        {
+            ClearJavaException();
+            return false;
+        }
+
+        GodotObject intent = launchIntent.AsGodotObject();
+        intent.Call("addFlags", NewTask);
+        Activity.Call("startActivity", intent);
+        return !ReportJavaException($"opening {packageName}");
+    }
+
+    public static bool OpenGameInApp(string packageName, string activityName, string gamePath)
+    {
+        if (!IsAvailable)
+        {
+            return false;
+        }
+
+        GodotObject documentUri = AndroidStorage.DocumentUriForPath(gamePath);
+
+        if (documentUri == null)
+        {
+            GD.PrintErr($"[Android] no folder access covers {gamePath}.");
+            return false;
+        }
+
+        GodotObject intent = JavaClassWrapper.Wrap("android.content.Intent").Call("Intent", "android.intent.action.VIEW").AsGodotObject();
+        intent.Call("setDataAndType", documentUri, "*/*");
+        intent.Call("setClassName", packageName, activityName);
+        intent.Call("addFlags", GrantReadUriPermission | NewTask);
+        Activity.Call("startActivity", intent);
+        return !ReportJavaException($"opening {gamePath} in {packageName}");
+    }
+
+    private static GodotObject ContentUriForFile(string filePath)
+    {
+        GodotObject file = JavaClassWrapper.Wrap("java.io.File").Call("File", filePath).AsGodotObject();
+        string authority = Activity.Call("getPackageName").AsString() + ".fileprovider";
+        GodotObject contentUri = JavaClassWrapper.Wrap("androidx.core.content.FileProvider")
+            .Call("getUriForFile", Activity, authority, file).AsGodotObject();
+
+        return ReportJavaException($"resolving a content URI for {filePath}") ? null : contentUri;
     }
 
     public static bool OpenUninstaller(string packageName)
