@@ -7,10 +7,12 @@
   "executable_regex": {
     "linux": "flycast-x86_64\\.AppImage$"
   },
+  "android_package": "com.flycast.emulator",
   "emulator_dir_name": {
     "windows": "flycast",
     "linux": "flycast",
-    "macos": "flycast"
+    "macos": "flycast",
+    "android": "flycast"
   },
   "emulator_bios_path": {
     "windows": "data",
@@ -51,6 +53,12 @@
       "type": "github_release",
       "repo": "flyinghead/flycast",
       "asset_regex": "flycast-x86_64\\.AppImage$",
+      "extract": false
+    },
+    "android": {
+      "type": "github_release",
+      "repo": "flyinghead/flycast",
+      "asset_regex": "flycast-.*\\.apk$",
       "extract": false
     }
   },

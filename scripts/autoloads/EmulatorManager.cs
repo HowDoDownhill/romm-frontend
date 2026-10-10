@@ -453,6 +453,9 @@ public class EmulatorMeta
     [JsonPropertyName("executable_regex")]
     public Dictionary<string, string> ExecutableRegex { get; set; }
 
+    [JsonPropertyName("android_package")]
+    public string AndroidPackage { get; set; }
+
     [JsonPropertyName("emulator_dir_name")]
     public Dictionary<string, string> EmulatorDirName { get; set; }
 
@@ -1670,6 +1673,11 @@ public partial class EmulatorManager : Node
             return false;
         }
 
+        if (AndroidApps.IsAvailable)
+        {
+            return AndroidApps.IsInstalled(emulatorMetadata.AndroidPackage);
+        }
+
         string currentOperatingSystem = OS.GetName().ToLower();
 
         bool hasExecutableEntry = (emulatorMetadata.ExecutableName != null && emulatorMetadata.ExecutableName.ContainsKey(currentOperatingSystem)) ||
@@ -1722,6 +1730,11 @@ public partial class EmulatorManager : Node
 
     public bool IsSelectedCoreInstalled(string emulatorName, string systemSlug)
     {
+        if (AndroidApps.IsAvailable)
+        {
+            return true;
+        }
+
         var emulatorMetadata = LoadEmulatorMetadataFromDisk(emulatorName);
         string selectedCore = ResolveSelectedCore(emulatorMetadata, systemSlug);
 

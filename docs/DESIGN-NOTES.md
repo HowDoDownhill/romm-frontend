@@ -3361,5 +3361,14 @@ build-tools 36.1.0 and platform 36, matching Godot 4.7's template. The preset ex
 - `REQUEST_INSTALL_PACKAGES` and `QUERY_ALL_PACKAGES` are declared through
   `permissions/custom_permissions`; Godot's named options for them did not reach the manifest.
   Without `QUERY_ALL_PACKAGES`, Android 11+ hides other apps and every emulator reads as missing.
-- Not done yet: Android install recipes in each emulator's `meta.json`, launching emulators by
-  intent, ROM storage that emulators can read, and save sync.
+- An emulator is Android-ready when its `meta.json` has `android_package`, an `android` entry in
+  `emulator_dir_name` (which holds only `installed_version.txt`) and an `android` install recipe that
+  downloads the APK. On Android `IsEmulatorInstalled` asks the package manager, cores count as
+  installed (RetroArch manages its own), and `UniversalInstaller` moves the download to
+  `downloads/<emulator>.apk` and opens the system installer. The play button re-checks on
+  `NotificationApplicationResumed`, so it updates when the user returns from the installer.
+- `install_scripts` has a `.gdignore`, so Godot cannot pack it. The `android_bundle` editor plugin
+  adds its files to Android exports with `EditorExportPlugin.AddFile`, and `ConfigManager` copies
+  them to the app's `install_scripts` folder on every launch, so recipe changes ship with each APK.
+- Only Flycast has an Android recipe so far. Downloaded games show "Downloaded" until launching by
+  intent exists. Not done yet: launching, ROM storage that emulators can read, and save sync.

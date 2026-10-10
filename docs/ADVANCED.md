@@ -123,6 +123,7 @@ Each emulator is a folder under `install_scripts/` with a `meta.json`, and optio
 |---|---|
 | `name` | Name shown in the app |
 | `executable_name` | Executable per OS. Use `executable_regex` when the name contains a version. |
+| `android_package` | The emulator's Android package name, such as `com.flycast.emulator`. On Android the app is installed from an APK and detected by this name; give it an `android` entry in `emulator_dir_name` and `install_recipe` too. |
 | `emulator_dir_name` | Install folder per OS, under `emulators/` |
 | `emulator_bios_path` | Where the chosen BIOS is copied inside the install |
 | `relative_save_path` | Save folder inside the install, per system slug or `default`. A string or an array; `{system_slug}` is replaced. |

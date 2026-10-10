@@ -56,7 +56,7 @@ project/assembly_name="romm-frontend"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/SmoothScroll/plugin.cfg", "res://addons/controller_icons/plugin.cfg", "res://addons/tnowe_extra_controls/plugin.cfg")
+enabled=PackedStringArray("res://addons/SmoothScroll/plugin.cfg", "res://addons/controller_icons/plugin.cfg", "res://addons/tnowe_extra_controls/plugin.cfg", "res://addons/android_bundle/plugin.cfg")
 
 [gui]
 

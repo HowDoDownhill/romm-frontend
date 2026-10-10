@@ -405,6 +405,11 @@ public partial class MainScene : Control
         {
             SimulateAction("Back");
         }
+
+        if (what == NotificationApplicationResumed && GameListHandler?.currentlySelectedGame != null)
+        {
+            GameListHandler.UpdateDetailsPanelButtons(GameListHandler.currentlySelectedGame);
+        }
     }
 
     private static void SimulateControllerInput()

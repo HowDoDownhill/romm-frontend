@@ -1374,6 +1374,11 @@ public partial class MainSceneGameListHandler
             return new GameActionState { Kind = GameActionKind.DownloadGame, Label = "Download", Disabled = false, EmulatorName = mappedEmulator };
         }
 
+        if (AndroidApps.IsAvailable)
+        {
+            return new GameActionState { Kind = GameActionKind.Unavailable, Label = "Downloaded", Disabled = true, EmulatorName = mappedEmulator };
+        }
+
         if (!appInstance.emulatorManager.IsSelectedCoreInstalled(mappedEmulator, game.PlatformSlug))
         {
             return new GameActionState { Kind = GameActionKind.InstallEmulator, Label = $"Repair {emulatorDisplayName}", Disabled = false, EmulatorName = mappedEmulator };

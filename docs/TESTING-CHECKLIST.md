@@ -244,3 +244,6 @@ lobby from the command line, so one side can be the Linux test box (`docs/LINUX-
       gesture on the game list leaves the app open.
 - [ ] No controller-mapping offer, and no Automatic Controller Mapping or Prefer Discrete GPU rows.
 - [ ] Games without cover art show a dark card with a readable title.
+- [ ] Installing an Android-ready emulator (Flycast) downloads its APK and opens the system
+      installer; the first time, Android asks to allow installs from RomM Frontend. After installing
+      and returning to the app, the button changes from "Install Flycast" to "Download".

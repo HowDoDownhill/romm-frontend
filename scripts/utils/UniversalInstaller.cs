@@ -82,6 +82,11 @@ public static class UniversalInstaller
             return false;
         }
 
+        if (AndroidApps.IsAvailable)
+        {
+            return HandOverToAndroidInstaller(appInstance, emulatorName, temporaryArchiveFilePath, emulatorTargetDirectory, selectedRelease.VersionLabel);
+        }
+
         if (installRecipe.Extract)
         {
             ReportStage(appInstance, installTransfer, "Extracting...");
@@ -182,6 +187,21 @@ public static class UniversalInstaller
     }
 
     public const string InstalledVersionFileName = "installed_version.txt";
+
+    private static bool HandOverToAndroidInstaller(AppInstance appInstance, string emulatorName, string downloadedFilePath, string emulatorTargetDirectory, string versionLabel)
+    {
+        string apkPath = Path.Combine(appInstance.configManager.DownloadsPath, $"{emulatorName}.apk");
+
+        if (File.Exists(apkPath))
+        {
+            File.Delete(apkPath);
+        }
+
+        File.Move(downloadedFilePath, apkPath);
+        Directory.CreateDirectory(emulatorTargetDirectory);
+        WriteInstalledVersion(emulatorTargetDirectory, versionLabel);
+        return AndroidApps.OpenInstaller(apkPath);
+    }
 
     private static void WriteInstalledVersion(string emulatorTargetDirectory, string versionLabel)
     {

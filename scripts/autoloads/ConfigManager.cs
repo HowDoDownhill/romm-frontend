@@ -260,6 +260,7 @@ public partial class ConfigManager : Node
         EnsureRequiredDirectoriesExist();
         LoadThemes();
         LoadConfiguration();
+        CopyBundledInstallScripts();
         InterfaceScale.Apply(GetTree().Root, InterfaceSize);
     }
 
@@ -283,6 +284,44 @@ public partial class ConfigManager : Node
 
         configurationFilePath = ApplicationRootDirectory + "/config.cfg";
         configurationFile = new ConfigFile();
+    }
+
+    private const string BundledInstallScriptsDirectory = "res://install_scripts";
+
+    private void CopyBundledInstallScripts()
+    {
+        if (!OS.HasFeature("android") || !DirAccess.DirExistsAbsolute(BundledInstallScriptsDirectory))
+        {
+            return;
+        }
+
+        int copiedFileCount = CopyBundledDirectory(BundledInstallScriptsDirectory, ApplicationRootDirectory + "/install_scripts");
+        GD.Print($"[Android] copied {copiedFileCount} bundled install script files");
+    }
+
+    private static int CopyBundledDirectory(string sourceDirectory, string destinationDirectory)
+    {
+        DirAccess.MakeDirRecursiveAbsolute(destinationDirectory);
+        int copiedFileCount = 0;
+
+        foreach (string fileName in DirAccess.GetFilesAt(sourceDirectory))
+        {
+            byte[] contents = FileAccess.GetFileAsBytes(sourceDirectory + "/" + fileName);
+            using var destinationFile = FileAccess.Open(destinationDirectory + "/" + fileName, FileAccess.ModeFlags.Write);
+
+            if (destinationFile != null)
+            {
+                destinationFile.StoreBuffer(contents);
+                copiedFileCount++;
+            }
+        }
+
+        foreach (string subdirectoryName in DirAccess.GetDirectoriesAt(sourceDirectory))
+        {
+            copiedFileCount += CopyBundledDirectory(sourceDirectory + "/" + subdirectoryName, destinationDirectory + "/" + subdirectoryName);
+        }
+
+        return copiedFileCount;
     }
 
     private void EnsureRequiredDirectoriesExist()
