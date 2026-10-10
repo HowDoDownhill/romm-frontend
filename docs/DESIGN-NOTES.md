@@ -1494,8 +1494,8 @@ these buttons shrink to their text, so the icon got none. The glyph texture itse
 in a plain `TextureRect`). `ControllerGlyph.Apply` now turns `expand_icon` off and caps the glyph
 at 48 px with `icon_max_width`, which keeps it in the minimum size, and puts it left of the label.
 Glyphs still show only while the last input came from a controller (`show_mode = CONTROLLER`), so
-mouse and keyboard users see plain labels. The `glyphs` capture view simulates a controller press to
-capture them.
+mouse and keyboard users see plain labels. The `glyphs` capture view, or `--ui-capture-controller` with any
+other view, simulates a controller press so captures show them.
 
 ### The demo video is recorded, not screen-captured
 `tools/demo/record-demo.ps1` runs the app with `-- --ui-demo` under `--write-movie` at a fixed

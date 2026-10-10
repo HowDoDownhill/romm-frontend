@@ -293,6 +293,7 @@ public partial class MainScene : Control
     private const string LayoutCaptureViewArgumentPrefix = "--ui-capture-view=";
     private const string LayoutCaptureSystemArgumentPrefix = "--ui-capture-system=";
     private const string LayoutCaptureThemeArgumentPrefix = "--ui-capture-theme=";
+    private const string LayoutCaptureControllerArgument = "--ui-capture-controller";
     private const string LayoutCaptureBackgroundArgumentPrefix = "--ui-capture-background=";
 
     private string previewThemeName;
@@ -354,12 +355,14 @@ public partial class MainScene : Control
             case "start": ToggleStartMenu(); break;
             case "jump": OpenSystemJumpPopup(); break;
             case "carousel": CaptureGameListView(0, 3); break;
-            case "glyphs":
-                Input.ParseInputEvent(new InputEventJoypadButton { ButtonIndex = JoyButton.Misc1, Pressed = true, Device = 0 });
-                Input.ParseInputEvent(new InputEventJoypadButton { ButtonIndex = JoyButton.Misc1, Pressed = false, Device = 0 });
-                break;
+            case "glyphs": SimulateControllerInput(); break;
             case "grid": CaptureGameListView(1, 9); break;
             case "list": CaptureGameListView(2, 6); break;
+        }
+
+        if (userArguments.Contains(LayoutCaptureControllerArgument))
+        {
+            SimulateControllerInput();
         }
 
         await ToSignal(GetTree().CreateTimer(LayoutCaptureSettleSeconds - LayoutCaptureViewDelaySeconds), SceneTreeTimer.SignalName.Timeout);
@@ -370,6 +373,12 @@ public partial class MainScene : Control
         string openPanel = panelStack.TopPanel?.Name ?? "none";
         GD.Print($"[Layout] captured {capturedFrame.GetWidth()}x{capturedFrame.GetHeight()} (canvas {GetViewportRect().Size}, carousel {gameList?.Size}, details {detailsPanel?.Size}, open panel {openPanel}, section {SectionHandler?.CurrentSection}) to {capturePath}: {saveResult}");
         GetTree().Quit();
+    }
+
+    private static void SimulateControllerInput()
+    {
+        Input.ParseInputEvent(new InputEventJoypadButton { ButtonIndex = JoyButton.Misc1, Pressed = true, Device = 0 });
+        Input.ParseInputEvent(new InputEventJoypadButton { ButtonIndex = JoyButton.Misc1, Pressed = false, Device = 0 });
     }
 
     private void CaptureGameListView(int viewIndex, int selectedIndex)
