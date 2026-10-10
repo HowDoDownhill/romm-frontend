@@ -269,6 +269,11 @@ public partial class ConfigManager : Node
             ApplicationRootDirectory = ApplicationRootDirectory.Remove(ApplicationRootDirectory.Length - 1);
         }
 
+        else if (OS.HasFeature("android"))
+        {
+            ApplicationRootDirectory = OS.GetUserDataDir();
+        }
+
         else
         {
             ApplicationRootDirectory = OS.GetExecutablePath().GetBaseDir();
