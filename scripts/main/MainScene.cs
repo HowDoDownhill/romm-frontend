@@ -354,6 +354,10 @@ public partial class MainScene : Control
             case "start": ToggleStartMenu(); break;
             case "jump": OpenSystemJumpPopup(); break;
             case "carousel": CaptureGameListView(0, 3); break;
+            case "glyphs":
+                Input.ParseInputEvent(new InputEventJoypadButton { ButtonIndex = JoyButton.Misc1, Pressed = true, Device = 0 });
+                Input.ParseInputEvent(new InputEventJoypadButton { ButtonIndex = JoyButton.Misc1, Pressed = false, Device = 0 });
+                break;
             case "grid": CaptureGameListView(1, 9); break;
             case "list": CaptureGameListView(2, 6); break;
         }
@@ -673,7 +677,7 @@ public partial class MainScene : Control
         if (btn == null) return;
         btn.Text = defaultText;
         btn.ThemeTypeVariation = "FlatButton";
-        btn.Icon = ControllerGlyph.For(iconPath);
+        ControllerGlyph.Apply(btn, iconPath);
     }
 
     private void ToggleStartMenu()

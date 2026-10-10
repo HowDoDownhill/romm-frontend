@@ -168,6 +168,8 @@ This is the section with the worst platform divergence. Do not skip it on either
 - [ ] `-- --ui-bench=<report>` finishes with every phase's end state showing the input landed, no
       frame over 33 ms, and no more than a couple over 16.7 ms in any phase. Compare against the
       table in DESIGN-NOTES "Measure with `--ui-bench`".
+- [ ] Bottom-bar and changelog buttons show controller glyphs (A, B, X, Y, Start) left of their
+      labels after any controller input, and hide them again after moving the mouse.
 
 ## 9. Cross-platform traps
 

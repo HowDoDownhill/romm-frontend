@@ -25,13 +25,13 @@ public partial class ChangelogPanel : UiPanel
         if (acceptButton != null)
         {
             acceptButton.Pressed += EmitAccepted;
-            acceptButton.Icon = ControllerGlyph.For("Select");
+            ControllerGlyph.Apply(acceptButton, "Select");
         }
 
         if (cancelButton != null)
         {
             cancelButton.Pressed += EmitDismissed;
-            cancelButton.Icon = ControllerGlyph.For("Back");
+            ControllerGlyph.Apply(cancelButton, "Back");
         }
     }
 

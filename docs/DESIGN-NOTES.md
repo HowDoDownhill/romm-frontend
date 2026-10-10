@@ -1487,6 +1487,16 @@ Measured on 2026-10-07 at 1920x1080, RTX 5080, worst frame / frames over 16.7 ms
 | System switch | 275 ms / 26 | 27 ms / 19 | **17.5 ms / 1** |
 | System switch back | 163 ms / 11 | 17.5 ms / 1 | **5.5 ms / 0** |
 
+### Controller glyphs use a fixed size, not expand_icon
+The bottom-bar buttons had `expand_icon` on, and their glyphs never appeared. With `expand_icon`, a
+Button leaves the icon out of its minimum width and scales it into whatever width is left over;
+these buttons shrink to their text, so the icon got none. The glyph texture itself was fine (it drew
+in a plain `TextureRect`). `ControllerGlyph.Apply` now turns `expand_icon` off and caps the glyph
+at 48 px with `icon_max_width`, which keeps it in the minimum size, and puts it left of the label.
+Glyphs still show only while the last input came from a controller (`show_mode = CONTROLLER`), so
+mouse and keyboard users see plain labels. The `glyphs` capture view simulates a controller press to
+capture them.
+
 ### The demo video is recorded, not screen-captured
 `tools/demo/record-demo.ps1` runs the app with `-- --ui-demo` under `--write-movie` at a fixed
 60 fps and encodes `releases/romm-frontend-demo.mp4` plus a copy under 10 MB for GitHub embeds.
