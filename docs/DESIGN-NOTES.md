@@ -3414,3 +3414,26 @@ build-tools 36.1.0 and platform 36, matching Godot 4.7's template. The preset ex
   launches go straight to the game. `LIBRETRO` is passed as the bare core file name, which both
   the buildbot and Play builds resolve.
 - Not done yet: PS2 (ARMSX2, needs a BIOS), multi-file games, and save sync.
+
+### Android save locations (survey for save sync)
+Save files on Android follow the same Sigil layouts as desktop; what varies is whether another app
+can reach the folder. Android 11+ blocks every other app from `Android/data/<package>`, including
+through the folder picker. `Android/media/<package>` and ordinary shared folders are reachable with
+All files access or a folder grant, and an emulator that publishes a DocumentsProvider can be granted
+like any folder.
+
+Checked on a Galaxy S25 Ultra, Android 16:
+
+| Emulator | Saves | Reachable |
+| --- | --- | --- |
+| Flycast 2.7 | `Android/data/com.flycast.emulator/files/data/`: per-game `{dc_vmu_id}_vmu_save_A1.bin` (`T-9708N_vmu_save_A1.bin` for 4 Wheel Thunder), shared `vmu_save_A2.bin`, `dc_nvmem.bin` | no; no DocumentsProvider |
+| Dolphin (Play) | `Android/data/org.dolphinemu.dolphinemu/files/`: `GC/<region>/Card A/`, `Wii/` | yes, through its `features.DocumentProvider` with a one-time grant |
+| RetroArch (nightly) | `Android/media/com.retroarch.aarch64/RetroArch/saves` and `states` (from its log) | yes, with All files access |
+
+Still to check: PPSSPP and Azahar (both ask for a storage folder on first run, which can be under
+`Documents/RomM`), melonDS (can save next to the ROM), DuckStation.
+
+Emulator names for save sync follow Sigil's layout ids: the libretro core name for RetroArch, and
+`flycast_standalone`, `dolphin_standalone`, `duckstation`, `pcsx2_standalone` (also ARMSX2),
+`ppsspp_standalone`, `azahar`, `melonds`, `mgba_standalone` for standalone emulators. snes9x, ares
+and gopher64 have no row of their own, so the libretro default (`{stem}.srm`) applies.
