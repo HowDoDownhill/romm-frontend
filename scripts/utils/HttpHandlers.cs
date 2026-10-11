@@ -23,10 +23,69 @@ public static class HttpHandlers
         string host = context.DnsEndPoint.Host;
         int port = context.DnsEndPoint.Port;
 
-        IPAddress[] addresses = IPAddress.TryParse(host, out IPAddress literalAddress)
-            ? new[] { literalAddress }
-            : await ResolveFromFirstAnsweringFamilyAsync(host, cancellationToken);
+        if (IPAddress.TryParse(host, out IPAddress literalAddress))
+        {
+            return await ConnectToFirstReachableAsync(new[] { literalAddress }, port, cancellationToken)
+                ?? throw new SocketException((int)SocketError.HostUnreachable);
+        }
 
+        var pendingLookups = new List<Task<IPAddress[]>>
+        {
+            Dns.GetHostAddressesAsync(host, AddressFamily.InterNetwork, cancellationToken),
+            Dns.GetHostAddressesAsync(host, AddressFamily.InterNetworkV6, cancellationToken)
+        };
+
+        foreach (Task<IPAddress[]> lookup in pendingLookups)
+        {
+            _ = lookup.ContinueWith(faulted => _ = faulted.Exception, TaskContinuationOptions.OnlyOnFaulted);
+        }
+
+        Exception lastFailure = null;
+        bool anyAddressFound = false;
+
+        while (pendingLookups.Count > 0)
+        {
+            Task<IPAddress[]> finishedLookup = await Task.WhenAny(pendingLookups);
+            pendingLookups.Remove(finishedLookup);
+
+            if (!finishedLookup.IsCompletedSuccessfully || finishedLookup.Result.Length == 0)
+            {
+                continue;
+            }
+
+            anyAddressFound = true;
+
+            try
+            {
+                Stream connection = await ConnectToFirstReachableAsync(finishedLookup.Result, port, cancellationToken);
+
+                if (connection != null)
+                {
+                    return connection;
+                }
+            }
+
+            catch (Exception failure) when (failure is not OperationCanceledException)
+            {
+                lastFailure = failure;
+            }
+        }
+
+        if (!anyAddressFound)
+        {
+            Stream fallbackConnection = await ConnectToFirstReachableAsync(await Dns.GetHostAddressesAsync(host, cancellationToken), port, cancellationToken);
+
+            if (fallbackConnection != null)
+            {
+                return fallbackConnection;
+            }
+        }
+
+        throw lastFailure ?? new SocketException((int)SocketError.HostUnreachable);
+    }
+
+    private static async Task<Stream> ConnectToFirstReachableAsync(IPAddress[] addresses, int port, CancellationToken cancellationToken)
+    {
         Exception lastFailure = null;
 
         foreach (IPAddress address in addresses)
@@ -39,40 +98,18 @@ public static class HttpHandlers
                 return new NetworkStream(socket, ownsSocket: true);
             }
 
-            catch (Exception failure)
+            catch (Exception failure) when (failure is not OperationCanceledException)
             {
                 socket.Dispose();
                 lastFailure = failure;
             }
         }
 
-        throw lastFailure ?? new SocketException((int)SocketError.HostNotFound);
-    }
-
-    private static async Task<IPAddress[]> ResolveFromFirstAnsweringFamilyAsync(string host, CancellationToken cancellationToken)
-    {
-        var pendingLookups = new List<Task<IPAddress[]>>
+        if (lastFailure != null)
         {
-            Dns.GetHostAddressesAsync(host, AddressFamily.InterNetwork, cancellationToken),
-            Dns.GetHostAddressesAsync(host, AddressFamily.InterNetworkV6, cancellationToken)
-        };
-
-        foreach (Task<IPAddress[]> lookup in pendingLookups)
-        {
-            _ = lookup.ContinueWith(faulted => _ = faulted.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            throw lastFailure;
         }
 
-        while (pendingLookups.Count > 0)
-        {
-            Task<IPAddress[]> finishedLookup = await Task.WhenAny(pendingLookups);
-            pendingLookups.Remove(finishedLookup);
-
-            if (finishedLookup.IsCompletedSuccessfully && finishedLookup.Result.Length > 0)
-            {
-                return finishedLookup.Result;
-            }
-        }
-
-        return await Dns.GetHostAddressesAsync(host, cancellationToken);
+        return null;
     }
 }

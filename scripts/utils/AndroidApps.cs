@@ -28,6 +28,28 @@ public static class AndroidApps
         return launchIntent.VariantType != Variant.Type.Nil;
     }
 
+    public static string InstallerOf(string packageName)
+    {
+        if (!IsInstalled(packageName))
+        {
+            return null;
+        }
+
+        Variant installSource = PackageManager.Call("getInstallSourceInfo", packageName);
+
+        if (ReportJavaException($"reading the install source of {packageName}") || installSource.VariantType == Variant.Type.Nil)
+        {
+            return null;
+        }
+
+        return installSource.AsGodotObject().Call("getInstallingPackageName").AsString();
+    }
+
+    public static bool IsFromPlayStore(string packageName)
+    {
+        return InstallerOf(packageName) == PlayStorePackage;
+    }
+
     public static bool CanRequestInstalls()
     {
         return IsAvailable && PackageManager.Call("canRequestPackageInstalls").AsBool();

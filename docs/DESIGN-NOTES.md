@@ -3413,7 +3413,26 @@ build-tools 36.1.0 and platform 36, matching Godot 4.7's template. The preset ex
   offers Open RetroArch; choosing it records the core under `[Android] CoresSetUp`, so later
   launches go straight to the game. `LIBRETRO` is passed as the bare core file name, which both
   the buildbot and Play builds resolve.
+- RetroArch is the exception to Play-first. RetroArch Plus from Play requests no storage permission
+  at all (Play forbids All files access), so it cannot open a game in `Documents/RomM` and returns to
+  its menu; its log shows `Storage permission resolved (granted: 0)`. The libretro build requests
+  `MANAGE_EXTERNAL_STORAGE`, so the recipe sets `android_needs_direct_build`: a Play-installed copy
+  (installer `com.android.vending`, from `getInstallSourceInfo`) counts as not installed, the button
+  reads "Replace RetroArch", and pressing it opens the system uninstaller, since the two builds are
+  signed differently. Its cores go with it, so the recorded cores are cleared.
+- Asking to uninstall another app needs `REQUEST_DELETE_PACKAGES`; without it the system uninstaller
+  opens and closes at once with no message.
+- RetroArch started with a missing core shows a black screen and stays idle instead of reporting
+  it, and other apps cannot see its cores. So the core prompt records a core only when the user
+  chooses I've Installed It; Open RetroArch records nothing, and the prompt returns until confirmed.
 - Not done yet: PS2 (ARMSX2, needs a BIOS), multi-file games, and save sync.
+
+### Network connections
+`HttpHandlers` resolves IPv4 and IPv6 in parallel and connects with whichever family answers first,
+which removed a 5 s stall on Linux (see Startup). It used to try only that family. On a network with
+no IPv6 route a host with an AAAA record answered IPv6 first and every connection failed with
+"Network is unreachable" (the libretro buildbot from the phone on Wi-Fi). Now, when every address in
+one family fails, it tries the other family before giving up.
 
 ### Android save locations (survey for save sync)
 Save files on Android follow the same Sigil layouts as desktop; what varies is whether another app

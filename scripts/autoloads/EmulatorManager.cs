@@ -489,6 +489,9 @@ public class EmulatorMeta
     [JsonPropertyName("android_fallback")]
     public bool AndroidFallback { get; set; }
 
+    [JsonPropertyName("android_needs_direct_build")]
+    public bool AndroidNeedsDirectBuild { get; set; }
+
     [JsonPropertyName("core_display_names")]
     public Dictionary<string, string> CoreDisplayNames { get; set; }
 
@@ -1731,7 +1734,7 @@ public partial class EmulatorManager : Node
 
         if (AndroidApps.IsAvailable)
         {
-            return ResolveInstalledAndroidPackage(emulatorMetadata) != null;
+            return ResolveInstalledAndroidPackage(emulatorMetadata) != null && !IsUnusableAndroidBuildInstalled(emulatorName);
         }
 
         string currentOperatingSystem = OS.GetName().ToLower();
@@ -1905,6 +1908,21 @@ public partial class EmulatorManager : Node
         }
 
         string currentOperatingSystem = OS.GetName().ToLower();
+
+        if (IsUnusableAndroidBuildInstalled(emulatorName))
+        {
+            GD.Print($"[Android] {emulatorMetadata.Name} came from Google Play, which cannot read the games folder; asking to uninstall it first.");
+            AndroidApps.OpenUninstaller(emulatorMetadata.AndroidPackage);
+
+            if (emulatorMetadata.CoreDisplayNames != null)
+            {
+                appInstance.configManager.ClearAndroidCoresSetUp();
+            }
+
+            installingEmulators.Remove(emulatorName);
+            EmitSignal(SignalName.EmulatorInstallationCompleted, emulatorName, false);
+            return;
+        }
 
         if (AndroidApps.IsAvailable && emulatorMetadata.AndroidPlayStore && AndroidApps.OpenStoreListing(emulatorMetadata.AndroidPackage))
         {
@@ -2272,6 +2290,17 @@ public partial class EmulatorManager : Node
         {
             SetEmulatorLaunching(false);
         }
+    }
+
+    public bool IsUnusableAndroidBuildInstalled(string emulatorName)
+    {
+        if (!AndroidApps.IsAvailable)
+        {
+            return false;
+        }
+
+        var emulatorMetadata = LoadEmulatorMetadataFromDisk(emulatorName);
+        return emulatorMetadata != null && emulatorMetadata.AndroidNeedsDirectBuild && AndroidApps.IsFromPlayStore(emulatorMetadata.AndroidPackage);
     }
 
     public bool CanLaunchGamesOnThisPlatform(string emulatorName)

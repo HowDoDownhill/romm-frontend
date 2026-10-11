@@ -1369,6 +1369,11 @@ public partial class MainSceneGameListHandler
             return new GameActionState { Kind = GameActionKind.Unavailable, Label = "Not on Android Yet", Disabled = true, EmulatorName = mappedEmulator };
         }
 
+        if (appInstance.emulatorManager.IsUnusableAndroidBuildInstalled(mappedEmulator))
+        {
+            return new GameActionState { Kind = GameActionKind.InstallEmulator, Label = $"Replace {emulatorDisplayName}", Disabled = false, EmulatorName = mappedEmulator };
+        }
+
         if (!appInstance.emulatorManager.IsEmulatorInstalled(mappedEmulator))
         {
             return new GameActionState { Kind = GameActionKind.InstallEmulator, Label = $"Install {emulatorDisplayName}", Disabled = false, EmulatorName = mappedEmulator };

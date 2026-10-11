@@ -254,5 +254,9 @@ lobby from the command line, so one side can be the Linux test box (`docs/LINUX-
       install shows Download or Play.
 - [ ] GameCube (Dolphin), PS1 (DuckStation), DS (melonDS), PSP (PPSSPP) and 3DS (Azahar) games
       start in their standalone apps.
-- [ ] The first GBA, SNES or N64 Play explains which RetroArch core to install and opens RetroArch;
-      after installing it there, Play starts the game in RetroArch with that core.
+- [ ] The first GBA, SNES or N64 Play explains which RetroArch core to install; Open RetroArch opens
+      it and the prompt returns until I've Installed It, which starts the game with that core.
+- [ ] With RetroArch Plus from Google Play installed, the button reads Replace RetroArch and opens the
+      system uninstaller; Install RetroArch then installs the libretro build, which asks for All files
+      access on first launch.
+- [ ] Downloads from IPv6-capable hosts (the libretro buildbot) succeed on a network without IPv6.

@@ -5,7 +5,8 @@
     "linux": "RetroArch-Linux-x86_64.AppImage"
   },
   "android_package": "com.retroarch.aarch64",
-  "android_play_store": true,
+  "android_play_store": false,
+  "android_needs_direct_build": true,
   "android_fallback": true,
   "android_launch": {
     "activity": "com.retroarch.browser.retroactivity.RetroActivityFuture",

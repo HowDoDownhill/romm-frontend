@@ -910,7 +910,7 @@ public partial class MainScene : Control
         {
             gameWaitingForCoreSetup = selectedGame;
             coreWaitingForSetup = coreNeedingSetup;
-            changelogPanel?.ShowPrompt(ChangelogPanel.PromptSubject.AndroidCoreSetup, BuildCoreSetupBody(coreDisplayName), "Open RetroArch", "Not Now");
+            changelogPanel?.ShowPrompt(ChangelogPanel.PromptSubject.AndroidCoreSetup, BuildCoreSetupBody(coreDisplayName), "I've Installed It", "Open RetroArch");
             return;
         }
 
@@ -923,16 +923,29 @@ public partial class MainScene : Control
             "RetroArch downloads its own cores, and Android does not let other apps add them for it.\n\n" +
             $"In RetroArch, open Main Menu, then Online Updater, then Core Downloader, and choose {coreDisplayName}. " +
             "The first time RetroArch opens it asks for All files access; allow it so it can read your games.\n\n" +
-            "After that, Play starts the game directly.";
+            "Then come back and choose I've Installed It. RetroArch shows a black screen if it is asked to start a game whose core is missing.";
     }
 
-    private void OpenRetroArchForCoreSetup()
+    private void ConfirmCoreSetupAndPlay()
     {
+        Game waitingGame = gameWaitingForCoreSetup;
+
         if (coreWaitingForSetup != null)
         {
             appInstance.configManager.SaveAndroidCoreSetUp(coreWaitingForSetup);
         }
 
+        gameWaitingForCoreSetup = null;
+        coreWaitingForSetup = null;
+
+        if (waitingGame != null)
+        {
+            appInstance.emulatorManager.LaunchEmulatorWithGame(waitingGame);
+        }
+    }
+
+    private void OpenRetroArchForCoreSetup()
+    {
         if (gameWaitingForCoreSetup?.System != null)
         {
             appInstance.emulatorManager.OpenEmulatorAppForSystem(gameWaitingForCoreSetup.System.Slug);
@@ -968,7 +981,7 @@ public partial class MainScene : Control
         if (changelogPanel.ActiveSubject == ChangelogPanel.PromptSubject.AndroidCoreSetup)
         {
             changelogPanel.Close();
-            OpenRetroArchForCoreSetup();
+            ConfirmCoreSetupAndPlay();
             return;
         }
 
@@ -994,8 +1007,7 @@ public partial class MainScene : Control
         if (changelogPanel.ActiveSubject == ChangelogPanel.PromptSubject.AndroidCoreSetup)
         {
             changelogPanel.Close();
-            gameWaitingForCoreSetup = null;
-            coreWaitingForSetup = null;
+            OpenRetroArchForCoreSetup();
             return;
         }
 

@@ -619,6 +619,15 @@ public partial class ConfigManager : Node
         return androidCoresSetUp.Contains(coreName);
     }
 
+    public void ClearAndroidCoresSetUp()
+    {
+        if (androidCoresSetUp.Count > 0)
+        {
+            androidCoresSetUp.Clear();
+            SaveConfig();
+        }
+    }
+
     public void SaveAndroidCoreSetUp(string coreName)
     {
         if (androidCoresSetUp.Add(coreName))

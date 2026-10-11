@@ -1,3 +1,15 @@
+RomM Frontend - Unreleased
+
+✨ New Features
+
+    Android (in development): A phone build with touch controls. It installs emulators from Google Play where possible, downloads games to Documents/RomM, and launches them in Flycast, Dolphin, DuckStation, melonDS, PPSSPP, Azahar or RetroArch.
+
+🐛 Bug Fixes
+
+    Downloads on Networks Without IPv6: Emulator and asset downloads from servers with an IPv6 address failed with "Network is unreachable" on networks with no IPv6 route, instead of falling back to IPv4.
+
+---
+
 RomM Frontend - Version 1.1.0 Changelog
 
 This release covers everything since 1.0.13, including the netplay and Linux work that shipped in preview form as 1.0.14 to 1.0.16.
