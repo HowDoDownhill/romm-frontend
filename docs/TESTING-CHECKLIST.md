@@ -223,8 +223,16 @@ lobby from the command line, so one side can be the Linux test box (`docs/LINUX-
 - [ ] First launch asks once whether to use the controller layer. The answer persists.
 - [ ] Windows: accepting installs ViGEmBus with a single UAC prompt, and the layer reports working
       afterwards. Declining UAC leaves the app usable with the layer off.
-- [ ] With the layer on, each emulator sees the virtual pads in player order, whatever is physically
+- [ ] With the layer on, each emulator gets every player in player order, whatever is physically
       connected. Check at least RetroArch, Dolphin, PCSX2, Flycast, ares and mGBA.
+- [ ] Xbox pads pass straight through and only non-XInput pads get a virtual pad: the launch log
+      reports `N passed through, M on virtual pads`. Three Xbox pads plus a Switch Pro give four
+      working players in Dolphin.
+- [ ] `--controller-report` writes a report whose checks all read OK, with and without Steam.
+      The full grid lives in `CONTROLLER-TEST-MATRIX.md`.
+- [ ] Launched from Steam with Steam Input on for Xbox pads, every player still reaches the emulator.
+- [ ] Dolphin ports 2 to 4 receive port 1's bindings and are switched on in `Dolphin.ini` when a
+      player is assigned.
 - [ ] Player order can be set by pressing a button on each pad, and the emulator follows it.
 - [ ] Two physical pads give two players with no double input (PCSX2 player 2 is the known trap).
 - [ ] A non-Xbox pad (PlayStation, 8BitDo) is normalized through the layer and maps positionally.

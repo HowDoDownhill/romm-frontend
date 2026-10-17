@@ -235,6 +235,21 @@ public partial class MainScene : Control
         OfferControllerLayerOnceTheInterfaceHasSettled();
         CaptureLayoutIfRequested();
         RunBenchmarkIfRequested();
+        WriteControllerReportIfRequested();
+    }
+
+    private const string ControllerReportArgument = "--controller-report";
+    private const double ControllerReportStartupDelaySeconds = 3.0;
+
+    private async void WriteControllerReportIfRequested()
+    {
+        if (!OS.GetCmdlineArgs().Concat(OS.GetCmdlineUserArgs()).Contains(ControllerReportArgument))
+        {
+            return;
+        }
+
+        await ToSignal(GetTree().CreateTimer(ControllerReportStartupDelaySeconds), SceneTreeTimer.SignalName.Timeout);
+        await appInstance.emulatorManager.WriteControllerReport();
     }
 
     private const string BenchmarkArgumentPrefix = "--ui-bench=";

@@ -11,6 +11,15 @@ public enum InputLayerConsent
     Declined
 }
 
+public class SessionPlayer
+{
+    public int PhysicalDeviceId;
+    public bool IsPassthrough;
+    public int VirtualPadIndex = -1;
+    public ushort Vendor;
+    public ushort Product;
+}
+
 public partial class InputLayer : Node
 {
     public const int MaximumPlayers = 4;
@@ -22,7 +31,8 @@ public partial class InputLayer : Node
     private IVirtualPadBackend virtualPadBackend;
     private IDeviceHider deviceHider;
 
-    private readonly List<int> sessionPhysicalDeviceIds = new List<int>();
+    private readonly List<SessionPlayer> sessionPlayers = new List<SessionPlayer>();
+    private readonly List<SessionPlayer> virtualPadPlayers = new List<SessionPlayer>();
     private readonly List<PadMappingTable> sessionMappingTables = new List<PadMappingTable>();
     private readonly List<PadState> sessionPhysicalStates = new List<PadState>();
     private readonly List<PadState> sessionVirtualStates = new List<PadState>();
@@ -30,7 +40,7 @@ public partial class InputLayer : Node
     private const int VirtualPadEnumerationPollMilliseconds = 50;
     private const int VirtualPadEnumerationTimeoutMilliseconds = 3000;
 
-    private HashSet<int> joypadsPresentBeforeSession = new HashSet<int>();
+    private HashSet<string> joypadsPresentBeforeSession = new HashSet<string>();
     private readonly HashSet<int> ownVirtualDeviceIds = new HashSet<int>();
     private readonly List<int> ownVirtualDeviceIdsInPlayerOrder = new List<int>();
 
@@ -61,21 +71,22 @@ public partial class InputLayer : Node
     public bool IsVirtualPadBackendAvailable => virtualPadBackend.IsAvailable;
     public string VirtualPadBackendUnavailableReason => virtualPadBackend.UnavailableReason;
     public string VirtualPadSdlDeviceName => virtualPadBackend.SdlDeviceName;
-    public int ActivePlayerCount => sessionPhysicalDeviceIds.Count;
-    public int PhysicalPadsEnumeratedAheadOfOurs { get; private set; }
+    public int ActivePlayerCount => sessionPlayers.Count;
+    public int VirtualPadCount => virtualPadPlayers.Count;
+    public IReadOnlyList<SessionPlayer> SessionPlayers => sessionPlayers;
 
     public bool IsOwnVirtualDevice(int godotDeviceId)
     {
         return ownVirtualDeviceIds.Contains(godotDeviceId);
     }
 
-    public IReadOnlyList<int> SessionPhysicalDeviceIds => sessionPhysicalDeviceIds;
+    public IReadOnlyList<int> SessionPhysicalDeviceIds => sessionPlayers.Select(player => player.PhysicalDeviceId).ToList();
 
     public int ResolvePlayerOneDeviceId()
     {
-        if (sessionPhysicalDeviceIds.Count > 0)
+        if (sessionPlayers.Count > 0)
         {
-            return sessionPhysicalDeviceIds[0];
+            return sessionPlayers[0].PhysicalDeviceId;
         }
 
         List<ConnectedController> availablePads = GetAssignablePhysicalPads();
@@ -120,12 +131,26 @@ public partial class InputLayer : Node
         return assignedPosition >= 0 ? assignedPosition : playerAssignmentDeviceIds.Count + pad.ConnectionOrder;
     }
 
+    public static int ReadXInputSlot(int godotDeviceId)
+    {
+        Godot.Collections.Dictionary joypadInfo = Input.GetJoyInfo(godotDeviceId);
+        return joypadInfo.TryGetValue("xinput_index", out Variant slot) && int.TryParse(slot.AsString(), out int slotIndex) ? slotIndex : -1;
+    }
+
+    public static (ushort Vendor, ushort Product) ReadVendorAndProduct(int godotDeviceId)
+    {
+        Godot.Collections.Dictionary joypadInfo = Input.GetJoyInfo(godotDeviceId);
+        ushort ReadId(string key) => joypadInfo.TryGetValue(key, out Variant value) && ushort.TryParse(value.AsString(), out ushort id) ? id : (ushort)0;
+        return (ReadId("vendor_id"), ReadId("product_id"));
+    }
+
     public bool BeginSession(string systemSlug, EmulatorMeta emulatorMetadata)
     {
         EndSession();
 
-        if (!ShouldRunLayerForSession())
+        if (ResolveConsent() != InputLayerConsent.Accepted)
         {
+            LastSessionFailureReason = "automatic controller mapping has not been enabled";
             return false;
         }
 
@@ -138,85 +163,176 @@ public partial class InputLayer : Node
             return false;
         }
 
-        int playerCount = Math.Min(physicalPads.Count, ResolveMaximumPlayers(emulatorMetadata));
+        List<SessionPlayer> candidatePlayers = physicalPads
+            .Take(Math.Min(physicalPads.Count, ResolveMaximumPlayers(emulatorMetadata)))
+            .Select(DescribePlayer)
+            .ToList();
 
-        joypadsPresentBeforeSession = Input.GetConnectedJoypads().Select(deviceId => (int)deviceId).ToHashSet();
-        HidePhysicalPadsBeforeCreatingVirtualOnes(physicalPads);
+        if (candidatePlayers.Any(player => !player.IsPassthrough) && !virtualPadBackend.IsAvailable)
+        {
+            GD.Print($"[InputLayer] leaving out non-XInput pad(s): {virtualPadBackend.UnavailableReason}.");
+            candidatePlayers.RemoveAll(player => !player.IsPassthrough);
+        }
 
-        List<int> xinputSlotsBeforeCreatingPads = XInputSlots.ReadConnectedSlots();
-
-        if (!virtualPadBackend.TryCreatePads(playerCount))
+        if (candidatePlayers.Count == 0)
         {
             LastSessionFailureReason = virtualPadBackend.UnavailableReason;
-            GD.PrintErr($"[InputLayer] not starting a session: {LastSessionFailureReason}.");
+            GD.Print($"[InputLayer] not starting a session: {LastSessionFailureReason}.");
             return false;
         }
 
-        BuildSessionMappings(systemSlug, emulatorMetadata, physicalPads, playerCount);
-        RecordVirtualPadXInputSlots(xinputSlotsBeforeCreatingPads);
-        PhysicalPadsEnumeratedAheadOfOurs = physicalPads.Count;
+        List<SessionPlayer> playersNeedingVirtualPads = candidatePlayers.Where(player => !player.IsPassthrough).ToList();
+        joypadsPresentBeforeSession = Input.GetConnectedJoypads().Select(deviceId => DescribeJoypadIdentity((int)deviceId)).ToHashSet();
+        xinputSlotsBeforeCreatingPads = XInputSlots.ReadConnectedSlots();
+
+        GD.Print($"[InputLayer] XInput slot(s) [{string.Join(", ", xinputSlotsBeforeCreatingPads)}] in use; players: {string.Join("; ", candidatePlayers.Select(DescribePlayerForLog))}.");
+
+        if (playersNeedingVirtualPads.Count > 0)
+        {
+            HidePhysicalPadsBeforeCreatingVirtualOnes(physicalPads);
+
+            if (!virtualPadBackend.TryCreatePads(playersNeedingVirtualPads.Count))
+            {
+                LastSessionFailureReason = virtualPadBackend.UnavailableReason;
+                GD.PrintErr($"[InputLayer] not starting a session: {LastSessionFailureReason}.");
+                return false;
+            }
+        }
+
+        sessionPlayers.AddRange(candidatePlayers);
+        BuildVirtualPadMappings(systemSlug, emulatorMetadata, playersNeedingVirtualPads);
+        RecordVirtualPadXInputSlots();
 
         IsSessionActive = true;
         LastSessionFailureReason = "";
-        SetProcess(true);
+        SetProcess(virtualPadPlayers.Count > 0);
 
-        GD.Print($"[InputLayer] session started for '{systemSlug}' with {playerCount} virtual pad(s).");
+        GD.Print($"[InputLayer] session started for '{systemSlug}' with {sessionPlayers.Count} player(s): {sessionPlayers.Count - virtualPadPlayers.Count} passed through, {virtualPadPlayers.Count} on virtual pads.");
         return true;
     }
 
-    private readonly List<int> virtualPadXInputSlots = new List<int>();
+    private static SessionPlayer DescribePlayer(ConnectedController pad)
+    {
+        (ushort vendor, ushort product) = ReadVendorAndProduct(pad.GodotDeviceId);
 
-    private void RecordVirtualPadXInputSlots(List<int> slotsBeforeCreatingPads)
+        return new SessionPlayer
+        {
+            PhysicalDeviceId = pad.GodotDeviceId,
+            IsPassthrough = ReadXInputSlot(pad.GodotDeviceId) >= 0,
+            Vendor = vendor,
+            Product = product
+        };
+    }
+
+    private string DescribePlayerForLog(SessionPlayer player, int playerIndex)
+    {
+        string route = player.IsPassthrough ? $"passthrough, XInput slot {ReadXInputSlot(player.PhysicalDeviceId)}" : "virtual pad";
+        return $"P{playerIndex + 1} device {player.PhysicalDeviceId} \"{Input.GetJoyName(player.PhysicalDeviceId)}\" {player.Vendor:X4}/{player.Product:X4} ({route})";
+    }
+
+    private readonly List<int> virtualPadXInputSlots = new List<int>();
+    private List<int> xinputSlotsBeforeCreatingPads = new List<int>();
+
+    private void RecordVirtualPadXInputSlots()
     {
         virtualPadXInputSlots.Clear();
 
         foreach (int slotIndex in XInputSlots.ReadConnectedSlots())
         {
-            if (!slotsBeforeCreatingPads.Contains(slotIndex))
+            if (!xinputSlotsBeforeCreatingPads.Contains(slotIndex))
             {
                 virtualPadXInputSlots.Add(slotIndex);
             }
         }
-
-        GD.Print(virtualPadXInputSlots.Count > 0
-            ? $"[InputLayer] virtual pads occupy XInput slot(s) [{string.Join(", ", virtualPadXInputSlots)}]."
-            : "[InputLayer] no new XInput slots appeared; emulators reading XInput may not see the virtual pads.");
     }
 
-    public string ResolveVirtualPadGuid(int playerIndex)
+    private void ReportVirtualPadXInputSlots()
     {
-        return playerIndex >= 0 && playerIndex < ownVirtualDeviceIdsInPlayerOrder.Count
-            ? Input.GetJoyGuid(ownVirtualDeviceIdsInPlayerOrder[playerIndex])
-            : "";
+        if (virtualPadPlayers.Count == 0)
+        {
+            return;
+        }
+
+        GD.Print(virtualPadXInputSlots.Count >= virtualPadPlayers.Count
+            ? $"[InputLayer] virtual pads occupy XInput slot(s) [{string.Join(", ", virtualPadXInputSlots)}]."
+            : $"[InputLayer] only {virtualPadXInputSlots.Count} of {virtualPadPlayers.Count} virtual pad(s) got an XInput slot; the rest are invisible to emulators.");
+    }
+
+    public bool IsPlayerPassthrough(int playerIndex)
+    {
+        return playerIndex >= 0 && playerIndex < sessionPlayers.Count && sessionPlayers[playerIndex].IsPassthrough;
+    }
+
+    public int ResolvePlayerXInputSlot(int playerIndex)
+    {
+        if (playerIndex < 0 || playerIndex >= sessionPlayers.Count)
+        {
+            return -1;
+        }
+
+        SessionPlayer player = sessionPlayers[playerIndex];
+
+        if (player.IsPassthrough)
+        {
+            return ReadXInputSlot(player.PhysicalDeviceId);
+        }
+
+        return player.VirtualPadIndex < virtualPadXInputSlots.Count ? virtualPadXInputSlots[player.VirtualPadIndex] : -1;
+    }
+
+    public (ushort Vendor, ushort Product) ResolvePlayerIdentity(int playerIndex)
+    {
+        if (playerIndex < 0 || playerIndex >= sessionPlayers.Count)
+        {
+            return (0, 0);
+        }
+
+        SessionPlayer player = sessionPlayers[playerIndex];
+        return player.IsPassthrough ? (player.Vendor, player.Product) : (ViGEmPadBackend.VirtualPadVendorId, ViGEmPadBackend.VirtualPadProductId);
+    }
+
+    public string ResolvePlayerGuid(int playerIndex)
+    {
+        if (playerIndex < 0 || playerIndex >= sessionPlayers.Count)
+        {
+            return "";
+        }
+
+        SessionPlayer player = sessionPlayers[playerIndex];
+
+        if (player.IsPassthrough)
+        {
+            return Input.GetJoyGuid(player.PhysicalDeviceId);
+        }
+
+        return player.VirtualPadIndex < ownVirtualDeviceIdsInPlayerOrder.Count ? Input.GetJoyGuid(ownVirtualDeviceIdsInPlayerOrder[player.VirtualPadIndex]) : "";
     }
 
     public async Task WaitForVirtualPadsToEnumerate()
     {
-        if (!IsSessionActive)
+        if (!IsSessionActive || virtualPadPlayers.Count == 0)
         {
             return;
         }
 
         int elapsedMilliseconds = 0;
-        GD.Print($"[InputLayer] waiting for virtual pads to enumerate: {ownVirtualDeviceIdsInPlayerOrder.Count} of {ActivePlayerCount} seen.");
+        GD.Print($"[InputLayer] waiting for virtual pads to enumerate: {ownVirtualDeviceIdsInPlayerOrder.Count} of {virtualPadPlayers.Count} seen.");
 
-        while (ownVirtualDeviceIdsInPlayerOrder.Count < ActivePlayerCount && elapsedMilliseconds < VirtualPadEnumerationTimeoutMilliseconds)
+        while ((ownVirtualDeviceIdsInPlayerOrder.Count < virtualPadPlayers.Count || virtualPadXInputSlots.Count < virtualPadPlayers.Count)
+            && elapsedMilliseconds < VirtualPadEnumerationTimeoutMilliseconds)
         {
             await ToSignal(GetTree().CreateTimer(VirtualPadEnumerationPollMilliseconds / 1000.0f), SceneTreeTimer.SignalName.Timeout);
             elapsedMilliseconds += VirtualPadEnumerationPollMilliseconds;
+            RecordVirtualPadXInputSlots();
         }
 
         GD.Print($"[InputLayer] enumeration wait finished after {elapsedMilliseconds} ms with {ownVirtualDeviceIdsInPlayerOrder.Count} pad(s).");
+        ReportVirtualPadXInputSlots();
 
-        if (ownVirtualDeviceIdsInPlayerOrder.Count < ActivePlayerCount)
+        if (ownVirtualDeviceIdsInPlayerOrder.Count < virtualPadPlayers.Count)
         {
-            GD.PrintErr($"[InputLayer] only {ownVirtualDeviceIdsInPlayerOrder.Count} of {ActivePlayerCount} virtual pad(s) enumerated; emulator config may name the wrong device.");
+            GD.PrintErr($"[InputLayer] only {ownVirtualDeviceIdsInPlayerOrder.Count} of {virtualPadPlayers.Count} virtual pad(s) enumerated; emulator config may name the wrong device.");
         }
-    }
-
-    public int ResolveVirtualPadXInputSlot(int playerIndex)
-    {
-        return playerIndex >= 0 && playerIndex < virtualPadXInputSlots.Count ? virtualPadXInputSlots[playerIndex] : -1;
     }
 
     private void HidePhysicalPadsBeforeCreatingVirtualOnes(List<ConnectedController> physicalPads)
@@ -229,36 +345,19 @@ public partial class InputLayer : Node
         deviceHider.HidePhysicalPads(physicalPads);
     }
 
-    private bool ShouldRunLayerForSession()
-    {
-        if (ResolveConsent() != InputLayerConsent.Accepted)
-        {
-            LastSessionFailureReason = "automatic controller mapping has not been enabled";
-            return false;
-        }
-
-        if (!virtualPadBackend.IsAvailable)
-        {
-            LastSessionFailureReason = virtualPadBackend.UnavailableReason;
-            GD.Print($"[InputLayer] not starting a session: {LastSessionFailureReason}.");
-            return false;
-        }
-
-        return true;
-    }
-
     private int ResolveMaximumPlayers(EmulatorMeta emulatorMetadata)
     {
         int metadataMaximum = emulatorMetadata?.ControllerConfig?.MaxControllers ?? 0;
         return metadataMaximum > 0 ? Math.Min(metadataMaximum, MaximumPlayers) : MaximumPlayers;
     }
 
-    private void BuildSessionMappings(string systemSlug, EmulatorMeta emulatorMetadata, List<ConnectedController> physicalPads, int playerCount)
+    private void BuildVirtualPadMappings(string systemSlug, EmulatorMeta emulatorMetadata, List<SessionPlayer> playersNeedingVirtualPads)
     {
-        for (int playerIndex = 0; playerIndex < playerCount; playerIndex++)
+        foreach (SessionPlayer player in playersNeedingVirtualPads)
         {
-            sessionPhysicalDeviceIds.Add(physicalPads[playerIndex].GodotDeviceId);
-            sessionMappingTables.Add(BuildMappingTableForPlayer(systemSlug, emulatorMetadata, playerIndex));
+            player.VirtualPadIndex = virtualPadPlayers.Count;
+            virtualPadPlayers.Add(player);
+            sessionMappingTables.Add(BuildMappingTableForPlayer(systemSlug, emulatorMetadata, sessionPlayers.IndexOf(player)));
             sessionPhysicalStates.Add(new PadState());
             sessionVirtualStates.Add(new PadState());
         }
@@ -292,7 +391,7 @@ public partial class InputLayer : Node
 
     public void EndSession()
     {
-        if (!IsSessionActive && sessionPhysicalDeviceIds.Count == 0)
+        if (!IsSessionActive && sessionPlayers.Count == 0)
         {
             return;
         }
@@ -303,12 +402,13 @@ public partial class InputLayer : Node
         virtualPadBackend.DestroyPads();
         deviceHider.UnhideAll();
 
-        sessionPhysicalDeviceIds.Clear();
+        sessionPlayers.Clear();
+        virtualPadPlayers.Clear();
         virtualPadXInputSlots.Clear();
+        xinputSlotsBeforeCreatingPads.Clear();
         sessionMappingTables.Clear();
         sessionPhysicalStates.Clear();
         sessionVirtualStates.Clear();
-        ownVirtualDeviceIds.Clear();
         ownVirtualDeviceIdsInPlayerOrder.Clear();
         joypadsPresentBeforeSession.Clear();
 
@@ -322,14 +422,14 @@ public partial class InputLayer : Node
             return;
         }
 
-        for (int playerIndex = 0; playerIndex < sessionPhysicalDeviceIds.Count; playerIndex++)
+        for (int virtualPadIndex = 0; virtualPadIndex < virtualPadPlayers.Count; virtualPadIndex++)
         {
-            PadState physicalState = sessionPhysicalStates[playerIndex];
-            PadState virtualState = sessionVirtualStates[playerIndex];
+            PadState physicalState = sessionPhysicalStates[virtualPadIndex];
+            PadState virtualState = sessionVirtualStates[virtualPadIndex];
 
-            physicalPadReader.ReadInto(sessionPhysicalDeviceIds[playerIndex], physicalState);
-            sessionMappingTables[playerIndex].Apply(physicalState, virtualState);
-            virtualPadBackend.Submit(playerIndex, virtualState);
+            physicalPadReader.ReadInto(virtualPadPlayers[virtualPadIndex].PhysicalDeviceId, physicalState);
+            sessionMappingTables[virtualPadIndex].Apply(physicalState, virtualState);
+            virtualPadBackend.Submit(virtualPadIndex, virtualState);
         }
     }
 
@@ -349,11 +449,22 @@ public partial class InputLayer : Node
             return;
         }
 
-        if (virtualPadBackend.CreatedPadCount > 0 && !joypadsPresentBeforeSession.Contains(joypadId) && ownVirtualDeviceIds.Add(joypadId))
+        if (virtualPadBackend.CreatedPadCount == 0 || joypadsPresentBeforeSession.Contains(DescribeJoypadIdentity(joypadId)))
+        {
+            ownVirtualDeviceIds.Remove(joypadId);
+            return;
+        }
+
+        if (ownVirtualDeviceIds.Add(joypadId))
         {
             ownVirtualDeviceIdsInPlayerOrder.Add(joypadId);
             GD.Print($"[InputLayer] our virtual pad appeared as Godot device {joypadId} \"{Input.GetJoyName(joypadId)}\"; excluding it from input.");
         }
+    }
+
+    private static string DescribeJoypadIdentity(int godotDeviceId)
+    {
+        return $"{godotDeviceId}:{Input.GetJoyGuid(godotDeviceId)}";
     }
 
     public Dictionary<string, string> BuildLaunchEnvironment(EmulatorMeta emulatorMetadata)
@@ -363,7 +474,19 @@ public partial class InputLayer : Node
             return new Dictionary<string, string>();
         }
 
-        return SdlDeviceAllowlist.BuildEnvironment();
+        var allowedDevices = new List<(ushort Vendor, ushort Product)>();
+
+        for (int playerIndex = 0; playerIndex < sessionPlayers.Count; playerIndex++)
+        {
+            (ushort, ushort) identity = ResolvePlayerIdentity(playerIndex);
+
+            if (!allowedDevices.Contains(identity))
+            {
+                allowedDevices.Add(identity);
+            }
+        }
+
+        return SdlDeviceAllowlist.BuildEnvironment(allowedDevices);
     }
 
     private static string ResolveInputLayerMode(EmulatorMeta emulatorMetadata)

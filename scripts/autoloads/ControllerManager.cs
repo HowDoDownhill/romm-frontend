@@ -18,7 +18,31 @@ public partial class ControllerManager : Node
     public override void _Ready()
     {
         Input.JoyConnectionChanged += OnJoyConnectionChanged;
+        ReportSteamLaunchEnvironment();
         PopulateAlreadyConnectedControllers();
+    }
+
+    private static readonly string[] SteamInputEnvironmentVariables =
+    {
+        "SteamAppId",
+        "SteamGameId",
+        "SDL_GAMECONTROLLER_IGNORE_DEVICES",
+        "SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT",
+        "SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD",
+        "SDL_GAMECONTROLLERCONFIG"
+    };
+
+    private static void ReportSteamLaunchEnvironment()
+    {
+        foreach (string variableName in SteamInputEnvironmentVariables)
+        {
+            string value = System.Environment.GetEnvironmentVariable(variableName);
+
+            if (!string.IsNullOrEmpty(value))
+            {
+                GD.Print($"[Controllers] inherited {variableName}={value}");
+            }
+        }
     }
 
     private void PopulateAlreadyConnectedControllers()

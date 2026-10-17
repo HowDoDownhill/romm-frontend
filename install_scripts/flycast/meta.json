@@ -119,17 +119,19 @@
     "max_controllers": 2,
     "config_file_relative_path": "emu.cfg",
     "format": "ini",
+    "sdl_enumeration": "all",
     "controller_sections": [
       {
         "section_template": "input",
         "port_start": 0,
-        "device_key": "maple_sdl_joystick_{sdl_index_after_hidden}",
+        "device_key": "maple_sdl_joystick_{sdl_list_index}",
         "device_template": "{port}"
       },
       {
         "section_template": "input",
         "port_start": 2,
-        "device_key": "maple_sdl_joystick_{sdl_index}",
+        "other_devices": true,
+        "device_key": "maple_sdl_joystick_{sdl_list_index}",
         "device_template": "{port}"
       }
     ]

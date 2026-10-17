@@ -952,6 +952,9 @@ public class ControllerConfig
     [JsonPropertyName("controller_sections")]
     public List<ControllerSection> ControllerSections { get; set; }
 
+    [JsonPropertyName("sdl_enumeration")]
+    public string SdlEnumeration { get; set; }
+
     [JsonPropertyName("remove_section_patterns")]
     public List<string> RemoveSectionPatterns { get; set; }
 
@@ -1005,6 +1008,15 @@ public class ControllerSection
 
     [JsonPropertyName("static_values")]
     public Dictionary<string, string> StaticValues { get; set; }
+
+    [JsonPropertyName("other_devices")]
+    public bool OtherDevices { get; set; }
+
+    [JsonPropertyName("config_file_relative_path")]
+    public string ConfigFileRelativePath { get; set; }
+
+    [JsonPropertyName("bindings_from_section")]
+    public string BindingsFromSection { get; set; }
 }
 
 public partial class EmulatorManager : Node
@@ -2203,6 +2215,12 @@ public partial class EmulatorManager : Node
 
     private Process BuildAndStartEmulatorProcess(string executablePath, string launchArguments, string workingDirectory, EmulatorMeta emulatorMetadata = null)
     {
+        DiscreteGpuPreference.RegisterWindowsGpuPreference(executablePath, appInstance?.configManager?.PreferDiscreteGpu ?? true);
+        return Process.Start(BuildEmulatorStartInfo(executablePath, launchArguments, workingDirectory, emulatorMetadata));
+    }
+
+    private ProcessStartInfo BuildEmulatorStartInfo(string executablePath, string launchArguments, string workingDirectory, EmulatorMeta emulatorMetadata)
+    {
         ProcessStartInfo processStartInfo = new ProcessStartInfo
         {
             FileName = executablePath,
@@ -2212,14 +2230,10 @@ public partial class EmulatorManager : Node
             UseShellExecute = false
         };
 
-        bool preferDiscreteGpu = appInstance?.configManager?.PreferDiscreteGpu ?? true;
-
-        DiscreteGpuPreference.ApplyToProcess(processStartInfo, preferDiscreteGpu);
-        DiscreteGpuPreference.RegisterWindowsGpuPreference(executablePath, preferDiscreteGpu);
+        DiscreteGpuPreference.ApplyToProcess(processStartInfo, appInstance?.configManager?.PreferDiscreteGpu ?? true);
         ApplyLaunchEnvironment(processStartInfo, emulatorMetadata, workingDirectory);
         ApplyInputLayerEnvironment(processStartInfo, emulatorMetadata);
-
-        return Process.Start(processStartInfo);
+        return processStartInfo;
     }
 
     private void ApplyInputLayerEnvironment(ProcessStartInfo processStartInfo, EmulatorMeta emulatorMetadata)
@@ -2537,7 +2551,7 @@ public partial class EmulatorManager : Node
                 await appInstance.inputLayer.WaitForVirtualPadsToEnumerate();
             }
 
-            WriteInputLayerDeviceBindings(emulatorMetadata, emulatorInstallDirectory);
+            await WriteInputLayerDeviceBindings(emulatorMetadata, emulatorInstallDirectory, fullExecutablePath);
 
             DateTime sessionStart = DateTime.UtcNow;
 
@@ -2753,7 +2767,7 @@ public partial class EmulatorManager : Node
                 await appInstance.inputLayer.WaitForVirtualPadsToEnumerate();
             }
 
-            WriteInputLayerDeviceBindings(emulatorMetadata, emulatorInstallDirectory);
+            await WriteInputLayerDeviceBindings(emulatorMetadata, emulatorInstallDirectory, fullExecutablePath);
 
             Process emulatorProcess = BuildAndStartEmulatorProcess(fullExecutablePath, launchArguments, emulatorInstallDirectory, emulatorMetadata);
 
@@ -2867,7 +2881,18 @@ public partial class EmulatorManager : Node
 
     private static readonly bool SuspendControllerMapping = true;
 
-    private void WriteInputLayerDeviceBindings(EmulatorMeta emulatorMetadata, string emulatorInstallDirectory)
+    private class EmulatorDeviceView
+    {
+        public SdlProbeResult Probe;
+        public List<SdlProbeDevice> Devices = new List<SdlProbeDevice>();
+        public List<SdlProbeDevice> PlayerDevices = new List<SdlProbeDevice>();
+    }
+
+    private const int DeviceProbeSettleMilliseconds = 800;
+
+    private static readonly string[] ProbeDependentMacros = { "{sdl_list_index}", "{sdl_index}", "{sdl_name_index}", "{controller_name}", "{controller_guid}" };
+
+    private async Task WriteInputLayerDeviceBindings(EmulatorMeta emulatorMetadata, string emulatorInstallDirectory, string executablePath)
     {
         InputLayer inputLayer = appInstance?.inputLayer;
 
@@ -2898,12 +2923,94 @@ public partial class EmulatorManager : Node
             return;
         }
 
+        EmulatorDeviceView deviceView = NeedsDeviceProbe(controllerConfig)
+            ? await ProbeEmulatorDevices(emulatorMetadata, emulatorInstallDirectory, executablePath, inputLayer)
+            : null;
+
         RemoveStaleControllerProfiles(controllerConfig, configFilePath);
 
         foreach (ControllerSection controllerSection in controllerConfig.ControllerSections ?? new List<ControllerSection>())
         {
-            WriteDeviceBindingsForSection(controllerSection, controllerConfig, configFilePath, inputLayer);
+            RemoveStaleIndexedDeviceKeys(controllerSection, controllerConfig, configFilePath, deviceView);
         }
+
+        foreach (ControllerSection controllerSection in controllerConfig.ControllerSections ?? new List<ControllerSection>())
+        {
+            if (controllerSection.OtherDevices)
+            {
+                WriteOtherDeviceBindings(controllerSection, configFilePath, deviceView);
+                continue;
+            }
+
+            string sectionConfigFilePath = string.IsNullOrEmpty(controllerSection.ConfigFileRelativePath)
+                ? configFilePath
+                : Path.Combine(emulatorInstallDirectory, controllerSection.ConfigFileRelativePath);
+
+            if (!File.Exists(sectionConfigFilePath))
+            {
+                GD.Print($"[InputLayer] {sectionConfigFilePath} does not exist yet; skipping its controller section.");
+                continue;
+            }
+
+            WriteDeviceBindingsForSection(controllerSection, controllerConfig, sectionConfigFilePath, inputLayer, deviceView);
+        }
+    }
+
+    private static bool NeedsDeviceProbe(ControllerConfig controllerConfig)
+    {
+        return OperatingSystem.IsWindows() && controllerConfig.ControllerSections != null && controllerConfig.ControllerSections.Any(controllerSection =>
+            controllerSection.OtherDevices
+            || new[] { controllerSection.DeviceKey, controllerSection.DeviceTemplate, controllerSection.DeviceBindingTemplate }
+                .Concat(controllerSection.Mappings?.Values ?? Enumerable.Empty<string>())
+                .Any(template => template != null && ProbeDependentMacros.Any(template.Contains)));
+    }
+
+    private async Task<EmulatorDeviceView> ProbeEmulatorDevices(EmulatorMeta emulatorMetadata, string emulatorInstallDirectory, string executablePath, InputLayer inputLayer)
+    {
+        string sdlLibraryPath = FindEmulatorSdlLibrary(emulatorInstallDirectory, out string sdlSource);
+
+        if (sdlLibraryPath == null)
+        {
+            GD.PrintErr("[InputLayer] no SDL library to probe this emulator's devices with; falling back to player order.");
+            return null;
+        }
+
+        SdlProbeResult probe = await SdlEnumerationProbe.RunAsync(BuildEmulatorStartInfo(executablePath, "", emulatorInstallDirectory, emulatorMetadata), sdlLibraryPath, DeviceProbeSettleMilliseconds);
+
+        if (!string.IsNullOrEmpty(probe.Error))
+        {
+            GD.PrintErr($"[InputLayer] device probe failed ({probe.Error}); falling back to player order.");
+            return null;
+        }
+
+        GD.Print($"[InputLayer] probed devices with {sdlSource} (SDL {probe.SdlVersion}), Steam overlay {(probe.SteamHooked ? "loaded" : "not loaded")}.");
+        return BuildDeviceView(probe, emulatorMetadata.ControllerConfig, inputLayer);
+    }
+
+    private static EmulatorDeviceView BuildDeviceView(SdlProbeResult probe, ControllerConfig controllerConfig, InputLayer inputLayer)
+    {
+        var deviceView = new EmulatorDeviceView
+        {
+            Probe = probe,
+            Devices = controllerConfig.SdlEnumeration == "all" ? probe.AllDevices : probe.Devices
+        };
+
+        for (int playerIndex = 0; playerIndex < inputLayer.ActivePlayerCount; playerIndex++)
+        {
+            int xinputSlot = inputLayer.ResolvePlayerXInputSlot(playerIndex);
+            (ushort vendor, ushort product) = inputLayer.ResolvePlayerIdentity(playerIndex);
+
+            SdlProbeDevice playerDevice =
+                deviceView.Devices.FirstOrDefault(candidate => xinputSlot >= 0 && candidate.PlayerIndex == xinputSlot && !deviceView.PlayerDevices.Contains(candidate))
+                ?? deviceView.Devices.FirstOrDefault(candidate => candidate.Vendor == vendor && candidate.Product == product && !deviceView.PlayerDevices.Contains(candidate));
+
+            deviceView.PlayerDevices.Add(playerDevice);
+            GD.Print(playerDevice != null
+                ? $"[InputLayer] player {playerIndex + 1} is \"{playerDevice.Name}\" {playerDevice.Vendor:X4}/{playerDevice.Product:X4} at index {playerDevice.Index} of this emulator's devices."
+                : $"[InputLayer] player {playerIndex + 1} (XInput slot {xinputSlot}, {vendor:X4}/{product:X4}) is not among this emulator's devices.");
+        }
+
+        return deviceView;
     }
 
     private void RemoveStaleControllerProfiles(ControllerConfig controllerConfig, string configFilePath)
@@ -2926,12 +3033,52 @@ public partial class EmulatorManager : Node
         }
     }
 
+    private static readonly System.Text.RegularExpressions.Regex DeviceMacroPattern = new System.Text.RegularExpressions.Regex(@"\{(sdl_[a-z_]+|xinput_index)\}");
+
+    private static void RemoveStaleIndexedDeviceKeys(ControllerSection controllerSection, ControllerConfig controllerConfig, string configFilePath, EmulatorDeviceView deviceView)
+    {
+        if (controllerConfig.Format != "ini" || deviceView == null || string.IsNullOrEmpty(controllerSection.DeviceKey) || !DeviceMacroPattern.IsMatch(controllerSection.DeviceKey))
+        {
+            return;
+        }
+
+        string keyPattern = "^" + string.Join(@"\d+", DeviceMacroPattern.Split(controllerSection.DeviceKey).Where((_, partIndex) => partIndex % 2 == 0).Select(System.Text.RegularExpressions.Regex.Escape)) + "$";
+        string sectionName = (controllerSection.SectionTemplate ?? "").Replace("{port}", controllerSection.PortStart.ToString());
+        int removedKeyCount = IniKeyRemover.RemoveMatchingKeys(configFilePath, sectionName, keyPattern);
+
+        if (removedKeyCount > 0)
+        {
+            GD.Print($"[InputLayer] cleared {removedKeyCount} stale [{sectionName}] key(s) matching {keyPattern}");
+        }
+    }
+
     private static bool SupportsDeviceBindingWrites(string configurationFormat)
     {
         return configurationFormat == "ini" || configurationFormat == "flat" || configurationFormat == SectionDeviceIndexRewriter.IndentedSectionStyle;
     }
 
-    private void WriteDeviceBindingsForSection(ControllerSection controllerSection, ControllerConfig controllerConfig, string configFilePath, InputLayer inputLayer)
+    private void WriteOtherDeviceBindings(ControllerSection controllerSection, string configFilePath, EmulatorDeviceView deviceView)
+    {
+        if (deviceView == null || string.IsNullOrEmpty(controllerSection.DeviceKey) || string.IsNullOrEmpty(controllerSection.DeviceTemplate))
+        {
+            return;
+        }
+
+        var iniUpdater = new IniConfigurationUpdater();
+        string sectionName = (controllerSection.SectionTemplate ?? "").Replace("{port}", controllerSection.PortStart.ToString());
+        int nextPort = controllerSection.PortStart;
+
+        foreach (SdlProbeDevice otherDevice in deviceView.Devices.Where(candidate => !deviceView.PlayerDevices.Contains(candidate)))
+        {
+            string deviceKey = DeviceMacroPattern.Replace(controllerSection.DeviceKey, otherDevice.Index.ToString());
+            string deviceValue = controllerSection.DeviceTemplate.Replace("{port}", nextPort.ToString());
+            iniUpdater.UpdateValue(configFilePath, sectionName, deviceKey, deviceValue, deviceValue);
+            GD.Print($"[InputLayer] {sectionName}/{deviceKey} = {deviceValue} (\"{otherDevice.Name}\", not a player)");
+            nextPort++;
+        }
+    }
+
+    private void WriteDeviceBindingsForSection(ControllerSection controllerSection, ControllerConfig controllerConfig, string configFilePath, InputLayer inputLayer, EmulatorDeviceView deviceView)
     {
         bool writesSections = controllerConfig.Format == "ini" || controllerConfig.Format == SectionDeviceIndexRewriter.IndentedSectionStyle;
 
@@ -2962,11 +3109,22 @@ public partial class EmulatorManager : Node
             if (writesPortOccupancy)
             {
                 string portType = playerIsPresent ? controllerSection.TypeConnected : controllerSection.TypeDisconnected;
+                string typeKey = controllerSection.TypeKey.Replace("{port}", portNumber);
 
                 if (!string.IsNullOrEmpty(portType))
                 {
-                    iniUpdater.UpdateValue(configFilePath, sectionName, controllerSection.TypeKey, portType, portType);
-                    GD.Print($"[InputLayer] {sectionName}/{controllerSection.TypeKey} = {portType}");
+                    iniUpdater.UpdateValue(configFilePath, sectionName, typeKey, portType, portType);
+                    GD.Print($"[InputLayer] {sectionName}/{typeKey} = {portType}");
+                }
+            }
+
+            if (writesSections && playerIsPresent && !string.IsNullOrEmpty(controllerSection.BindingsFromSection))
+            {
+                int copiedBindingCount = IniSectionCopier.CopyMissingKeys(configFilePath, controllerSection.BindingsFromSection, sectionName, new[] { controllerSection.DeviceKey });
+
+                if (copiedBindingCount > 0)
+                {
+                    GD.Print($"[InputLayer] copied {copiedBindingCount} binding(s) from [{controllerSection.BindingsFromSection}] into [{sectionName}]");
                 }
             }
 
@@ -2976,7 +3134,7 @@ public partial class EmulatorManager : Node
                     ? null
                     : controllerSection.BindingKeyPrefixTemplate.Replace("{port}", portNumber);
 
-                RewriteSectionDeviceBindings(controllerSection, controllerConfig, configFilePath, sectionName, playerIndex, inputLayer, bindingKeyPrefix);
+                RewriteSectionDeviceBindings(controllerSection, controllerConfig, configFilePath, sectionName, playerIndex, inputLayer, bindingKeyPrefix, deviceView);
             }
 
             if (!writesDeviceBinding)
@@ -2985,7 +3143,7 @@ public partial class EmulatorManager : Node
             }
 
             string deviceValue = playerIsPresent
-                ? ResolveDeviceBindingMacros(controllerSection.DeviceTemplate, playerIndex, inputLayer).Replace("{port}", portNumber)
+                ? ResolveDeviceBindingMacros(controllerSection.DeviceTemplate, playerIndex, inputLayer, deviceView).Replace("{port}", portNumber)
                 : controllerSection.DeviceDisconnected;
 
             if (string.IsNullOrEmpty(deviceValue))
@@ -2993,7 +3151,14 @@ public partial class EmulatorManager : Node
                 continue;
             }
 
-            string deviceKey = ResolveDeviceBindingMacros(controllerSection.DeviceKey, playerIndex, inputLayer).Replace("{port}", portNumber);
+            string deviceKey = playerIsPresent
+                ? ResolveDeviceBindingMacros(controllerSection.DeviceKey, playerIndex, inputLayer, deviceView).Replace("{port}", portNumber)
+                : controllerSection.DeviceKey.Replace("{port}", portNumber);
+
+            if (string.IsNullOrEmpty(deviceKey) || DeviceMacroPattern.IsMatch(deviceKey))
+            {
+                continue;
+            }
 
             if (writesSections)
             {
@@ -3007,32 +3172,58 @@ public partial class EmulatorManager : Node
         }
     }
 
-    private static string ResolveDeviceBindingMacros(string deviceTemplate, int playerIndex, InputLayer inputLayer)
+    private static string ResolveDeviceBindingMacros(string deviceTemplate, int playerIndex, InputLayer inputLayer, EmulatorDeviceView deviceView)
     {
-        int xinputSlot = inputLayer.ResolveVirtualPadXInputSlot(playerIndex);
+        int xinputSlot = inputLayer.ResolvePlayerXInputSlot(playerIndex);
 
-        if (deviceTemplate.Contains("{xinput_index}") && xinputSlot < 0)
+        if ((deviceTemplate.Contains("{xinput_index}") || deviceTemplate.Contains("{sdl_player_index}") || deviceTemplate.Contains("{sdl_index_after_hidden}")) && xinputSlot < 0)
         {
             return "";
         }
 
+        SdlProbeDevice playerDevice = deviceView != null && playerIndex < deviceView.PlayerDevices.Count ? deviceView.PlayerDevices[playerIndex] : null;
+
+        if (deviceView != null && playerDevice == null && ProbeDependentMacros.Any(deviceTemplate.Contains))
+        {
+            return "";
+        }
+
+        string listIndex = (playerDevice?.Index ?? playerIndex).ToString();
+        string nameIndex = playerDevice != null
+            ? deviceView.Devices.TakeWhile(candidate => candidate != playerDevice).Count(candidate => candidate.Name == playerDevice.Name).ToString()
+            : playerIndex.ToString();
+
         return deviceTemplate
-            .Replace("{sdl_index_after_hidden_plus_one}", (inputLayer.PhysicalPadsEnumeratedAheadOfOurs + playerIndex + 1).ToString())
-            .Replace("{sdl_index_after_hidden}", (inputLayer.PhysicalPadsEnumeratedAheadOfOurs + playerIndex).ToString())
-            .Replace("{sdl_index}", playerIndex.ToString())
+            .Replace("{sdl_index_after_hidden}", xinputSlot.ToString())
+            .Replace("{sdl_player_index}", xinputSlot.ToString())
             .Replace("{xinput_index}", xinputSlot.ToString())
-            .Replace("{controller_name}", inputLayer.VirtualPadSdlDeviceName)
-            .Replace("{controller_guid}", inputLayer.ResolveVirtualPadGuid(playerIndex));
+            .Replace("{sdl_list_index}", listIndex)
+            .Replace("{sdl_index}", listIndex)
+            .Replace("{sdl_name_index}", nameIndex)
+            .Replace("{controller_name}", playerDevice?.Name ?? ResolveFallbackDeviceName(playerIndex, inputLayer))
+            .Replace("{controller_guid}", playerDevice?.Guid ?? inputLayer.ResolvePlayerGuid(playerIndex));
     }
 
-    private void RewriteSectionDeviceBindings(ControllerSection controllerSection, ControllerConfig controllerConfig, string configFilePath, string sectionName, int playerIndex, InputLayer inputLayer, string bindingKeyPrefix)
+    private static string ResolveFallbackDeviceName(int playerIndex, InputLayer inputLayer)
+    {
+        if (!inputLayer.IsPlayerPassthrough(playerIndex))
+        {
+            return inputLayer.VirtualPadSdlDeviceName;
+        }
+
+        int physicalDeviceId = inputLayer.SessionPlayers[playerIndex].PhysicalDeviceId;
+        Godot.Collections.Dictionary joypadInfo = Input.GetJoyInfo(physicalDeviceId);
+        return joypadInfo.TryGetValue("raw_name", out Variant rawName) ? rawName.AsString() : Input.GetJoyName(physicalDeviceId);
+    }
+
+    private void RewriteSectionDeviceBindings(ControllerSection controllerSection, ControllerConfig controllerConfig, string configFilePath, string sectionName, int playerIndex, InputLayer inputLayer, string bindingKeyPrefix, EmulatorDeviceView deviceView)
     {
         if (string.IsNullOrEmpty(controllerSection.DeviceBindingPattern) || string.IsNullOrEmpty(controllerSection.DeviceBindingTemplate))
         {
             return;
         }
 
-        string deviceReplacement = ResolveDeviceBindingMacros(controllerSection.DeviceBindingTemplate, playerIndex, inputLayer);
+        string deviceReplacement = ResolveDeviceBindingMacros(controllerSection.DeviceBindingTemplate, playerIndex, inputLayer, deviceView);
 
         if (string.IsNullOrEmpty(deviceReplacement))
         {
@@ -3050,10 +3241,10 @@ public partial class EmulatorManager : Node
             return;
         }
 
-        WriteSectionBindingsFromMappings(controllerSection, controllerConfig, configFilePath, sectionName, playerIndex, inputLayer, deviceReplacement);
+        WriteSectionBindingsFromMappings(controllerSection, controllerConfig, configFilePath, sectionName, playerIndex, inputLayer, deviceReplacement, deviceView);
     }
 
-    private void WriteSectionBindingsFromMappings(ControllerSection controllerSection, ControllerConfig controllerConfig, string configFilePath, string sectionName, int playerIndex, InputLayer inputLayer, string deviceReplacement)
+    private void WriteSectionBindingsFromMappings(ControllerSection controllerSection, ControllerConfig controllerConfig, string configFilePath, string sectionName, int playerIndex, InputLayer inputLayer, string deviceReplacement, EmulatorDeviceView deviceView)
     {
         if (controllerSection.Mappings == null || controllerSection.Mappings.Count == 0)
         {
@@ -3067,7 +3258,7 @@ public partial class EmulatorManager : Node
 
         foreach (var mapping in controllerSection.Mappings)
         {
-            string bindingValue = ResolveDeviceBindingMacros(mapping.Value, playerIndex, inputLayer);
+            string bindingValue = ResolveDeviceBindingMacros(mapping.Value, playerIndex, inputLayer, deviceView);
 
             if (bindingValue.Contains('{'))
             {
@@ -3075,15 +3266,16 @@ public partial class EmulatorManager : Node
             }
 
             bindingValue = devicePattern.Replace(bindingValue, deviceReplacement);
+            string bindingKey = mapping.Key.Replace("{port}", (controllerSection.PortStart + playerIndex).ToString());
 
             if (controllerConfig.Format == SectionDeviceIndexRewriter.IndentedSectionStyle)
             {
-                indentedUpdater.UpdateValue(configFilePath, sectionName, mapping.Key, bindingValue);
+                indentedUpdater.UpdateValue(configFilePath, sectionName, bindingKey, bindingValue);
             }
 
             else
             {
-                iniUpdater.UpdateValue(configFilePath, sectionName, mapping.Key, bindingValue, bindingValue);
+                iniUpdater.UpdateValue(configFilePath, sectionName, bindingKey, bindingValue, bindingValue);
             }
 
             writtenBindingCount++;

@@ -3,9 +3,14 @@ RomM Frontend - Unreleased
 ✨ New Features
 
     Android (in development): A phone build with touch controls. It installs emulators from Google Play where possible, downloads games to Documents/RomM, and launches them in Flycast, Dolphin, DuckStation, melonDS, PPSSPP, Azahar or RetroArch.
+    Controller Report: Starting the app with --controller-report writes a file showing what every emulator will see from each controller, for diagnosing mapping problems.
 
 🐛 Bug Fixes
 
+    Four Players With Xbox Controllers (Windows): Xbox controllers now go straight to the emulator, and only other pads (Switch Pro, PlayStation) use a virtual controller. Three or more Xbox pads used to run out of Windows' four controller slots, leaving players with dead controllers.
+    Controllers in Dolphin Beyond Player One: Ports 2 to 4 now get working bindings and are switched on, so multiplayer GameCube games see every player.
+    Mixed Controllers in PCSX2 and DuckStation: Player one could be pointed at the wrong device when a non-Xbox pad was connected alongside Xbox pads.
+    RetroArch Controller Mapping: RetroArch could read the physical controller directly, skipping custom remaps, when the virtual controller connected a moment late.
     Downloads on Networks Without IPv6: Emulator and asset downloads from servers with an IPv6 address failed with "Network is unreachable" on networks with no IPv6 route, instead of falling back to IPv4.
 
 ---

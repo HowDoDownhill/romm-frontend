@@ -132,10 +132,19 @@
     },
     "controller_sections": [
       {
+        "config_file_relative_path": "User/Config/Dolphin.ini",
+        "section_template": "Core",
+        "port_start": 0,
+        "type_key": "SIDevice{port}",
+        "type_connected": "6",
+        "type_disconnected": "0"
+      },
+      {
         "section_template": "GCPad{port}",
         "port_start": 1,
+        "bindings_from_section": "GCPad1",
         "device_key": "Device",
-        "device_template": "SDL/{sdl_index}/{controller_name}",
+        "device_template": "SDL/{sdl_name_index}/{controller_name}",
         "device_disconnected": "DInput/0/Keyboard Mouse",
         "mappings": {
           "Buttons/A": "{Platform_A}",

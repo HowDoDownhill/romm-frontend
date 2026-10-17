@@ -94,7 +94,7 @@
         "section_template": "Instance{port}",
         "port_start": 0,
         "device_key": "JoystickID",
-        "device_template": "{sdl_index}"
+        "device_template": "{sdl_list_index}"
       }
     ]
   }

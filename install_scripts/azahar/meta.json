@@ -98,12 +98,13 @@
     "max_controllers": 1,
     "config_file_relative_path": "user/config/qt-config.ini",
     "format": "ini",
+    "sdl_enumeration": "all",
     "controller_sections": [
       {
         "section_template": "Controls",
         "port_start": 1,
         "device_binding_pattern": "port:\\d+",
-        "device_binding_template": "port:{sdl_index_after_hidden}"
+        "device_binding_template": "port:{sdl_list_index}"
       }
     ]
   }

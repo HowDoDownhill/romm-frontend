@@ -3331,6 +3331,158 @@ Flycast also did **not** persist a port change made in its own UI — `emu.cfg` 
 shipped entry afterwards. Hand-fixing the ports is therefore not a workaround available to users, and
 writing them at launch is the only reliable route.
 
+### XInput pads pass through; only non-XInput pads get a virtual pad
+
+Windows has four XInput slots (`XUSER_MAX_COUNT`), and a virtual Xbox 360 pad from ViGEm takes one
+like real hardware. The original layer gave every player a virtual pad, so each Xbox player counted
+twice. Measured on 2026-10-17 with a Bluetooth Series pad, an Xbox One on the wireless adapter, a USB
+Xbox One and a Bluetooth Switch Pro:
+
+```
+XInput slot(s) [0, 1, 2] in use before creating virtual pads
+session started for 'ngc' with 4 virtual pad(s)
+virtual pads occupy XInput slot(s) [3]
+```
+
+Three of the four virtual pads never got a slot, and a pad without a slot is invisible to Godot, SDL
+and every emulator. Past four XInput devices Windows also chooses which ones keep a slot, so creating
+pads could take a slot away from a physical pad.
+
+The session now classifies each player by Godot's joypad info. SDL reports `xinput_index` for every
+XInput device, which makes the test exact:
+
+```
+{ "raw_name": "Xbox Series X Controller", "vendor_id": "1118", "product_id": "2835", "xinput_index": "2" }
+{ "raw_name": "Nintendo Switch Pro Controller", "vendor_id": "1406", "product_id": "8201", ... }
+```
+
+A pad with a slot is passed through and the emulator reads it directly. A pad without one gets a
+virtual pad, mapped as before. Slots used then equal players, so four players always fit. ViGEm is
+only needed when a non-XInput pad is a player; an all-Xbox session runs with the driver absent. The
+SDL allowlist names each passed-through pad's VID/PID next to the virtual pad's.
+
+The cost is that per-system remaps from `PlatformInputMappings` reach virtual pads only. An Xbox pad
+already has the layout the emulator configs expect, so the loss is limited to custom remaps.
+
+Steam Input falls out of the same rule. Inside a process Steam hooks, every pad is a Steam virtual
+pad (`28DE/11FF`) that reports an XInput slot, so all of them pass through and no ViGEm pad is made
+for Steam to wrap.
+
+### Device references come from probing the emulator's own SDL view
+
+The index macros were measured with only virtual pads visible, which made "player N is device N"
+true by construction. A mix of physical and virtual pads breaks that, and the measurements also
+showed the old rules were coincidences:
+
+| Old macro | What it really was | Broke when |
+|---|---|---|
+| `{sdl_index_after_hidden}` (PCSX2, DuckStation) | the SDL player index, which is the XInput slot | a Switch Pro was attached: we wrote `SDL-4/`, the pad was player index 3 |
+| `{sdl_index}` (Dolphin, melonDS, snes9x) | position in a list containing only our pads | any physical pad passed the filter |
+
+At launch the layer now runs `SdlEnumerationProbe`: a child PowerShell process started with the
+emulator's exact environment, loading the emulator's `SDL3.dll` or `SDL2.dll`. Being a child of the
+app, it is hooked by Steam the same way the emulator is. It returns the device list twice, with the
+launch filter and with the filter cleared through override-priority hints (SDL lets environment
+variables beat normal-priority hints). Each player is matched to a device by SDL player index, which
+SDL sets from the XInput slot, with VID/PID as the fallback.
+
+| Macro | Resolves to | Used by |
+|---|---|---|
+| `{xinput_index}`, `{sdl_player_index}` | the player's XInput slot | RetroArch; PCSX2, DuckStation |
+| `{sdl_list_index}` | the player's position in the probed list | melonDS, snes9x, Azahar, Flycast |
+| `{sdl_name_index}` + `{controller_name}` | name as the emulator's SDL reports it, and its occurrence among same-named devices | Dolphin |
+| `{controller_guid}` | the probed GUID | ares |
+
+`controller_config.sdl_enumeration: "all"` selects the unfiltered list for emulators that number
+filtered devices too (Flycast was seen listing four devices with two attached; Azahar wrote `port:2`
+with two physical pads). The old macro names remain as aliases.
+
+Dolphin, Flycast, melonDS, Azahar and snes9x link SDL statically, so the probe borrows another
+installed emulator's `SDL3.dll`. That assumes names and order match across SDL 3 releases. Dolphin
+was checked on 2026-10-17: four pads (three passed through, the Switch Pro on a virtual pad) each
+drove their own player in Super Smash Bros. Melee, with `SDL/0/Xbox One Controller` and
+`SDL/1/Xbox One Controller` telling apart two pads of the same model. The other four are unverified.
+
+The probe adds about two seconds to a launch and runs only when a config needs a probed macro.
+RetroArch, PCSX2 and DuckStation need only slots and skip it.
+
+Flycast's second section changed meaning with this. It used to push "the physical pads" to ports C
+and D by assuming they sat at the first indices. `other_devices: true` now assigns every probed
+device that is not a player to the next ports, and stale `maple_sdl_joystick_N` keys from earlier
+sessions are cleared first, since their indices may now name a different device.
+
+### Dolphin ports 2 to 4 had neither bindings nor a controller type
+
+The shipped `GCPadNew.ini` binds `[GCPad1]` only, and `Dolphin.ini` does not set `SIDevice1` to
+`SIDevice3`, which default to no controller. The layer wrote a `Device =` line into ports 2 to 4 and
+nothing else, so a second player had never worked in Dolphin.
+
+Two section options close it. `bindings_from_section: "GCPad1"` copies port one's bindings into a
+player's port when that port lacks them; Dolphin's SDL input names are the same for every gamepad,
+so they transfer unchanged, and a port with its own bindings keeps them. A section can name its own
+`config_file_relative_path`, which lets a `[Core]` section in `Dolphin.ini` set `SIDevice{port}` to
+6 (standard controller) for players and 0 for empty ports.
+
+### Our virtual pads are recognised by device ID and GUID together
+
+A Bluetooth Switch Pro sleeping mid-session freed Godot device ID 0, and the virtual pad created a
+moment later received it. The layer decided "ours" by asking whether the ID existed before the
+session, so it took the virtual pad for the sleeping physical one and counted it as a player in the
+next session. The pre-session set now holds `id:guid` pairs. A destroyed pad also stays marked as
+ours until its disconnect arrives, since two sessions in quick succession otherwise saw the old
+virtual pad as a physical one.
+
+### A new virtual pad's XInput slot can appear after the pad itself
+
+RetroArch logged `no new XInput slots appeared` on one launch, wrote no joypad index, and fell back
+to slot 0: the physical pad. Controls worked, which hid that the layer was bypassed. The slot is now
+re-measured on every poll of the enumeration wait, and the wait also continues until every virtual
+pad has a slot.
+
+### The controller report
+
+`--controller-report` on the command line (or in Steam's launch options) writes
+`user://logs/controller-report-<time>.md` after startup. For every installed emulator it starts a
+session, runs the probe, and checks each device reference the layer would write against the probed
+view, marking it OK, MISSING or WRONG DEVICE. It records whether Steam launched the app, whether the
+overlay is loaded in the app and in the probe, the pads Godot sees with bus, VID/PID, backend and
+XInput slot, and the XInput slots from both sides.
+
+Two reading notes. An Xbox pad read through XInput reports bus USB even over Bluetooth, so the bus
+column means something only for HIDAPI devices. Back-to-back sessions in a report reuse the virtual
+pad without a reconnect event, so the second session waits out the three-second enumeration limit;
+real launches are minutes apart.
+
+### Steam launches, measured
+
+Launched as a non-Steam shortcut, the app inherits `SteamAppId`, `SteamGameId`,
+`SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD=1` and an `SDL_GAMECONTROLLER_IGNORE_DEVICES` list
+that includes `0x045e/0x028e`, our virtual pad's identity. Every emulator inherits them in turn.
+`gameoverlayrenderer64.dll` was loaded in the app and in Dolphin, a child of the app, so Steam hooks
+the whole tree.
+
+With Steam Input off for Xbox pads the physical pad came through as itself and the layer worked.
+With it on, Godot saw the physical pad and our virtual pad both as `28DE/11FF`, and Dolphin reported
+no controller: we had written `SDL/0/Xbox 360 Controller`, a name that does not exist inside a hooked
+process.
+
+With passthrough and the probe, the same launch works. Steam wraps all four pads, the Switch Pro
+included, so every player passes through and no ViGEm pad is created:
+
+```
+Controller connected: Xbox One controller (GUID 0300fa67de280000ff11000000007801)
+Controller connected: #controller_xboxone (GUID 0300ba66de280000ff11000000007801)
+session started for 'ngc' with 4 player(s): 4 passed through, 0 on virtual pads.
+GCPad2/Device = SDL/0/#controller_xboxone
+```
+
+The names are Steam's, one of them an untranslated localisation token, which only a probe running
+inside the hook could have predicted. Godot's joypad info keeps the original VID/PID (`045E/02EA`
+for the USB Xbox One, which Steam reports under a different product ID) while the GUID carries
+`28DE/11FF`, so the launch log still identifies each physical pad. Those original IDs go into the
+allowlist; Steam's pads reach the emulator anyway through
+`SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD`.
+
 ### Android
 Building needs the .NET 9 SDK (the project targets net9.0 for Android) and the Android SDK with
 build-tools 36.1.0 and platform 36, matching Godot 4.7's template. The preset exports arm64 only.
